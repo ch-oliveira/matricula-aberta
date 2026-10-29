@@ -215,3 +215,4 @@ INSERT INTO ofertas (escola_id, etapa, periodo, vagas, capacidade, fila) VALUES
   ('emef-nosso-lar-tio-juca', 'fund1', 'parcial', 11, 130, 0),
   ('emef-nosso-lar-tio-juca', 'fund2', 'parcial', 7, 100, 0)
 ON CONFLICT (escola_id, etapa, periodo) DO NOTHING;
+
