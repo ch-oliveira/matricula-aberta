@@ -4,13 +4,13 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --no-warnings --watch --experimental-strip-types src/index.ts",
-    "start": "node --no-warnings --experimental-strip-types src/index.ts"
+    "dev": "node --no-warnings --watch --experimental-strip-types --experimental-sqlite src/index.ts",
+    "start": "node --no-warnings --experimental-strip-types --experimental-sqlite src/index.ts"
   },
   "dependencies": {
-    "pg": "^8.23.1"
+    "pg": "^8.13.1"
   },
   "devDependencies": {
-    "@types/pg": "^8.23.1"
+    "@types/pg": "^8.11.10"
   }
 }
