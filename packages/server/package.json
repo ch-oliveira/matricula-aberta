@@ -1,0 +1,16 @@
+{
+  "name": "@matricula-aberta/server",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --no-warnings --watch --experimental-strip-types src/index.ts",
+    "start": "node --no-warnings --experimental-strip-types src/index.ts"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
+  }
+}

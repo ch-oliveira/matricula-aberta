@@ -1,0 +1,11 @@
+{
+  "name": "Matrícula Aberta",
+  "short_name": "Matrícula",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF8EE",
+  "theme_color": "#5B3FD9",
+  "lang": "pt-BR",
+  "icons": []
+}
+

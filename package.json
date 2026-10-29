@@ -1,0 +1,15 @@
+{
+  "name": "matricula-aberta-monorepo",
+  "private": true,
+  "version": "2.0.0",
+  "description": "Monorepo Monolito Modular — Matrícula Aberta (Rede Municipal de Ensino de Patos - PB)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm --prefix packages/server run dev",
+    "dev:web": "npm --prefix packages/web run dev",
+    "build": "npm --prefix packages/web run build",
+    "start": "npm --prefix packages/server run start"
+  }
+}
