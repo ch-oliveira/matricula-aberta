@@ -9,7 +9,7 @@
   "scripts": {
     "dev:api": "npm --prefix packages/server run dev",
     "dev:web": "npm --prefix packages/web run dev",
-    "build": "npm --prefix packages/web run build",
+    "build": "npm --prefix packages/web run build && cp -r packages/web/dist ./dist",
     "start": "npm --prefix packages/server run start"
   }
 }
