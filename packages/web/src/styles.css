@@ -2989,7 +2989,7 @@ dialog:modal {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-inline-size: 440px;
+  max-inline-size: 460px;
   margin: 28px auto;
   padding: 28px;
   background: var(--surface);
@@ -2997,8 +2997,74 @@ dialog:modal {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
 }
+.login-card-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.login-card-topo canvas,
+.login-card-topo svg {
+  max-inline-size: 52px;
+  block-size: auto;
+}
 .login-emoji {
   font-size: 2.8rem;
+}
+.login-dica-homologacao {
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1.5px dashed var(--soft-line);
+  border-radius: var(--r-sm);
+  font-size: 0.82rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.login-dica-homologacao p {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.login-dica-homologacao strong {
+  color: var(--ink);
+}
+.login-dica-homologacao code {
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--soft-line);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  color: var(--primary);
+  font-weight: 700;
+}
+.campo-senha-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.campo-senha-container input {
+  inline-size: 100%;
+  padding-inline-end: 46px;
+}
+.btn-olho {
+  position: absolute;
+  inset-inline-end: 6px;
+  inline-size: 36px;
+  block-size: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+}
+.btn-olho:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.06);
 }
 .painel-cabecalho {
   display: flex;
@@ -3497,15 +3563,372 @@ dialog:modal {
   font-size: 1.22rem;
   font-weight: 900;
 }
+/* Controles e filtros da seção de Demanda Reprimida por Bairro */
+.demanda-bairro-bloco {
+  position: relative;
+}
+.demanda-controles-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-block-end: 4px;
+}
+.demanda-filtros-chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.chip-filtro:hover {
+  background: var(--surface);
+  transform: translateY(-1px);
+}
+.chip-filtro.ativo {
+  background: var(--ink);
+  color: var(--surface);
+  border-color: var(--ink);
+  box-shadow: var(--shadow-xs);
+}
+.chip-filtro.chip-critico.ativo {
+  background: var(--wait);
+  color: #ffffff;
+  border-color: var(--wait);
+}
+.chip-filtro.chip-atencao.ativo {
+  background: var(--warn);
+  color: #ffffff;
+  border-color: var(--warn);
+}
+.chip-filtro.chip-equilibrado.ativo {
+  background: var(--ok);
+  color: #ffffff;
+  border-color: var(--ok);
+}
+
+.demanda-alternador-modo {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-2);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+.btn-modo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-modo:hover {
+  color: var(--ink);
+}
+.btn-modo.ativo {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgba(23, 22, 37, 0.12);
+}
+
+/* Estado de filtro vazio */
+.demanda-vazio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 20px;
+  background: var(--bg);
+  border: 2px dashed var(--line);
+  border-radius: var(--r);
+  text-align: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* Gerenciamento de visibilidade: Auto, Cards e Tabela */
+.demanda-visualizacao-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Modo Auto: Mobile vê cards, Desktop vê tabela */
+@media (max-width: 768px) {
+  .demanda-visualizacao-container.modo-auto .demanda-cards-lista {
+    display: flex;
+  }
+  .demanda-visualizacao-container.modo-auto .tabela-responsiva {
+    display: none;
+  }
+  .demanda-alternador-modo .btn-modo.auto-cards {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(23, 22, 37, 0.12);
+  }
+}
+@media (min-width: 769px) {
+  .demanda-visualizacao-container.modo-auto .demanda-cards-lista {
+    display: none;
+  }
+  .demanda-visualizacao-container.modo-auto .tabela-responsiva {
+    display: block;
+  }
+  .demanda-alternador-modo .btn-modo.auto-tabela {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 3px rgba(23, 22, 37, 0.12);
+  }
+}
+
+/* Modo Forçado: Cards */
+.demanda-visualizacao-container.modo-cards .demanda-cards-lista {
+  display: flex;
+}
+.demanda-visualizacao-container.modo-cards .tabela-responsiva {
+  display: none;
+}
+
+/* Modo Forçado: Tabela */
+.demanda-visualizacao-container.modo-tabela .demanda-cards-lista {
+  display: none;
+}
+.demanda-visualizacao-container.modo-tabela .tabela-responsiva {
+  display: block;
+}
+
+/* Layout dos Cards de Bairro */
+.demanda-cards-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+@media (min-width: 900px) {
+  .demanda-visualizacao-container.modo-cards .demanda-cards-lista {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+.demanda-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: 2.5px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.demanda-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+.demanda-card-critico {
+  border-inline-start: 6px solid var(--wait);
+}
+.demanda-card-atencao {
+  border-inline-start: 6px solid var(--warn);
+}
+.demanda-card-equilibrado {
+  border-inline-start: 6px solid var(--ok);
+}
+
+.demanda-card-topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.demanda-card-identificacao {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.demanda-card-bairro {
+  margin: 0;
+  font-size: 1.14rem;
+  font-weight: 900;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.demanda-card-sub {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Balanço / Déficit líquido em destaque */
+.demanda-card-balanco {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--line);
+}
+.balanco-deficit {
+  background: var(--wait-bg);
+  border-color: rgba(180, 35, 24, 0.3);
+  color: var(--wait);
+}
+.balanco-ok {
+  background: var(--ok-bg);
+  border-color: rgba(15, 115, 71, 0.3);
+  color: var(--ok);
+}
+.balanco-badge-icone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.balanco-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.balanco-info strong {
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1.3;
+}
+.balanco-info small {
+  font-size: 0.77rem;
+  font-weight: 700;
+  opacity: 0.9;
+}
+
+/* Grid de métricas essenciais */
+.demanda-card-metricas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1.5px solid var(--soft-line);
+  border-radius: var(--r-sm);
+}
+.demanda-metrica-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.metrica-rotulo {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 800;
+  color: var(--muted);
+}
+.metrica-valor strong {
+  font-size: 1.05rem;
+  font-weight: 900;
+  color: var(--ink);
+}
+.metrica-valor small {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-inline-start: 2px;
+}
+
+/* Barra de Pressão da Demanda */
+.demanda-card-pressao-barra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-block-start: 2px;
+}
+.pressao-barra-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.pressao-barra-header strong {
+  color: var(--ink);
+}
+.pressao-barra-trilho {
+  inline-size: 100%;
+  block-size: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--soft-line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pressao-barra-preenchimento {
+  block-size: 100%;
+  border-radius: 999px;
+  transition: inline-size 0.3s ease;
+}
+.preenchimento-critico {
+  background: var(--wait);
+}
+.preenchimento-atencao {
+  background: var(--warn);
+}
+.preenchimento-equilibrado {
+  background: var(--ok);
+}
+
+/* Tabela Detalhada com Colunas e Headers Sticky (modern-web-guidance) */
 .tabela-responsiva {
   overflow-x: auto;
-  border: 2px solid var(--line);
+  border: 2.5px solid var(--line);
   border-radius: var(--r);
-  background: var(--bg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  container-type: inline-size;
+}
+.tabela-dica-rolagem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  border-block-end: 1.5px solid var(--soft-line);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
 }
 .tabela-secretaria {
   inline-size: 100%;
-  border-collapse: collapse;
+  min-inline-size: 640px;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: start;
   font-size: 0.92rem;
 }
@@ -3513,15 +3936,39 @@ dialog:modal {
 .tabela-secretaria td {
   padding: 12px 14px;
   border-block-end: 1.5px solid var(--soft-line);
+  vertical-align: middle;
 }
-.tabela-secretaria th {
+.tabela-secretaria thead th {
+  position: sticky;
+  inset-block-start: 0;
   background: var(--surface-2);
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   font-weight: 900;
+  z-index: 2;
+  border-block-end: 2px solid var(--line);
 }
-.tabela-secretaria tr:last-child td {
+
+/* Fixação da coluna Bairro */
+.tabela-secretaria th.th-bairro-sticky {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 4;
+  background: var(--surface-2);
+  box-shadow: 3px 0 6px -2px rgba(23, 22, 37, 0.12);
+}
+.tabela-secretaria th.celula-bairro-sticky {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 3;
+  background: var(--surface);
+  box-shadow: 3px 0 6px -2px rgba(23, 22, 37, 0.12);
+  text-align: start;
+  font-weight: normal;
+}
+.tabela-secretaria tr:last-child td,
+.tabela-secretaria tr:last-child th {
   border-block-end: 0;
 }
 .celula-sub {
@@ -3540,7 +3987,8 @@ dialog:modal {
 .pilula-pressao {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  gap: 5px;
+  padding: 4px 10px;
   border-radius: 999px;
   border: 1.5px solid var(--line);
   font-size: 0.78rem;
@@ -4737,6 +5185,79 @@ dialog:modal {
     font-size: 0.86rem;
   }
 
+  /* Painel de Gestão & Demanda por Bairro */
+  .secretaria-hero {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+  .sec-bloco {
+    padding: 14px 12px;
+    gap: 12px;
+    border-radius: var(--r);
+  }
+  .sec-bloco h2 {
+    font-size: 1.08rem;
+  }
+  .sec-bloco .legenda {
+    font-size: 0.84rem;
+    line-height: 1.4;
+  }
+  .demanda-controles-barra {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .demanda-filtros-chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .demanda-filtros-chips::-webkit-scrollbar {
+    display: none;
+  }
+  .chip-filtro {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+  .demanda-alternador-modo {
+    align-self: flex-start;
+  }
+  .demanda-card {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+  .demanda-card-bairro {
+    font-size: 1.05rem;
+  }
+  .demanda-card-metricas {
+    grid-template-columns: repeat(3, 1fr);
+    padding: 8px 6px;
+    gap: 4px;
+  }
+  .metrica-rotulo {
+    font-size: 0.66rem;
+  }
+  .metrica-valor strong {
+    font-size: 0.94rem;
+  }
+  .metrica-valor small {
+    font-size: 0.7rem;
+  }
+  .demanda-card-balanco {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .balanco-info strong {
+    font-size: 0.84rem;
+  }
+  .balanco-info small {
+    font-size: 0.74rem;
+  }
+
   /* Toasts & Bandeja */
   .toasts {
     inset-block-start: 8px;
@@ -4781,6 +5302,16 @@ dialog:modal {
   }
   .card-escola {
     padding: 10px 12px;
+  }
+  .demanda-card-topo {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .tabela-secretaria th,
+  .tabela-secretaria td {
+    padding: 10px 10px;
+    font-size: 0.86rem;
   }
 }
 

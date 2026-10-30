@@ -5,7 +5,7 @@ import { Ocupacao, StatusPill } from '../components/ui';
 import { ETAPAS, statusDaOferta } from '../domain/etapas';
 import { desatualizado, tempoRelativo } from '../domain/geo';
 import type { Escola, Oferta, PainelSecretariaDTO, ProtocoloVisita } from '../domain/types';
-import { useAgora, usePersistido } from '../hooks';
+import { useAgora } from '../hooks';
 import {
   useEscolas,
   useHistorico,
@@ -14,21 +14,61 @@ import {
   vagasStore,
 } from '../services/vagasStore';
 import { PALETTES } from '../stickers/fun';
-import { school } from '../stickers/icons';
+import { padlock, school } from '../stickers/icons';
 import { Sticker } from '../stickers/Sticker';
 
 export function Gestao() {
   const escolas = useEscolas();
   const painelSecretaria = usePainelSecretaria();
-  const [aba, setAba] = usePersistido<'unidade' | 'secretaria'>('ma:gestao:aba:v2', 'secretaria');
-  const [sessao, setSessao] = usePersistido<string | null>('ma:gestao:sessao:v2', 'creche-manoel-quinidio');
-  const escola = escolas.find((e) => e.id === sessao) ?? escolas[0];
+  const [aba, setAba] = useState<'secretaria' | 'unidade'>('secretaria');
 
-  useEffect(() => {
-    if (!sessao && escolas[0]) {
-      setSessao(escolas[0].id);
+  const [authSecretaria, setAuthSecretariaRaw] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('ma:gestao:auth:secretaria:v1') === 'true';
+    } catch {
+      return false;
     }
-  }, [escolas, sessao, setSessao]);
+  });
+
+  const [authUnidade, setAuthUnidadeRaw] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem('ma:gestao:auth:unidade:v1');
+    } catch {
+      return null;
+    }
+  });
+
+  const setAuthSecretaria = (val: boolean) => {
+    setAuthSecretariaRaw(val);
+    try {
+      if (val) sessionStorage.setItem('ma:gestao:auth:secretaria:v1', 'true');
+      else sessionStorage.removeItem('ma:gestao:auth:secretaria:v1');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const setAuthUnidade = (escolaId: string | null) => {
+    setAuthUnidadeRaw(escolaId);
+    try {
+      if (escolaId) sessionStorage.setItem('ma:gestao:auth:unidade:v1', escolaId);
+      else sessionStorage.removeItem('ma:gestao:auth:unidade:v1');
+    } catch {
+      /* ignore */
+    }
+  };
+
+  // Limpa legado de autologin antigo se existente
+  useEffect(() => {
+    try {
+      localStorage.removeItem('ma:gestao:sessao:v2');
+      localStorage.removeItem('ma:gestao:aba:v2');
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const escola = authUnidade ? escolas.find((e) => e.id === authUnidade) ?? null : null;
 
   return (
     <div className="gestao">
@@ -51,6 +91,7 @@ export function Gestao() {
               onClick={() => setAba('secretaria')}
             >
               <Icone nome="building" tamanho={16} /> Secretaria de Educação
+              {authSecretaria && <span className="ponto-vivo" title="Sessão autenticada ativa" />}
             </button>
             <button
               type="button"
@@ -58,10 +99,37 @@ export function Gestao() {
               onClick={() => setAba('unidade')}
             >
               <Icone nome="school" tamanho={16} /> Painel da Unidade
+              {authUnidade && <span className="ponto-vivo" title="Sessão autenticada ativa" />}
             </button>
           </nav>
 
           <div className="gestao-topo-acoes">
+            {aba === 'secretaria' && authSecretaria && (
+              <button
+                type="button"
+                className="btn btn-fantasma btn-pequeno"
+                onClick={() => {
+                  setAuthSecretaria(false);
+                  toast('Sessão da Secretaria de Educação encerrada.', { emoji: 'info', tom: 'info' });
+                }}
+              >
+                <Icone nome="x" tamanho={14} /> Sair da Secretaria
+              </button>
+            )}
+
+            {aba === 'unidade' && authUnidade && (
+              <button
+                type="button"
+                className="btn btn-fantasma btn-pequeno"
+                onClick={() => {
+                  setAuthUnidade(null);
+                  toast('Sessão da Unidade Escolar encerrada.', { emoji: 'info', tom: 'info' });
+                }}
+              >
+                <Icone nome="x" tamanho={14} /> Sair da Unidade
+              </button>
+            )}
+
             <a className="btn btn-secundario btn-pequeno" href="#">
               ← Voltar ao portal dos pais
             </a>
@@ -71,26 +139,49 @@ export function Gestao() {
 
       <main className="gestao-conteudo">
         {aba === 'secretaria' ? (
-          painelSecretaria ? (
-            <PainelMacroSecretaria
-              painel={painelSecretaria}
-              onAbrirUnidade={(id) => {
-                setSessao(id);
-                setAba('unidade');
+          authSecretaria ? (
+            painelSecretaria ? (
+              <PainelMacroSecretaria
+                painel={painelSecretaria}
+                onAbrirUnidade={(id) => {
+                  setAuthUnidade(id);
+                  setAba('unidade');
+                }}
+                onSair={() => {
+                  setAuthSecretaria(false);
+                  toast('Sessão da Secretaria encerrada com sucesso.', { emoji: 'info', tom: 'info' });
+                }}
+              />
+            ) : (
+              <p className="aviso-suave">Carregando indicadores da Secretaria Municipal de Educação de Patos - PB…</p>
+            )
+          ) : (
+            <LoginSecretaria
+              onEntrar={() => {
+                setAuthSecretaria(true);
+                toast('Bem-vindo à Secretaria Municipal de Educação de Patos - PB!', { emoji: 'check-circle', tom: 'ok' });
               }}
             />
-          ) : (
-            <p className="aviso-suave">Carregando indicadores da Secretaria Municipal de Educação de Patos - PB…</p>
           )
-        ) : escola ? (
+        ) : authUnidade && escola ? (
           <PainelUnidade
             escola={escola}
             escolas={escolas}
-            onTrocarEscola={(id) => setSessao(id)}
-            onSair={() => setSessao(null)}
+            onTrocarEscola={(id) => setAuthUnidade(id)}
+            onSair={() => {
+              setAuthUnidade(null);
+              toast('Sessão da Unidade encerrada.', { emoji: 'info', tom: 'info' });
+            }}
           />
         ) : (
-          <Login escolas={escolas} onEntrar={setSessao} />
+          <LoginUnidade
+            escolas={escolas}
+            onEntrar={(id) => {
+              setAuthUnidade(id);
+              const esc = escolas.find((e) => e.id === id);
+              toast(`Acesso liberado: ${esc?.nome ?? 'Unidade Escolar'}`, { emoji: 'check-circle', tom: 'ok' });
+            }}
+          />
         )}
       </main>
     </div>
@@ -100,12 +191,26 @@ export function Gestao() {
 function PainelMacroSecretaria({
   painel,
   onAbrirUnidade,
+  onSair,
 }: {
   painel: PainelSecretariaDTO;
   onAbrirUnidade: (id: string) => void;
+  onSair: () => void;
 }) {
   const agora = useAgora(15_000);
   const { kpis } = painel;
+  const [filtroPressao, setFiltroPressao] = useState<'todos' | 'critico' | 'atencao' | 'equilibrado'>('todos');
+  const [modoVisualizacao, setModoVisualizacao] = useState<'auto' | 'cards' | 'tabela'>('auto');
+
+  const totalBairros = painel.demandaPorBairro.length;
+  const totalCriticos = painel.demandaPorBairro.filter((b) => b.statusPressao === 'critico').length;
+  const totalAtencao = painel.demandaPorBairro.filter((b) => b.statusPressao === 'atencao').length;
+  const totalEquilibrados = painel.demandaPorBairro.filter((b) => b.statusPressao === 'equilibrado').length;
+
+  const bairrosFiltrados =
+    filtroPressao === 'todos'
+      ? painel.demandaPorBairro
+      : painel.demandaPorBairro.filter((b) => b.statusPressao === filtroPressao);
 
   return (
     <div className="secretaria-grid">
@@ -128,6 +233,14 @@ function PainelMacroSecretaria({
             }}
           >
             <Icone nome="refresh" tamanho={15} /> Restaurar cenários de Patos-PB
+          </button>
+          <button
+            type="button"
+            className="btn btn-fantasma btn-pequeno"
+            onClick={onSair}
+            title="Encerrar sessão de gestão da Secretaria"
+          >
+            <Icone nome="x" tamanho={14} /> Sair da Secretaria
           </button>
         </div>
       </section>
@@ -156,7 +269,7 @@ function PainelMacroSecretaria({
       </section>
 
       {/* Ranking de Demanda Reprimida por Bairro de Patos - PB */}
-      <section className="sec-bloco" aria-labelledby="t-demanda-bairros">
+      <section className="sec-bloco demanda-bairro-bloco" aria-labelledby="t-demanda-bairros">
         <div className="sec-bloco-topo">
           <div>
             <h2 id="t-demanda-bairros">
@@ -169,66 +282,251 @@ function PainelMacroSecretaria({
           </div>
         </div>
 
-        <div className="tabela-responsiva">
-          <table className="tabela-secretaria">
-            <thead>
-              <tr>
-                <th>Bairro (Patos - PB)</th>
-                <th>Unidades</th>
-                <th>Vagas livres</th>
-                <th>
-                  Fila + Alertas <Icone nome="bell" tamanho={14} />
-                </th>
-                <th>Déficit líquido</th>
-                <th>Situação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {painel.demandaPorBairro.map((b) => (
-                <tr key={b.bairro}>
-                  <td>
-                    <strong>{b.bairro}</strong>
-                    <small className="celula-sub">{b.zona}</small>
-                  </td>
-                  <td>{b.unidades}</td>
-                  <td>
-                    <strong>{b.vagasLivres}</strong> <small className="celula-sub">/ {b.capacidadeTotal}</small>
-                  </td>
-                  <td>
-                    <strong>{b.demandaReprimida}</strong>{' '}
-                    <small className="celula-sub">
-                      ({b.filaEspera} fila · {b.alertasAtivos} alertas)
-                    </small>
-                  </td>
-                  <td>
-                    {b.deficitVagas > 0 ? (
-                      <strong className="texto-perigo">−{b.deficitVagas} vagas</strong>
-                    ) : (
-                      <span className="texto-ok">Suprido</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`pilula-pressao pressao-${b.statusPressao}`}>
-                      {b.statusPressao === 'critico' ? (
+        {/* Controles: Filtros por nível de pressão e alternador Cards / Tabela */}
+        <div className="demanda-controles-barra">
+          <div className="demanda-filtros-chips" role="tablist" aria-label="Filtrar bairros por nível de pressão">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filtroPressao === 'todos'}
+              className={`chip-filtro ${filtroPressao === 'todos' ? 'ativo' : ''}`}
+              onClick={() => setFiltroPressao('todos')}
+            >
+              Todos ({totalBairros})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filtroPressao === 'critico'}
+              className={`chip-filtro chip-critico ${filtroPressao === 'critico' ? 'ativo' : ''}`}
+              onClick={() => setFiltroPressao('critico')}
+            >
+              <Icone nome="alert-triangle" tamanho={12} /> Alta pressão ({totalCriticos})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filtroPressao === 'atencao'}
+              className={`chip-filtro chip-atencao ${filtroPressao === 'atencao' ? 'ativo' : ''}`}
+              onClick={() => setFiltroPressao('atencao')}
+            >
+              <Icone nome="bolt" tamanho={12} /> Em atenção ({totalAtencao})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filtroPressao === 'equilibrado'}
+              className={`chip-filtro chip-equilibrado ${filtroPressao === 'equilibrado' ? 'ativo' : ''}`}
+              onClick={() => setFiltroPressao('equilibrado')}
+            >
+              <Icone nome="check-circle" tamanho={12} /> Equilibrado ({totalEquilibrados})
+            </button>
+          </div>
+
+          <div className="demanda-alternador-modo" role="group" aria-label="Modo de visualização do quadro">
+            <button
+              type="button"
+              className={`btn-modo ${modoVisualizacao === 'cards' ? 'ativo' : modoVisualizacao === 'auto' ? 'auto-cards' : ''}`}
+              onClick={() => setModoVisualizacao('cards')}
+              title="Exibir em formato de cards"
+            >
+              Cards
+            </button>
+            <button
+              type="button"
+              className={`btn-modo ${modoVisualizacao === 'tabela' ? 'ativo' : modoVisualizacao === 'auto' ? 'auto-tabela' : ''}`}
+              onClick={() => setModoVisualizacao('tabela')}
+              title="Exibir em tabela detalhada"
+            >
+              <Icone nome="list" tamanho={13} /> Tabela
+            </button>
+          </div>
+        </div>
+
+        {bairrosFiltrados.length === 0 ? (
+          <div className="demanda-vazio">
+            <p>Nenhum bairro cadastrado com esta situação no momento.</p>
+            <button
+              type="button"
+              className="btn btn-secundario btn-pequeno"
+              onClick={() => setFiltroPressao('todos')}
+            >
+              Ver todos os bairros de Patos
+            </button>
+          </div>
+        ) : (
+          <div className={`demanda-visualizacao-container modo-${modoVisualizacao}`}>
+            {/* Visualização em Cards (Mobile First / Opcional no Desktop) */}
+            <div className="demanda-cards-lista" role="feed" aria-label="Lista de demanda por bairro">
+              {bairrosFiltrados.map((b) => {
+                const totalFluxo = b.vagasLivres + b.demandaReprimida;
+                const pressaoPct = totalFluxo > 0 ? Math.min(100, Math.round((b.demandaReprimida / totalFluxo) * 100)) : 0;
+                return (
+                  <article key={b.bairro} className={`demanda-card demanda-card-${b.statusPressao}`}>
+                    <div className="demanda-card-topo">
+                      <div className="demanda-card-identificacao">
+                        <h3 className="demanda-card-bairro">{b.bairro}</h3>
+                        <span className="demanda-card-sub">
+                          {b.zona} · {b.unidades} {b.unidades === 1 ? 'unidade escolar' : 'unidades escolares'}
+                        </span>
+                      </div>
+                      <span className={`pilula-pressao pressao-${b.statusPressao}`}>
+                        {b.statusPressao === 'critico' ? (
+                          <>
+                            <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
+                          </>
+                        ) : b.statusPressao === 'atencao' ? (
+                          <>
+                            <Icone nome="bolt" tamanho={13} /> Em atenção
+                          </>
+                        ) : (
+                          <>
+                            <Icone nome="check-circle" tamanho={13} /> Equilibrado
+                          </>
+                        )}
+                      </span>
+                    </div>
+
+                    {/* Destaque do Balanço / Déficit Líquido */}
+                    <div className={`demanda-card-balanco ${b.deficitVagas > 0 ? 'balanco-deficit' : 'balanco-ok'}`}>
+                      {b.deficitVagas > 0 ? (
                         <>
-                          <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
-                        </>
-                      ) : b.statusPressao === 'atencao' ? (
-                        <>
-                          <Icone nome="bolt" tamanho={13} /> Em atenção
+                          <span className="balanco-badge-icone">
+                            <Icone nome="alert-triangle" tamanho={16} />
+                          </span>
+                          <div className="balanco-info">
+                            <strong>Déficit líquido de −{b.deficitVagas} {b.deficitVagas === 1 ? 'vaga' : 'vagas'}</strong>
+                            <small>Fila ({b.filaEspera}) e alertas ({b.alertasAtivos}) superam as vagas livres</small>
+                          </div>
                         </>
                       ) : (
                         <>
-                          <Icone nome="check-circle" tamanho={13} /> Equilibrado
+                          <span className="balanco-badge-icone">
+                            <Icone nome="check-circle" tamanho={16} />
+                          </span>
+                          <div className="balanco-info">
+                            <strong>Oferta equilibrada ({b.vagasLivres} vagas livres)</strong>
+                            <small>Capacidade local atende à fila e aos alertas ativos</small>
+                          </div>
                         </>
                       )}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+
+                    {/* Grid de métricas do bairro */}
+                    <div className="demanda-card-metricas">
+                      <div className="demanda-metrica-bloco">
+                        <span className="metrica-rotulo">Vagas Livres</span>
+                        <span className="metrica-valor">
+                          <strong>{b.vagasLivres}</strong>
+                          <small>/ {b.capacidadeTotal}</small>
+                        </span>
+                      </div>
+                      <div className="demanda-metrica-bloco">
+                        <span className="metrica-rotulo">Fila de Espera</span>
+                        <span className="metrica-valor">
+                          <strong>{b.filaEspera}</strong>
+                          <small>crianças</small>
+                        </span>
+                      </div>
+                      <div className="demanda-metrica-bloco">
+                        <span className="metrica-rotulo">Alertas WhatsApp</span>
+                        <span className="metrica-valor">
+                          <strong>{b.alertasAtivos}</strong>
+                          <small><Icone nome="bell" tamanho={11} /> ativos</small>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Barra de Pressão da Demanda */}
+                    <div className="demanda-card-pressao-barra" title={`Pressão da demanda reprimida: ${pressaoPct}%`}>
+                      <div className="pressao-barra-header">
+                        <span>Pressão da Demanda</span>
+                        <strong>{pressaoPct}%</strong>
+                      </div>
+                      <div className="pressao-barra-trilho">
+                        <div
+                          className={`pressao-barra-preenchimento preenchimento-${b.statusPressao}`}
+                          style={{ inlineSize: `${pressaoPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            {/* Visualização em Tabela com Primeira Coluna Sticky */}
+            <div
+              tabIndex={0}
+              role="region"
+              aria-labelledby="t-demanda-bairros"
+              className="tabela-responsiva"
+            >
+              <div className="tabela-dica-rolagem" aria-hidden="true">
+                <Icone nome="compass" tamanho={13} />
+                <span>Deslize horizontalmente para conferir todas as colunas</span>
+              </div>
+              <table className="tabela-secretaria">
+                <thead>
+                  <tr>
+                    <th scope="col" className="th-bairro-sticky">Bairro (Patos - PB)</th>
+                    <th scope="col">Unidades</th>
+                    <th scope="col">Vagas livres</th>
+                    <th scope="col">
+                      Fila + Alertas <Icone nome="bell" tamanho={14} />
+                    </th>
+                    <th scope="col">Déficit líquido</th>
+                    <th scope="col">Situação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bairrosFiltrados.map((b) => (
+                    <tr key={b.bairro}>
+                      <th scope="row" className="celula-bairro-sticky">
+                        <strong>{b.bairro}</strong>
+                        <small className="celula-sub">{b.zona}</small>
+                      </th>
+                      <td>{b.unidades}</td>
+                      <td>
+                        <strong>{b.vagasLivres}</strong> <small className="celula-sub">/ {b.capacidadeTotal}</small>
+                      </td>
+                      <td>
+                        <strong>{b.demandaReprimida}</strong>{' '}
+                        <small className="celula-sub">
+                          ({b.filaEspera} fila · {b.alertasAtivos} alertas)
+                        </small>
+                      </td>
+                      <td>
+                        {b.deficitVagas > 0 ? (
+                          <strong className="texto-perigo">−{b.deficitVagas} vagas</strong>
+                        ) : (
+                          <span className="texto-ok">Suprido</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`pilula-pressao pressao-${b.statusPressao}`}>
+                          {b.statusPressao === 'critico' ? (
+                            <>
+                              <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
+                            </>
+                          ) : b.statusPressao === 'atencao' ? (
+                            <>
+                              <Icone nome="bolt" tamanho={13} /> Em atenção
+                            </>
+                          ) : (
+                            <>
+                              <Icone nome="check-circle" tamanho={13} /> Equilibrado
+                            </>
+                          )}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Balanço por Etapa de Ensino e Unidades em Atenção */}
@@ -356,8 +654,8 @@ function PainelUnidade({
             <Icone nome={velho ? 'alert-triangle' : 'check-circle'} tamanho={15} /> Atualizado{' '}
             {tempoRelativo(escola.atualizadoEm, agora)}
           </div>
-          <button type="button" className="btn btn-fantasma btn-pequeno" onClick={onSair}>
-            Trocar PIN
+          <button type="button" className="btn btn-fantasma btn-pequeno" onClick={onSair} title="Encerrar sessão desta unidade escolar">
+            <Icone nome="x" tamanho={14} /> Sair da Unidade
           </button>
         </div>
       </section>
@@ -549,33 +847,211 @@ function PainelUnidade({
   );
 }
 
-function Login({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id: string) => void }) {
-  const [id, setId] = useState(escolas[0]?.id ?? '');
-  const [pin, setPin] = useState('1234');
+function LoginSecretaria({ onEntrar }: { onEntrar: () => void }) {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  const emailId = useId();
+  const senhaId = useId();
+  const erroId = useId();
+
+  function enviar(e: FormEvent) {
+    e.preventDefault();
+    const emailLimpo = email.trim().toLowerCase();
+    const senhaLimpa = senha.trim();
+
+    if (!emailLimpo) {
+      setErro('Informe o e-mail institucional ou usuário da Secretaria.');
+      return;
+    }
+    if (!senhaLimpa) {
+      setErro('Digite sua senha de acesso.');
+      return;
+    }
+
+    const emailValido =
+      emailLimpo === 'secretaria@patos.pb.gov.br' ||
+      emailLimpo === 'admin' ||
+      emailLimpo === 'seduc' ||
+      emailLimpo === 'gestor.seduc@patos.pb.gov.br' ||
+      emailLimpo.endsWith('@patos.pb.gov.br');
+
+    const senhaValida =
+      senhaLimpa === 'patos2026' ||
+      senhaLimpa === 'seduc2026' ||
+      senhaLimpa === 'admin123' ||
+      senhaLimpa === '1234';
+
+    if (!emailValido || !senhaValida) {
+      setErro('Credenciais não autorizadas. Verifique o e-mail e a senha de acesso da SEDUC.');
+      return;
+    }
+
+    onEntrar();
+  }
+
+  return (
+    <form className="login-card" onSubmit={enviar} noValidate>
+      <div className="login-card-topo">
+        <Sticker icon={padlock} palette={PALETTES.clay} loop={false} replayOnHover style={{ width: 56 }} />
+        <span className="lp-tag">Acesso Restrito · SEDUC</span>
+      </div>
+
+      <h1>Secretaria de Educação</h1>
+      <p className="legenda">
+        Painel exclusivo de gestão, alocação de vagas e auditoria municipal de Patos - PB. Exige credenciais autorizadas.
+      </p>
+
+      <div className="campo">
+        <label htmlFor={emailId}>E-mail institucional ou Usuário</label>
+        <input
+          id={emailId}
+          name="username"
+          type="email"
+          autoComplete="username"
+          required
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          enterKeyHint="next"
+          placeholder="ex: secretaria@patos.pb.gov.br"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setErro(null);
+          }}
+          aria-describedby={erro ? erroId : undefined}
+          aria-invalid={erro ? true : undefined}
+        />
+      </div>
+
+      <div className="campo">
+        <label htmlFor={senhaId}>Senha de acesso</label>
+        <div className="campo-senha-container">
+          <input
+            id={senhaId}
+            name="password"
+            type={mostrarSenha ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            enterKeyHint="done"
+            placeholder="••••••••"
+            value={senha}
+            onChange={(e) => {
+              setSenha(e.target.value);
+              setErro(null);
+            }}
+            aria-describedby={erro ? erroId : undefined}
+            aria-invalid={erro ? true : undefined}
+          />
+          <button
+            type="button"
+            className="btn-olho"
+            onClick={() => setMostrarSenha((v) => !v)}
+            aria-label={mostrarSenha ? 'Ocultar senha' : 'Ver senha'}
+            title={mostrarSenha ? 'Ocultar senha' : 'Ver senha'}
+          >
+            <Icone nome={mostrarSenha ? 'stop' : 'scale'} tamanho={16} />
+          </button>
+        </div>
+      </div>
+
+      {erro && (
+        <p id={erroId} className="erro-campo" role="alert">
+          <Icone nome="alert-triangle" tamanho={16} /> {erro}
+        </p>
+      )}
+
+      <button type="submit" className="btn btn-primario btn-largo">
+        Entrar na Secretaria de Educação <span aria-hidden="true">→</span>
+      </button>
+
+      <div className="login-dica-homologacao">
+        <p>
+          <strong>Credenciais oficiais de teste (SEDUC Patos-PB):</strong>
+          <br />
+          E-mail: <code>secretaria@patos.pb.gov.br</code>
+          <br />
+          Senha: <code>patos2026</code>
+        </p>
+        <button
+          type="button"
+          className="btn btn-fantasma btn-pequeno"
+          onClick={() => {
+            setEmail('secretaria@patos.pb.gov.br');
+            setSenha('patos2026');
+            setErro(null);
+          }}
+        >
+          Preencher credenciais de teste
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id: string) => void }) {
+  const [escolaId, setEscolaId] = useState(escolas[0]?.id ?? '');
+  const [gestor, setGestor] = useState('');
+  const [pin, setPin] = useState('');
+  const [mostrarPin, setMostrarPin] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
   const selId = useId();
+  const gestorId = useId();
   const pinId = useId();
   const erroId = useId();
 
   function enviar(e: FormEvent) {
     e.preventDefault();
-    if (!/^\d{4}$/.test(pin)) {
-      setErro('O PIN tem 4 números (Demonstração: qualquer PIN de 4 dígitos, ex. 1234).');
+    const idAlvo = escolaId || escolas[0]?.id;
+    const gestorLimpo = gestor.trim();
+    const pinLimpo = pin.trim();
+
+    if (!idAlvo) {
+      setErro('Selecione uma unidade escolar.');
       return;
     }
-    onEntrar(id || escolas[0]?.id);
+    if (!gestorLimpo) {
+      setErro('Informe o e-mail ou matrícula funcional do gestor.');
+      return;
+    }
+    if (!pinLimpo) {
+      setErro('Informe o PIN de 4 dígitos da unidade escolar.');
+      return;
+    }
+
+    const pinValido =
+      pinLimpo === '2026' ||
+      pinLimpo === '1234' ||
+      pinLimpo === 'patos2026' ||
+      pinLimpo === 'escola123';
+
+    if (!pinValido) {
+      setErro('PIN de segurança incorreto para esta unidade escolar. Tente 2026 ou 1234.');
+      return;
+    }
+
+    onEntrar(idAlvo);
   }
 
   return (
     <form className="login-card" onSubmit={enviar} noValidate>
-      <p className="login-emoji" aria-hidden="true">
-        <Icone nome="school" tamanho={40} />
+      <div className="login-card-topo">
+        <Sticker icon={school} palette={PALETTES.riso} loop={false} replayOnHover style={{ width: 56 }} />
+        <span className="lp-tag">Acesso da Unidade Escolar</span>
+      </div>
+
+      <h1>Painel da Unidade Escolar</h1>
+      <p className="legenda">
+        Acesso restrito para gestão de vagas da creche ou escola e atendimento presencial com QR Code.
       </p>
-      <h1>Acesso da Unidade · Patos - PB</h1>
-      <p className="legenda">Selecione a creche ou escola municipal de Patos - PB para gerenciar suas vagas e protocolos.</p>
+
       <div className="campo">
         <label htmlFor={selId}>Unidade escolar de Patos - PB</label>
-        <select id={selId} name="unidade" value={id} onChange={(e) => setId(e.target.value)}>
+        <select id={selId} name="unidade" value={escolaId} onChange={(e) => setEscolaId(e.target.value)}>
           {escolas.map((e) => (
             <option key={e.id} value={e.id}>
               {e.nome} — {e.bairro}
@@ -583,32 +1059,93 @@ function Login({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id: string
           ))}
         </select>
       </div>
+
       <div className="campo">
-        <label htmlFor={pinId}>PIN do servidor (4 dígitos)</label>
+        <label htmlFor={gestorId}>E-mail institucional ou Matrícula do Gestor</label>
         <input
-          id={pinId}
-          name="pin"
-          type="password"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={4}
-          value={pin}
+          id={gestorId}
+          name="username"
+          type="text"
+          autoComplete="username"
+          required
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          enterKeyHint="next"
+          placeholder="ex: gestor@patos.pb.gov.br ou matrícula"
+          value={gestor}
           onChange={(e) => {
-            setPin(e.target.value.replace(/\D/g, ''));
+            setGestor(e.target.value);
             setErro(null);
           }}
           aria-describedby={erro ? erroId : undefined}
-          placeholder="••••"
+          aria-invalid={erro ? true : undefined}
         />
-        {erro && (
-          <p id={erroId} className="erro-campo" role="alert">
-            <Icone nome="alert-triangle" tamanho={16} /> {erro}
-          </p>
-        )}
       </div>
+
+      <div className="campo">
+        <label htmlFor={pinId}>PIN de segurança da Unidade</label>
+        <div className="campo-senha-container">
+          <input
+            id={pinId}
+            name="password"
+            type={mostrarPin ? 'text' : 'password'}
+            inputMode="numeric"
+            autoComplete="current-password"
+            required
+            maxLength={8}
+            enterKeyHint="done"
+            placeholder="••••"
+            value={pin}
+            onChange={(e) => {
+              setPin(e.target.value);
+              setErro(null);
+            }}
+            aria-describedby={erro ? erroId : undefined}
+            aria-invalid={erro ? true : undefined}
+          />
+          <button
+            type="button"
+            className="btn-olho"
+            onClick={() => setMostrarPin((v) => !v)}
+            aria-label={mostrarPin ? 'Ocultar PIN' : 'Ver PIN'}
+            title={mostrarPin ? 'Ocultar PIN' : 'Ver PIN'}
+          >
+            <Icone nome={mostrarPin ? 'stop' : 'scale'} tamanho={16} />
+          </button>
+        </div>
+      </div>
+
+      {erro && (
+        <p id={erroId} className="erro-campo" role="alert">
+          <Icone nome="alert-triangle" tamanho={16} /> {erro}
+        </p>
+      )}
+
       <button type="submit" className="btn btn-primario btn-largo">
-        Entrar no painel da unidade
+        Entrar no painel da unidade <span aria-hidden="true">→</span>
       </button>
+
+      <div className="login-dica-homologacao">
+        <p>
+          <strong>Credenciais oficiais de teste (Unidade Escolar):</strong>
+          <br />
+          Gestor: <code>gestor@patos.pb.gov.br</code>
+          <br />
+          PIN da Unidade: <code>2026</code>
+        </p>
+        <button
+          type="button"
+          className="btn btn-fantasma btn-pequeno"
+          onClick={() => {
+            setGestor('gestor@patos.pb.gov.br');
+            setPin('2026');
+            setErro(null);
+          }}
+        >
+          Preencher credenciais de teste
+        </button>
+      </div>
     </form>
   );
 }
