@@ -199,18 +199,6 @@ function PainelMacroSecretaria({
 }) {
   const agora = useAgora(15_000);
   const { kpis } = painel;
-  const [filtroPressao, setFiltroPressao] = useState<'todos' | 'critico' | 'atencao' | 'equilibrado'>('todos');
-  const [modoVisualizacao, setModoVisualizacao] = useState<'auto' | 'cards' | 'tabela'>('auto');
-
-  const totalBairros = painel.demandaPorBairro.length;
-  const totalCriticos = painel.demandaPorBairro.filter((b) => b.statusPressao === 'critico').length;
-  const totalAtencao = painel.demandaPorBairro.filter((b) => b.statusPressao === 'atencao').length;
-  const totalEquilibrados = painel.demandaPorBairro.filter((b) => b.statusPressao === 'equilibrado').length;
-
-  const bairrosFiltrados =
-    filtroPressao === 'todos'
-      ? painel.demandaPorBairro
-      : painel.demandaPorBairro.filter((b) => b.statusPressao === filtroPressao);
 
   return (
     <div className="secretaria-grid">
@@ -282,251 +270,83 @@ function PainelMacroSecretaria({
           </div>
         </div>
 
-        {/* Controles: Filtros por nível de pressão e alternador Cards / Tabela */}
-        <div className="demanda-controles-barra">
-          <div className="demanda-filtros-chips" role="tablist" aria-label="Filtrar bairros por nível de pressão">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filtroPressao === 'todos'}
-              className={`chip-filtro ${filtroPressao === 'todos' ? 'ativo' : ''}`}
-              onClick={() => setFiltroPressao('todos')}
-            >
-              Todos ({totalBairros})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filtroPressao === 'critico'}
-              className={`chip-filtro chip-critico ${filtroPressao === 'critico' ? 'ativo' : ''}`}
-              onClick={() => setFiltroPressao('critico')}
-            >
-              <Icone nome="alert-triangle" tamanho={12} /> Alta pressão ({totalCriticos})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filtroPressao === 'atencao'}
-              className={`chip-filtro chip-atencao ${filtroPressao === 'atencao' ? 'ativo' : ''}`}
-              onClick={() => setFiltroPressao('atencao')}
-            >
-              <Icone nome="bolt" tamanho={12} /> Em atenção ({totalAtencao})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filtroPressao === 'equilibrado'}
-              className={`chip-filtro chip-equilibrado ${filtroPressao === 'equilibrado' ? 'ativo' : ''}`}
-              onClick={() => setFiltroPressao('equilibrado')}
-            >
-              <Icone nome="check-circle" tamanho={12} /> Equilibrado ({totalEquilibrados})
-            </button>
-          </div>
-
-          <div className="demanda-alternador-modo" role="group" aria-label="Modo de visualização do quadro">
-            <button
-              type="button"
-              className={`btn-modo ${modoVisualizacao === 'cards' ? 'ativo' : modoVisualizacao === 'auto' ? 'auto-cards' : ''}`}
-              onClick={() => setModoVisualizacao('cards')}
-              title="Exibir em formato de cards"
-            >
-              Cards
-            </button>
-            <button
-              type="button"
-              className={`btn-modo ${modoVisualizacao === 'tabela' ? 'ativo' : modoVisualizacao === 'auto' ? 'auto-tabela' : ''}`}
-              onClick={() => setModoVisualizacao('tabela')}
-              title="Exibir em tabela detalhada"
-            >
-              <Icone nome="list" tamanho={13} /> Tabela
-            </button>
-          </div>
-        </div>
-
-        {bairrosFiltrados.length === 0 ? (
-          <div className="demanda-vazio">
-            <p>Nenhum bairro cadastrado com esta situação no momento.</p>
-            <button
-              type="button"
-              className="btn btn-secundario btn-pequeno"
-              onClick={() => setFiltroPressao('todos')}
-            >
-              Ver todos os bairros de Patos
-            </button>
-          </div>
-        ) : (
-          <div className={`demanda-visualizacao-container modo-${modoVisualizacao}`}>
-            {/* Visualização em Cards (Mobile First / Opcional no Desktop) */}
-            <div className="demanda-cards-lista" role="feed" aria-label="Lista de demanda por bairro">
-              {bairrosFiltrados.map((b) => {
-                const totalFluxo = b.vagasLivres + b.demandaReprimida;
-                const pressaoPct = totalFluxo > 0 ? Math.min(100, Math.round((b.demandaReprimida / totalFluxo) * 100)) : 0;
-                return (
-                  <article key={b.bairro} className={`demanda-card demanda-card-${b.statusPressao}`}>
-                    <div className="demanda-card-topo">
-                      <div className="demanda-card-identificacao">
-                        <h3 className="demanda-card-bairro">{b.bairro}</h3>
-                        <span className="demanda-card-sub">
-                          {b.zona} · {b.unidades} {b.unidades === 1 ? 'unidade escolar' : 'unidades escolares'}
-                        </span>
-                      </div>
-                      <span className={`pilula-pressao pressao-${b.statusPressao}`}>
-                        {b.statusPressao === 'critico' ? (
-                          <>
-                            <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
-                          </>
-                        ) : b.statusPressao === 'atencao' ? (
-                          <>
-                            <Icone nome="bolt" tamanho={13} /> Em atenção
-                          </>
-                        ) : (
-                          <>
-                            <Icone nome="check-circle" tamanho={13} /> Equilibrado
-                          </>
-                        )}
-                      </span>
-                    </div>
-
-                    {/* Destaque do Balanço / Déficit Líquido */}
-                    <div className={`demanda-card-balanco ${b.deficitVagas > 0 ? 'balanco-deficit' : 'balanco-ok'}`}>
-                      {b.deficitVagas > 0 ? (
+        <div className="tabela-quadro-container" role="region" aria-labelledby="t-demanda-bairros">
+          <table className="tabela-secretaria tabela-demanda-quadro">
+            <thead>
+              <tr>
+                <th scope="col" className="col-bairro">Bairro (Patos - PB)</th>
+                <th scope="col" className="col-unidades">Unidades</th>
+                <th scope="col" className="col-vagas">Vagas livres</th>
+                <th scope="col" className="col-fila">
+                  Fila + Alertas <Icone nome="bell" tamanho={13} />
+                </th>
+                <th scope="col" className="col-deficit">Déficit líquido</th>
+                <th scope="col" className="col-situacao">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {painel.demandaPorBairro.map((b) => (
+                <tr key={b.bairro} className={`linha-${b.statusPressao}`}>
+                  <td className="col-bairro">
+                    <strong>{b.bairro}</strong>
+                    <small className="celula-sub">
+                      {b.zona}
+                      <span className="sub-unidades-inline"> · {b.unidades} {b.unidades === 1 ? 'unid.' : 'unid.'}</span>
+                    </small>
+                  </td>
+                  <td className="col-unidades">{b.unidades}</td>
+                  <td className="col-vagas">
+                    <strong>{b.vagasLivres}</strong>
+                    <small className="celula-sub">/ {b.capacidadeTotal}</small>
+                  </td>
+                  <td className="col-fila">
+                    <strong>{b.demandaReprimida}</strong>{' '}
+                    <small className="celula-sub celula-fila-detalhe">
+                      ({b.filaEspera} fila · {b.alertasAtivos} alertas)
+                    </small>
+                    <small className="celula-sub celula-fila-compacta">
+                      ({b.filaEspera}f · {b.alertasAtivos}🔔)
+                    </small>
+                  </td>
+                  <td className="col-deficit">
+                    {b.deficitVagas > 0 ? (
+                      <strong className="texto-perigo">−{b.deficitVagas} vagas</strong>
+                    ) : (
+                      <span className="texto-ok">Suprido</span>
+                    )}
+                  </td>
+                  <td className="col-situacao">
+                    <span className={`pilula-pressao pressao-${b.statusPressao} pilula-desktop`}>
+                      {b.statusPressao === 'critico' ? (
                         <>
-                          <span className="balanco-badge-icone">
-                            <Icone nome="alert-triangle" tamanho={16} />
-                          </span>
-                          <div className="balanco-info">
-                            <strong>Déficit líquido de −{b.deficitVagas} {b.deficitVagas === 1 ? 'vaga' : 'vagas'}</strong>
-                            <small>Fila ({b.filaEspera}) e alertas ({b.alertasAtivos}) superam as vagas livres</small>
-                          </div>
+                          <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
+                        </>
+                      ) : b.statusPressao === 'atencao' ? (
+                        <>
+                          <Icone nome="bolt" tamanho={13} /> Em atenção
                         </>
                       ) : (
                         <>
-                          <span className="balanco-badge-icone">
-                            <Icone nome="check-circle" tamanho={16} />
-                          </span>
-                          <div className="balanco-info">
-                            <strong>Oferta equilibrada ({b.vagasLivres} vagas livres)</strong>
-                            <small>Capacidade local atende à fila e aos alertas ativos</small>
-                          </div>
+                          <Icone nome="check-circle" tamanho={13} /> Equilibrado
                         </>
                       )}
+                    </span>
+                    <div className="celula-situacao-mobile">
+                      {b.deficitVagas > 0 ? (
+                        <span className="badge-saldo-mobile saldo-critico">−{b.deficitVagas} vagas</span>
+                      ) : (
+                        <span className="badge-saldo-mobile saldo-suprido">Suprido</span>
+                      )}
+                      <small className={`status-sub-mobile status-${b.statusPressao}`}>
+                        {b.statusPressao === 'critico' ? 'Alta pressão' : b.statusPressao === 'atencao' ? 'Em atenção' : 'Equilibrado'}
+                      </small>
                     </div>
-
-                    {/* Grid de métricas do bairro */}
-                    <div className="demanda-card-metricas">
-                      <div className="demanda-metrica-bloco">
-                        <span className="metrica-rotulo">Vagas Livres</span>
-                        <span className="metrica-valor">
-                          <strong>{b.vagasLivres}</strong>
-                          <small>/ {b.capacidadeTotal}</small>
-                        </span>
-                      </div>
-                      <div className="demanda-metrica-bloco">
-                        <span className="metrica-rotulo">Fila de Espera</span>
-                        <span className="metrica-valor">
-                          <strong>{b.filaEspera}</strong>
-                          <small>crianças</small>
-                        </span>
-                      </div>
-                      <div className="demanda-metrica-bloco">
-                        <span className="metrica-rotulo">Alertas WhatsApp</span>
-                        <span className="metrica-valor">
-                          <strong>{b.alertasAtivos}</strong>
-                          <small><Icone nome="bell" tamanho={11} /> ativos</small>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Barra de Pressão da Demanda */}
-                    <div className="demanda-card-pressao-barra" title={`Pressão da demanda reprimida: ${pressaoPct}%`}>
-                      <div className="pressao-barra-header">
-                        <span>Pressão da Demanda</span>
-                        <strong>{pressaoPct}%</strong>
-                      </div>
-                      <div className="pressao-barra-trilho">
-                        <div
-                          className={`pressao-barra-preenchimento preenchimento-${b.statusPressao}`}
-                          style={{ inlineSize: `${pressaoPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-
-            {/* Visualização em Tabela com Primeira Coluna Sticky */}
-            <div
-              tabIndex={0}
-              role="region"
-              aria-labelledby="t-demanda-bairros"
-              className="tabela-responsiva"
-            >
-              <div className="tabela-dica-rolagem" aria-hidden="true">
-                <Icone nome="compass" tamanho={13} />
-                <span>Deslize horizontalmente para conferir todas as colunas</span>
-              </div>
-              <table className="tabela-secretaria">
-                <thead>
-                  <tr>
-                    <th scope="col" className="th-bairro-sticky">Bairro (Patos - PB)</th>
-                    <th scope="col">Unidades</th>
-                    <th scope="col">Vagas livres</th>
-                    <th scope="col">
-                      Fila + Alertas <Icone nome="bell" tamanho={14} />
-                    </th>
-                    <th scope="col">Déficit líquido</th>
-                    <th scope="col">Situação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bairrosFiltrados.map((b) => (
-                    <tr key={b.bairro}>
-                      <th scope="row" className="celula-bairro-sticky">
-                        <strong>{b.bairro}</strong>
-                        <small className="celula-sub">{b.zona}</small>
-                      </th>
-                      <td>{b.unidades}</td>
-                      <td>
-                        <strong>{b.vagasLivres}</strong> <small className="celula-sub">/ {b.capacidadeTotal}</small>
-                      </td>
-                      <td>
-                        <strong>{b.demandaReprimida}</strong>{' '}
-                        <small className="celula-sub">
-                          ({b.filaEspera} fila · {b.alertasAtivos} alertas)
-                        </small>
-                      </td>
-                      <td>
-                        {b.deficitVagas > 0 ? (
-                          <strong className="texto-perigo">−{b.deficitVagas} vagas</strong>
-                        ) : (
-                          <span className="texto-ok">Suprido</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`pilula-pressao pressao-${b.statusPressao}`}>
-                          {b.statusPressao === 'critico' ? (
-                            <>
-                              <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
-                            </>
-                          ) : b.statusPressao === 'atencao' ? (
-                            <>
-                              <Icone nome="bolt" tamanho={13} /> Em atenção
-                            </>
-                          ) : (
-                            <>
-                              <Icone nome="check-circle" tamanho={13} /> Equilibrado
-                            </>
-                          )}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* Balanço por Etapa de Ensino e Unidades em Atenção */}
