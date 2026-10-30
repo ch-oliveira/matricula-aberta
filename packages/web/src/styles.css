@@ -64,6 +64,20 @@ html {
   scroll-padding-block: 88px 40px;
 }
 
+@media (max-width: 760px) {
+  html {
+    scroll-padding-block: 92px 20px;
+  }
+  .lp-secao,
+  .palco-etapa,
+  .lp-hero-wrapper,
+  section[id],
+  h1[id],
+  h2[id] {
+    scroll-margin-top: 94px;
+  }
+}
+
 body {
   margin: 0;
   font-family: var(--font);
@@ -76,6 +90,7 @@ body {
     var(--bg);
   background-attachment: fixed;
   min-height: 100dvh;
+  overflow-x: hidden;
 }
 
 h1,
@@ -311,16 +326,84 @@ h1:focus {
 }
 
 @media (max-width: 760px) {
+  .topo {
+    border-block-end-width: 1.5px;
+  }
   .topo-interno {
-    padding: 8px 14px;
+    padding: 6px 12px;
+    gap: 8px 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+  .marca {
+    gap: 8px;
+    min-inline-size: 0;
+  }
+  .marca-sticker,
+  .marca-icone {
+    inline-size: 34px;
+    block-size: 34px;
+    border-radius: 9px;
+    border-width: 1.5px;
+  }
+  .marca-sticker canvas,
+  .marca-sticker svg {
+    max-inline-size: 26px;
+    block-size: auto;
+  }
+  .marca-nome {
+    font-size: 0.96rem;
+    line-height: 1.1;
+    min-inline-size: 0;
+  }
+  .marca-nome small {
+    font-size: 0.65rem;
+    margin-block-start: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topo-acoes {
+    gap: 6px;
+    justify-self: end;
+  }
+  .topo-grupo-acess {
+    padding: 2px;
+    gap: 2px;
+    border-width: 1.5px;
+  }
+  .btn-barra {
+    min-block-size: 34px;
+    min-inline-size: 34px;
+    padding-inline: 7px;
+    font-size: 0.78rem;
+  }
+  .btn-topo {
+    min-block-size: 34px;
+    min-inline-size: 34px;
+    padding-inline: 8px;
+    font-size: 0.8rem;
+    border-width: 1.5px;
+  }
+  .btn-barra-protocolo {
+    font-size: 0.74rem;
+    padding-inline: 8px;
+    min-block-size: 32px;
   }
   .topo-nav {
+    grid-column: 1 / -1;
     order: 3;
     inline-size: 100%;
+    padding: 2px;
+    gap: 2px;
+    border-width: 1.5px;
   }
   .nav-link {
     flex: 1;
+    min-block-size: 34px;
     padding-inline: 10px;
+    font-size: 0.84rem;
   }
   .rotulo-topo {
     display: none;
@@ -337,7 +420,7 @@ h1:focus {
 
 @media (max-width: 640px) {
   .conteudo-container {
-    padding: 14px 14px 40px;
+    padding: 10px 12px 36px;
   }
 }
 
@@ -4032,4 +4115,673 @@ dialog:modal {
 .titulo-emoji .ma-icone {
   vertical-align: middle;
 }
+
+/* ==========================================================================
+   OTIMIZAÇÃO MOBILE (max-width: 640px)
+   Espaçamentos equilibrados, tipografia proporcional e ergonomia touch
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  /* --- Landing Page --- */
+  .landing {
+    gap: 22px;
+  }
+  .lp-secao {
+    gap: 14px;
+    scroll-margin-top: 94px;
+  }
+  .lp-hero-wrapper {
+    border-width: 2px;
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+  }
+  .lp-hero {
+    padding: 16px 14px 14px;
+    gap: 14px;
+  }
+  .lp-hero-texto {
+    gap: 12px;
+  }
+  .lp-selo-vivo {
+    font-size: 0.76rem;
+    padding: 3px 10px;
+    gap: 6px;
+  }
+  .lp-hero-texto h1 {
+    font-size: clamp(1.36rem, 5.8vw, 1.72rem);
+    line-height: 1.15;
+  }
+  .lp-grifo {
+    padding-inline: 6px;
+    border-radius: 8px;
+    border-width: 1.5px;
+  }
+  .lp-subtitulo {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .lp-cta-linha {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 8px;
+  }
+  .btn-hero {
+    min-block-size: 48px;
+    width: 100%;
+    font-size: 0.96rem;
+    padding-inline: 16px;
+    justify-content: center;
+  }
+  .lp-cta-linha .btn-secundario {
+    min-block-size: 42px;
+    width: 100%;
+    font-size: 0.88rem;
+    justify-content: center;
+  }
+  .lp-garantias {
+    gap: 6px 12px;
+    font-size: 0.78rem;
+    margin: 2px 0 0;
+  }
+  .lp-check {
+    inline-size: 18px;
+    block-size: 18px;
+    font-size: 0.68rem;
+  }
+  .lp-hero-ilustracao {
+    padding-block: 0 4px;
+  }
+  .dupla3d-palco {
+    max-inline-size: 240px;
+    margin-inline: auto;
+  }
+  .dupla3d-svg {
+    max-block-size: 200px;
+  }
+  .dupla3d-dica {
+    font-size: 0.72rem;
+    margin-block-start: -4px;
+  }
+
+  /* Faixa de etapas no rodapé do hero */
+  .lp-faixa-etapas {
+    padding: 14px 12px 16px;
+    gap: 10px;
+    border-block-start-width: 1.5px;
+  }
+  .lp-faixa-topo {
+    gap: 4px;
+  }
+  .lp-faixa-topo h2 {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+  .lp-faixa-dica {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+  }
+  .lp-etapas-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .lp-etapa-card {
+    padding: 10px 10px 8px;
+    gap: 4px;
+    border-radius: var(--r-sm);
+    border-block-start-width: 5px;
+  }
+  .lp-etapa-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .lp-etapa-card-topo strong {
+    font-size: 0.86rem;
+  }
+  .lp-etapa-card-topo small {
+    font-size: 0.72rem;
+  }
+  .lp-etapa-icone {
+    font-size: 1.15rem;
+  }
+  .lp-etapa-card-rodape {
+    font-size: 0.72rem;
+    padding-block-start: 2px;
+  }
+  .lp-etapa-vagas-pill {
+    font-size: 0.7rem;
+    padding: 1px 6px;
+  }
+
+  /* Seção "Como funciona em 3 passos" */
+  .lp-secao-cabecalho {
+    gap: 4px;
+  }
+  .lp-secao-cabecalho h2 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+  .lp-tag {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+  }
+  .lp-passos-grade {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .lp-passo-card {
+    padding: 14px 12px;
+    gap: 6px;
+    border-radius: var(--r-sm);
+  }
+  .lp-passo-num {
+    inline-size: 30px;
+    block-size: 30px;
+    font-size: 0.82rem;
+    border-radius: 8px;
+  }
+  .lp-passo-sticker {
+    margin-block: -4px -2px;
+  }
+  .lp-passo-sticker canvas,
+  .lp-passo-sticker svg {
+    max-inline-size: 46px;
+    block-size: auto;
+  }
+  .lp-passo-card h3 {
+    font-size: 1rem;
+  }
+  .lp-passo-card p {
+    font-size: 0.86rem;
+    line-height: 1.4;
+  }
+
+  /* CTA Lateral + FAQ */
+  .lp-rodape-duplo {
+    gap: 16px;
+  }
+  .lp-cta-lateral {
+    padding: 16px 14px;
+    gap: 10px;
+    border-radius: var(--r-sm);
+    border-width: 2px;
+  }
+  .lp-cta-lateral-topo {
+    gap: 8px;
+  }
+  .lp-cta-lateral-topo canvas,
+  .lp-cta-lateral-topo svg {
+    max-inline-size: 44px;
+    block-size: auto;
+  }
+  .lp-cta-lateral h2 {
+    font-size: 1.22rem;
+  }
+  .lp-cta-lateral p {
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+  .lp-cta-final-botoes {
+    gap: 8px;
+  }
+  .lp-cta-final-botoes .btn {
+    min-block-size: 44px;
+    font-size: 0.92rem;
+  }
+  .lp-faq-coluna {
+    gap: 10px;
+  }
+  .lp-faq-coluna h2 {
+    font-size: 1.22rem;
+  }
+  .lp-faq {
+    gap: 8px;
+  }
+  .lp-faq-item {
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+  }
+  .lp-faq-item summary {
+    font-size: 0.92rem;
+    gap: 8px;
+  }
+  .lp-faq-item summary::after {
+    inline-size: 24px;
+    block-size: 24px;
+    font-size: 0.85rem;
+    border-width: 1.5px;
+  }
+  .lp-faq-item p {
+    font-size: 0.86rem;
+    line-height: 1.42;
+    margin-block-start: 8px;
+    padding-block-start: 8px;
+  }
+
+  /* Rodapé */
+  .rodape {
+    padding: 16px 12px calc(18px + env(safe-area-inset-bottom));
+  }
+  .rodape-interno {
+    font-size: 0.8rem;
+    gap: 10px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .rodape-credito {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    margin-block-start: 4px;
+  }
+  .rodape-links {
+    gap: 6px 12px;
+    flex-wrap: wrap;
+  }
+  .link-sutil {
+    font-size: 0.82rem;
+    padding: 4px 6px;
+    min-block-size: 32px;
+  }
+
+  /* --- Wizard de Consulta: Stepper & Palco --- */
+  .stepper {
+    padding: 6px 6px;
+    border-radius: var(--r-sm);
+  }
+  .stepper ol {
+    gap: 3px;
+  }
+  .passo button {
+    flex-direction: column;
+    text-align: center;
+    gap: 3px;
+    padding: 4px 2px;
+    border-radius: 8px;
+    min-block-size: 42px;
+    justify-content: center;
+  }
+  .passo-bolha {
+    inline-size: 26px;
+    block-size: 26px;
+    font-size: 0.74rem;
+    border-radius: 8px;
+    border-width: 1.5px;
+  }
+  .passo-rotulo {
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+  .passo-desc {
+    display: none;
+  }
+
+  .palco-etapa {
+    padding: 14px 12px;
+    gap: 14px;
+    border-radius: var(--r-sm);
+    border-width: 2px;
+    box-shadow: var(--shadow);
+  }
+  .etapa {
+    gap: 14px;
+  }
+  .titulo-etapa {
+    gap: 8px;
+    padding-block-end: 10px;
+  }
+  .titulo-sticker canvas,
+  .titulo-sticker svg {
+    max-inline-size: 40px;
+    block-size: auto;
+  }
+  .titulo-emoji {
+    font-size: 1.5rem;
+  }
+  .titulo-textos h1 {
+    font-size: 1.22rem;
+    line-height: 1.15;
+  }
+  .titulo-textos p {
+    font-size: 0.84rem;
+    line-height: 1.38;
+  }
+  .btn-ouvir {
+    min-block-size: 34px;
+    padding-inline: 10px;
+    font-size: 0.8rem;
+  }
+
+  /* Etapa 1: Quem vai estudar? */
+  .campo {
+    gap: 4px;
+  }
+  .campo label {
+    font-size: 0.88rem;
+  }
+  .campo input,
+  .campo select {
+    min-block-size: 46px;
+    padding: 8px 12px;
+    font-size: 0.94rem;
+    border-radius: var(--r-sm);
+  }
+  .atalhos-idade-container {
+    gap: 6px;
+  }
+  .atalhos-idade-rotulo {
+    font-size: 0.8rem;
+  }
+  .atalhos-idade-grade {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .btn-atalho-idade {
+    width: 100%;
+    padding: 7px 8px;
+    font-size: 0.78rem;
+    gap: 4px;
+    justify-content: space-between;
+    box-shadow: 1.5px 1.5px 0 var(--line);
+    border-radius: 9px;
+    min-block-size: 38px;
+  }
+  .btn-atalho-idade:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .btn-atalho-idade strong {
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .btn-atalho-idade small {
+    font-size: 0.68rem;
+    padding: 1px 5px;
+    white-space: nowrap;
+  }
+
+  .grade-etapas {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .grade-etapas legend {
+    font-size: 0.82rem;
+    margin-block-end: 6px;
+  }
+  .chip-etapa {
+    padding: 8px 10px;
+    gap: 3px;
+    border-radius: var(--r-sm);
+    border-width: 1.5px;
+  }
+  .chip-etapa:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .chip-etapa-emoji {
+    font-size: 1.22rem;
+  }
+  .chip-etapa-nome {
+    font-size: 0.88rem;
+  }
+  .chip-etapa-faixa {
+    font-size: 0.72rem;
+  }
+  .chip-etapa-vagas {
+    margin-block-start: 2px;
+    gap: 2px;
+  }
+  .chip-etapa-vagas small {
+    font-size: 0.7rem;
+  }
+
+  /* Barra de Navegação Inferior (Thumb-first) */
+  .barra-acao {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding-block-start: 12px;
+    margin-block-start: 2px;
+  }
+  .barra-acao .btn {
+    width: 100%;
+    min-block-size: 46px;
+    justify-content: center;
+    font-size: 0.94rem;
+    padding-inline: 14px;
+  }
+  .barra-acao .btn-fantasma {
+    min-block-size: 38px;
+    font-size: 0.86rem;
+    box-shadow: none;
+  }
+
+  /* Painéis Laterais Compactados no Mobile */
+  .consulta-lateral {
+    position: static;
+    gap: 8px;
+    margin-block-start: 4px;
+  }
+  .painel-resumo,
+  .painel-familia {
+    padding: 10px 12px;
+    gap: 6px;
+    border-radius: var(--r-sm);
+    border-width: 1.5px;
+    box-shadow: var(--shadow-sm);
+  }
+  .painel-resumo-topo,
+  .painel-familia-topo {
+    gap: 8px;
+  }
+  .painel-resumo-topo canvas,
+  .painel-resumo-topo svg,
+  .painel-familia-topo canvas,
+  .painel-familia-topo svg {
+    max-inline-size: 30px;
+    block-size: auto;
+  }
+  .painel-resumo-topo h2,
+  .painel-familia-topo h3 {
+    font-size: 0.9rem;
+  }
+  .painel-resumo-topo p,
+  .painel-familia-topo p {
+    font-size: 0.72rem;
+  }
+  .resumo-lista {
+    gap: 4px;
+  }
+  .resumo-lista > div {
+    padding: 5px 8px;
+    border-radius: 6px;
+  }
+  .resumo-lista dt {
+    font-size: 0.66rem;
+  }
+  .resumo-lista dd {
+    font-size: 0.82rem;
+  }
+  .resumo-lista dd small {
+    font-size: 0.72rem;
+  }
+  .painel-familia-texto {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  .painel-familia .btn {
+    min-block-size: 36px;
+    font-size: 0.82rem;
+    padding-inline: 10px;
+  }
+
+  /* Etapa 2: Bairro & Filtros */
+  .chips {
+    gap: 6px;
+  }
+  .chip span {
+    min-block-size: 40px;
+    padding: 6px 12px;
+    font-size: 0.86rem;
+  }
+
+  /* Etapa 3: Vagas */
+  .placar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--r-sm);
+  }
+  .placar-principal {
+    justify-content: space-between;
+    align-items: center;
+  }
+  .placar-numero {
+    font-size: 2rem;
+  }
+  .placar-rotulo {
+    font-size: 0.82rem;
+  }
+  .placar-semaforo {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    text-align: center;
+    font-size: 0.76rem;
+    padding: 0;
+  }
+  .placar-semaforo li {
+    padding: 6px 4px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--soft-line);
+    justify-content: center;
+  }
+  .barra-ferramentas {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .segmentado {
+    width: 100%;
+  }
+  .segmentado label {
+    flex: 1;
+    min-block-size: 38px;
+    justify-content: center;
+    font-size: 0.84rem;
+  }
+
+  /* Card da Escola */
+  .card-escola {
+    padding: 12px 14px;
+    gap: 8px;
+    border-radius: var(--r-sm);
+    border-inline-start-width: 7px;
+  }
+  .card-topo {
+    gap: 10px;
+  }
+  .card-avatar {
+    inline-size: 38px;
+    block-size: 38px;
+    font-size: 1.22rem;
+    border-radius: 10px;
+  }
+  .card-nome h2,
+  .card-nome h3 {
+    font-size: 1.02rem;
+  }
+  .card-nome p {
+    font-size: 0.82rem;
+  }
+  .card-numero {
+    font-size: 0.94rem;
+  }
+  .card-acoes {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card-acoes .btn {
+    width: 100%;
+    min-block-size: 44px;
+  }
+  .btn-comparar > span {
+    min-block-size: 38px;
+    justify-content: center;
+    width: 100%;
+    font-size: 0.82rem;
+  }
+
+  /* Etapa 4: Visita & Protocolo */
+  .card-escolhida {
+    border-radius: var(--r-sm);
+    padding: 12px;
+  }
+  .protocolo-bilhete {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    padding: 12px;
+    gap: 12px;
+  }
+  .protocolo-qr-svg {
+    inline-size: 110px;
+    block-size: 110px;
+  }
+  .protocolo-codigo-destaque {
+    font-size: 1.35rem;
+  }
+  .checklist-item {
+    min-block-size: 44px;
+    padding: 8px 10px;
+    gap: 8px;
+    font-size: 0.86rem;
+  }
+
+  /* Toasts & Bandeja */
+  .toasts {
+    inset-block-start: 8px;
+    padding-inline: 8px;
+  }
+  .toast {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    border-radius: var(--r-sm);
+    max-inline-size: 94vw;
+  }
+  .bandeja-comparar {
+    padding: 8px 12px;
+    gap: 8px;
+    border-radius: var(--r-sm);
+    font-size: 0.84rem;
+    inset-block-end: calc(10px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 480px) {
+  .marca-nome small {
+    display: none;
+  }
+  .conteudo-container {
+    padding: 8px 10px 32px;
+  }
+  .palco-etapa {
+    padding: 12px 10px;
+  }
+  .lp-hero {
+    padding: 14px 10px 12px;
+  }
+  .lp-hero-texto h1 {
+    font-size: 1.32rem;
+  }
+  .lp-faixa-etapas {
+    padding: 12px 10px 14px;
+  }
+  .lp-passo-card {
+    padding: 12px 10px;
+  }
+  .card-escola {
+    padding: 10px 12px;
+  }
+}
+
 
