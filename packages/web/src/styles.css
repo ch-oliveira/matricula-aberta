@@ -3630,18 +3630,6 @@ dialog:modal {
   font-weight: 700;
   margin-block-start: 1px;
 }
-.sub-unidades-inline {
-  display: none;
-}
-.celula-fila-compacta {
-  display: none;
-}
-.celula-situacao-mobile {
-  display: none;
-}
-.pilula-desktop {
-  display: inline-flex;
-}
 .texto-perigo {
   color: var(--wait);
   font-weight: 900;
@@ -3674,30 +3662,64 @@ dialog:modal {
   color: var(--ok);
 }
 
-/* Adaptação Inteligente do Quadro para Telas Menores e Mobile */
+/* Visibilidade Desktop vs Mobile para o Quadro */
+.vis-mobile {
+  display: none !important;
+}
+.vis-desktop {
+  display: block;
+}
+span.vis-desktop,
+strong.vis-desktop {
+  display: inline;
+}
+th.vis-desktop,
+td.vis-desktop {
+  display: table-cell;
+}
+
+/* Adaptação Estrita do Quadro para Telas Menores e Mobile */
 @media (max-width: 680px) {
+  .tabela-quadro-container {
+    overflow-x: hidden;
+  }
   .tabela-demanda-quadro {
     table-layout: fixed;
     inline-size: 100%;
     min-inline-size: 0;
-    font-size: 0.85rem;
+    max-inline-size: 100%;
+    font-size: 0.84rem;
   }
   .tabela-demanda-quadro th,
   .tabela-demanda-quadro td {
-    padding: 10px 6px;
+    padding: 8px 4px;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .tabela-demanda-quadro thead th {
-    font-size: 0.69rem;
-    padding: 8px 6px;
+    font-size: 0.68rem;
+    padding: 7px 4px;
   }
 
-  /* No mobile, colunas 'Unidades' e 'Déficit líquido' são incorporadas nas adjacentes */
-  .tabela-demanda-quadro .col-unidades,
-  .tabela-demanda-quadro .col-deficit {
-    display: none;
+  /* Visibilidade alternada */
+  .vis-desktop {
+    display: none !important;
+  }
+  .vis-mobile {
+    display: block !important;
+  }
+  span.vis-mobile,
+  strong.vis-mobile {
+    display: inline !important;
+  }
+  .celula-situacao-mobile.vis-mobile {
+    display: flex !important;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
   }
 
-  /* Proporções compactas para caber 100% da tela sem rolagem horizontal */
+  /* 4 colunas estritas sem overflow */
   .tabela-demanda-quadro .col-bairro {
     inline-size: 38%;
   }
@@ -3711,33 +3733,18 @@ dialog:modal {
     inline-size: 24%;
   }
 
-  .sub-unidades-inline {
-    display: inline;
-    font-weight: 600;
-  }
-  .celula-fila-detalhe {
-    display: none;
-  }
-  .celula-fila-compacta {
+  .nome-bairro {
+    font-size: 0.88rem;
+    line-height: 1.2;
     display: block;
-    font-size: 0.72rem;
-  }
-  .pilula-desktop {
-    display: none;
-  }
-  .celula-situacao-mobile {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
   }
   .badge-saldo-mobile {
     display: inline-block;
-    padding: 2px 6px;
-    border-radius: 6px;
-    font-size: 0.78rem;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.74rem;
     font-weight: 900;
-    line-height: 1.2;
+    line-height: 1.25;
     white-space: nowrap;
   }
   .badge-saldo-mobile.saldo-critico {
@@ -3752,7 +3759,7 @@ dialog:modal {
   }
   .status-sub-mobile {
     display: block;
-    font-size: 0.68rem;
+    font-size: 0.66rem;
     font-weight: 800;
     white-space: nowrap;
   }
@@ -3765,42 +3772,6 @@ dialog:modal {
   .status-sub-mobile.status-equilibrado {
     color: var(--ok);
   }
-}
-.celula-sub {
-  display: block;
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-.texto-perigo {
-  color: var(--wait);
-}
-.texto-ok {
-  color: var(--ok);
-  font-weight: 800;
-}
-.pilula-pressao {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1.5px solid var(--line);
-  font-size: 0.78rem;
-  font-weight: 900;
-  white-space: nowrap;
-}
-.pressao-critico {
-  background: var(--wait-bg);
-  color: var(--wait);
-}
-.pressao-atencao {
-  background: var(--warn-bg);
-  color: var(--warn);
-}
-.pressao-equilibrado {
-  background: var(--ok-bg);
-  color: var(--ok);
 }
 
 .secretaria-duas-colunas {
@@ -4981,12 +4952,19 @@ dialog:modal {
   }
 
   /* Painel de Gestão & Demanda por Bairro */
+  .gestao {
+    padding: 0 8px 40px;
+  }
+  .gestao-topo-interno {
+    gap: 10px;
+    padding-block: 4px;
+  }
   .secretaria-hero {
     padding: 16px 14px;
     gap: 12px;
   }
   .sec-bloco {
-    padding: 14px 10px;
+    padding: 12px 8px;
     gap: 10px;
     border-radius: var(--r);
   }
@@ -4994,8 +4972,26 @@ dialog:modal {
     font-size: 1.05rem;
   }
   .sec-bloco .legenda {
-    font-size: 0.82rem;
-    line-height: 1.38;
+    font-size: 0.8rem;
+    line-height: 1.36;
+  }
+  .login-card {
+    padding: 18px 14px;
+    margin: 12px auto;
+    border-radius: var(--r);
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .login-card-topo {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .login-card-topo .lp-tag {
+    font-size: 0.72rem;
+    padding: 3px 8px;
+    white-space: normal;
+    text-align: right;
+    max-width: 75%;
   }
 
   /* Toasts & Bandeja */

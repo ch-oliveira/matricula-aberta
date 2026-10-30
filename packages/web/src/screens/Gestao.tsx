@@ -274,13 +274,20 @@ function PainelMacroSecretaria({
           <table className="tabela-secretaria tabela-demanda-quadro">
             <thead>
               <tr>
-                <th scope="col" className="col-bairro">Bairro (Patos - PB)</th>
-                <th scope="col" className="col-unidades">Unidades</th>
-                <th scope="col" className="col-vagas">Vagas livres</th>
-                <th scope="col" className="col-fila">
-                  Fila + Alertas <Icone nome="bell" tamanho={13} />
+                <th scope="col" className="col-bairro">
+                  <span className="vis-desktop">Bairro (Patos - PB)</span>
+                  <span className="vis-mobile">Bairro</span>
                 </th>
-                <th scope="col" className="col-deficit">Déficit líquido</th>
+                <th scope="col" className="col-unidades vis-desktop">Unidades</th>
+                <th scope="col" className="col-vagas">
+                  <span className="vis-desktop">Vagas livres</span>
+                  <span className="vis-mobile">Vagas</span>
+                </th>
+                <th scope="col" className="col-fila">
+                  <span className="vis-desktop">Fila + Alertas <Icone nome="bell" tamanho={13} /></span>
+                  <span className="vis-mobile">Demanda <Icone nome="bell" tamanho={11} /></span>
+                </th>
+                <th scope="col" className="col-deficit vis-desktop">Déficit líquido</th>
                 <th scope="col" className="col-situacao">Situação</th>
               </tr>
             </thead>
@@ -288,27 +295,27 @@ function PainelMacroSecretaria({
               {painel.demandaPorBairro.map((b) => (
                 <tr key={b.bairro} className={`linha-${b.statusPressao}`}>
                   <td className="col-bairro">
-                    <strong>{b.bairro}</strong>
+                    <strong className="nome-bairro">{b.bairro}</strong>
                     <small className="celula-sub">
                       {b.zona}
-                      <span className="sub-unidades-inline"> · {b.unidades} {b.unidades === 1 ? 'unid.' : 'unid.'}</span>
+                      <span className="vis-mobile"> · {b.unidades} unid.</span>
                     </small>
                   </td>
-                  <td className="col-unidades">{b.unidades}</td>
+                  <td className="col-unidades vis-desktop">{b.unidades}</td>
                   <td className="col-vagas">
                     <strong>{b.vagasLivres}</strong>
                     <small className="celula-sub">/ {b.capacidadeTotal}</small>
                   </td>
                   <td className="col-fila">
-                    <strong>{b.demandaReprimida}</strong>{' '}
-                    <small className="celula-sub celula-fila-detalhe">
+                    <strong>{b.demandaReprimida}</strong>
+                    <small className="celula-sub vis-desktop">
                       ({b.filaEspera} fila · {b.alertasAtivos} alertas)
                     </small>
-                    <small className="celula-sub celula-fila-compacta">
-                      ({b.filaEspera}f · {b.alertasAtivos}🔔)
+                    <small className="celula-sub vis-mobile">
+                      {b.filaEspera} fila · {b.alertasAtivos}🔔
                     </small>
                   </td>
-                  <td className="col-deficit">
+                  <td className="col-deficit vis-desktop">
                     {b.deficitVagas > 0 ? (
                       <strong className="texto-perigo">−{b.deficitVagas} vagas</strong>
                     ) : (
@@ -316,22 +323,24 @@ function PainelMacroSecretaria({
                     )}
                   </td>
                   <td className="col-situacao">
-                    <span className={`pilula-pressao pressao-${b.statusPressao} pilula-desktop`}>
-                      {b.statusPressao === 'critico' ? (
-                        <>
-                          <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
-                        </>
-                      ) : b.statusPressao === 'atencao' ? (
-                        <>
-                          <Icone nome="bolt" tamanho={13} /> Em atenção
-                        </>
-                      ) : (
-                        <>
-                          <Icone nome="check-circle" tamanho={13} /> Equilibrado
-                        </>
-                      )}
-                    </span>
-                    <div className="celula-situacao-mobile">
+                    <div className="vis-desktop">
+                      <span className={`pilula-pressao pressao-${b.statusPressao}`}>
+                        {b.statusPressao === 'critico' ? (
+                          <>
+                            <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
+                          </>
+                        ) : b.statusPressao === 'atencao' ? (
+                          <>
+                            <Icone nome="bolt" tamanho={13} /> Em atenção
+                          </>
+                        ) : (
+                          <>
+                            <Icone nome="check-circle" tamanho={13} /> Equilibrado
+                          </>
+                        )}
+                      </span>
+                    </div>
+                    <div className="vis-mobile celula-situacao-mobile">
                       {b.deficitVagas > 0 ? (
                         <span className="badge-saldo-mobile saldo-critico">−{b.deficitVagas} vagas</span>
                       ) : (
