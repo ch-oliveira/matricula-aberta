@@ -130,8 +130,9 @@ export function Gestao() {
               </button>
             )}
 
-            <a className="btn btn-secundario btn-pequeno" href="#">
-              ← Voltar ao portal dos pais
+            <a className="btn btn-secundario btn-pequeno" href="#" title="Voltar ao portal dos pais">
+              <span className="btn-voltar-texto-longo">← Voltar ao portal dos pais</span>
+              <span className="btn-voltar-texto-curto">← Voltar</span>
             </a>
           </div>
         </div>

@@ -2970,9 +2970,11 @@ dialog:modal {
 /* ---------- Gestão ---------- */
 
 .gestao {
+  inline-size: 100%;
   max-inline-size: 1080px;
   margin-inline: auto;
   padding: 0 20px 56px;
+  box-sizing: border-box;
 }
 .gestao-topo {
   display: flex;
@@ -2984,11 +2986,14 @@ dialog:modal {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  inline-size: 100%;
+  box-sizing: border-box;
 }
 .login-card {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  inline-size: 100%;
   max-inline-size: 460px;
   margin: 28px auto;
   padding: 28px;
@@ -2996,12 +3001,20 @@ dialog:modal {
   border: 2.5px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
+  box-sizing: border-box;
 }
 .login-card-topo {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  inline-size: 100%;
+}
+.btn-voltar-texto-longo {
+  display: inline;
+}
+.btn-voltar-texto-curto {
+  display: none;
 }
 .login-card-topo canvas,
 .login-card-topo svg {
@@ -4951,13 +4964,58 @@ td.vis-desktop {
     font-size: 0.86rem;
   }
 
-  /* Painel de Gestão & Demanda por Bairro */
+  /* Painel de Gestão & Topo & Login */
   .gestao {
-    padding: 0 8px 40px;
+    padding: 0 10px 40px;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    overflow-x: hidden;
   }
   .gestao-topo-interno {
-    gap: 10px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px 10px;
+    inline-size: 100%;
     padding-block: 4px;
+  }
+  .gestao-topo-interno .marca {
+    grid-column: 1 / 2;
+  }
+  .gestao-topo-interno .gestao-topo-acoes {
+    grid-column: 2 / 3;
+    justify-content: flex-end;
+  }
+  .gestao-topo-interno .gestao-topo-acoes .btn {
+    padding-inline: 8px;
+    font-size: 0.78rem;
+    min-block-size: 34px;
+  }
+  .gestao-topo-interno .topo-nav {
+    grid-column: 1 / -1;
+    inline-size: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px;
+    box-sizing: border-box;
+    gap: 2px;
+  }
+  .gestao-topo-interno .topo-nav .nav-link {
+    inline-size: 100%;
+    padding-inline: 4px;
+    font-size: 0.76rem;
+    min-block-size: 36px;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+  .btn-voltar-texto-longo {
+    display: none;
+  }
+  .btn-voltar-texto-curto {
+    display: inline;
   }
   .secretaria-hero {
     padding: 16px 14px;
@@ -4976,22 +5034,51 @@ td.vis-desktop {
     line-height: 1.36;
   }
   .login-card {
+    inline-size: 100%;
+    max-inline-size: 100%;
     padding: 18px 14px;
-    margin: 12px auto;
+    margin: 10px 0;
     border-radius: var(--r);
     gap: 14px;
     box-shadow: var(--shadow-sm);
+    box-sizing: border-box;
   }
   .login-card-topo {
-    flex-wrap: wrap;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     gap: 8px;
+    inline-size: 100%;
+  }
+  .login-card-topo canvas,
+  .login-card-topo svg {
+    max-inline-size: 40px;
+    flex-shrink: 0;
   }
   .login-card-topo .lp-tag {
-    font-size: 0.72rem;
-    padding: 3px 8px;
+    font-size: 0.7rem;
+    padding: 3px 6px;
     white-space: normal;
     text-align: right;
-    max-width: 75%;
+    max-inline-size: 72%;
+    line-height: 1.2;
+  }
+  .login-card h1 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+  .login-card .legenda {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  .login-card .campo select,
+  .login-card .campo input {
+    font-size: 0.92rem;
+    min-block-size: 44px;
+  }
+  .login-dica-homologacao {
+    padding: 10px 12px;
+    font-size: 0.78rem;
   }
 
   /* Toasts & Bandeja */
