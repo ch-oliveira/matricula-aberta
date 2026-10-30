@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
+import { Icone, IconeEtapa } from '../components/Icone';
 import { toast } from '../components/Toasts';
 import { Ocupacao, StatusPill } from '../components/ui';
 import { ETAPAS, statusDaOferta } from '../domain/etapas';
@@ -49,14 +50,14 @@ export function Gestao() {
               className={`nav-link ${aba === 'secretaria' ? 'ativo' : ''}`}
               onClick={() => setAba('secretaria')}
             >
-              🏛️ Secretaria de Educação
+              <Icone nome="building" tamanho={16} /> Secretaria de Educação
             </button>
             <button
               type="button"
               className={`nav-link ${aba === 'unidade' ? 'ativo' : ''}`}
               onClick={() => setAba('unidade')}
             >
-              🏫 Painel da Unidade
+              <Icone nome="school" tamanho={16} /> Painel da Unidade
             </button>
           </nav>
 
@@ -123,10 +124,10 @@ function PainelMacroSecretaria({
             className="btn btn-secundario btn-pequeno"
             onClick={() => {
               void vagasStore.resetar();
-              toast('Dados oficiais de demonstração de Patos - PB restaurados.', { emoji: '♻️', tom: 'info' });
+              toast('Dados oficiais de demonstração de Patos - PB restaurados.', { emoji: 'refresh', tom: 'info' });
             }}
           >
-            ♻️ Restaurar cenários de Patos-PB
+            <Icone nome="refresh" tamanho={15} /> Restaurar cenários de Patos-PB
           </button>
         </div>
       </section>
@@ -144,7 +145,8 @@ function PainelMacroSecretaria({
         <div className="kpi kpi-alerta">
           <span className="kpi-num">{kpis.filaEsperaTotal + kpis.alertasAtivosTotal}</span>
           <span>
-            demanda reprimida ({kpis.filaEsperaTotal} em fila + {kpis.alertasAtivosTotal} alertas 🔔)
+            demanda reprimida ({kpis.filaEsperaTotal} em fila + {kpis.alertasAtivosTotal} alertas{' '}
+            <Icone nome="bell" tamanho={14} />)
           </span>
         </div>
         <div className="kpi kpi-destaque">
@@ -157,7 +159,9 @@ function PainelMacroSecretaria({
       <section className="sec-bloco" aria-labelledby="t-demanda-bairros">
         <div className="sec-bloco-topo">
           <div>
-            <h2 id="t-demanda-bairros">📍 Demanda Reprimida por Bairro em Patos - PB</h2>
+            <h2 id="t-demanda-bairros">
+              <Icone nome="pin" tamanho={20} /> Demanda Reprimida por Bairro em Patos - PB
+            </h2>
             <p className="legenda">
               Cruzamento em tempo real entre vagas abertas, fila de espera nas unidades e famílias com alerta ativo no
               WhatsApp/Push para planejamento de abertura de novas turmas.
@@ -172,7 +176,9 @@ function PainelMacroSecretaria({
                 <th>Bairro (Patos - PB)</th>
                 <th>Unidades</th>
                 <th>Vagas livres</th>
-                <th>Fila + Alertas 🔔</th>
+                <th>
+                  Fila + Alertas <Icone nome="bell" tamanho={14} />
+                </th>
                 <th>Déficit líquido</th>
                 <th>Situação</th>
               </tr>
@@ -203,11 +209,19 @@ function PainelMacroSecretaria({
                   </td>
                   <td>
                     <span className={`pilula-pressao pressao-${b.statusPressao}`}>
-                      {b.statusPressao === 'critico'
-                        ? '🔴 Alta pressão'
-                        : b.statusPressao === 'atencao'
-                          ? '🟡 Em atenção'
-                          : '🟢 Equilibrado'}
+                      {b.statusPressao === 'critico' ? (
+                        <>
+                          <Icone nome="alert-triangle" tamanho={13} /> Alta pressão
+                        </>
+                      ) : b.statusPressao === 'atencao' ? (
+                        <>
+                          <Icone nome="bolt" tamanho={13} /> Em atenção
+                        </>
+                      ) : (
+                        <>
+                          <Icone nome="check-circle" tamanho={13} /> Equilibrado
+                        </>
+                      )}
                     </span>
                   </td>
                 </tr>
@@ -220,17 +234,18 @@ function PainelMacroSecretaria({
       {/* Balanço por Etapa de Ensino e Unidades em Atenção */}
       <div className="secretaria-duas-colunas">
         <section className="sec-bloco" aria-labelledby="t-balanco-etapas">
-          <h2 id="t-balanco-etapas">🎒 Balanço por Etapa de Ensino</h2>
+          <h2 id="t-balanco-etapas">
+            <Icone nome="backpack" tamanho={20} /> Balanço por Etapa de Ensino
+          </h2>
           <p className="legenda">Capacidade instalada vs. vagas abertas hoje na rede de Patos - PB.</p>
           <div className="etapas-macro-lista">
             {painel.resumoPorEtapa.map((item) => {
-              const info = ETAPAS[item.etapa];
               const st = statusDaOferta({ vagas: item.vagasLivres });
               return (
                 <div key={item.etapa} className="etapa-macro-item">
                   <div className="etapa-macro-topo">
                     <strong>
-                      <span aria-hidden="true">{info.emoji}</span> {item.nome}
+                      <IconeEtapa etapa={item.etapa} tamanho={18} /> {item.nome}
                     </strong>
                     <span>
                       <strong>{item.vagasLivres} livres</strong> · {item.taxaOcupacao}% ocupada
@@ -250,7 +265,9 @@ function PainelMacroSecretaria({
         </section>
 
         <section className="sec-bloco" aria-labelledby="t-unidades-atencao">
-          <h2 id="t-unidades-atencao">⚠️ Unidades com Fila ou Atualização Pendente</h2>
+          <h2 id="t-unidades-atencao">
+            <Icone nome="alert-triangle" tamanho={20} /> Unidades com Fila ou Atualização Pendente
+          </h2>
           <p className="legenda">
             Unidades com lista de espera ativa ou há mais de 48h sem confirmação cadastral.
           </p>
@@ -265,8 +282,16 @@ function PainelMacroSecretaria({
                       {u.bairro} · Atualizado {tempoRelativo(u.atualizadoEm, agora)}
                     </small>
                     <div className="unidade-atencao-badges">
-                      {u.filaTotal > 0 && <span className="badge-mini badge-fila">⏳ {u.filaTotal} na fila</span>}
-                      {velho && <span className="badge-mini badge-velho">⚠️ +48h sem confirmar</span>}
+                      {u.filaTotal > 0 && (
+                        <span className="badge-mini badge-fila">
+                          <Icone nome="hourglass" tamanho={12} /> {u.filaTotal} na fila
+                        </span>
+                      )}
+                      {velho && (
+                        <span className="badge-mini badge-velho">
+                          <Icone nome="alert-triangle" tamanho={12} /> +48h sem confirmar
+                        </span>
+                      )}
                       <span className="badge-mini">{u.vagasLivres} vagas livres</span>
                     </div>
                   </div>
@@ -328,7 +353,8 @@ function PainelUnidade({
 
         <div className="painel-cabecalho-dir">
           <div className={`selo-atualizacao ${velho ? 'velho' : ''}`}>
-            {velho ? '⚠️' : '✅'} Atualizado {tempoRelativo(escola.atualizadoEm, agora)}
+            <Icone nome={velho ? 'alert-triangle' : 'check-circle'} tamanho={15} /> Atualizado{' '}
+            {tempoRelativo(escola.atualizadoEm, agora)}
           </div>
           <button type="button" className="btn btn-fantasma btn-pequeno" onClick={onSair}>
             Trocar PIN
@@ -347,11 +373,15 @@ function PainelUnidade({
         </div>
         <div className="kpi kpi-destaque">
           <span className="kpi-num">{aguardandoAlerta}</span>
-          <span>alertas ativos no banco 🔔</span>
+          <span>
+            alertas ativos no banco <Icone nome="bell" tamanho={14} />
+          </span>
         </div>
         <div className="kpi">
           <span className="kpi-num">{protPendentes.length}</span>
-          <span>protocolos QR aguardando 🎟️</span>
+          <span>
+            protocolos QR aguardando <Icone nome="ticket" tamanho={14} />
+          </span>
         </div>
       </section>
 
@@ -359,7 +389,9 @@ function PainelUnidade({
       <section className="sec-bloco" aria-labelledby="t-prot-escola">
         <div className="sec-bloco-topo">
           <div>
-            <h2 id="t-prot-escola">🎟️ Protocolos de Atendimento Presencial ({protocolos.length})</h2>
+            <h2 id="t-prot-escola">
+              <Icone nome="ticket" tamanho={20} /> Protocolos de Atendimento Presencial ({protocolos.length})
+            </h2>
             <p className="legenda">
               Protocolos gerados pelos pais na Etapa 4. Ao confirmar a matrícula, o sistema ocupa automaticamente 1 vaga
               na turma correspondente e registra na auditoria.
@@ -380,22 +412,38 @@ function PainelUnidade({
                   <div className="card-prot-topo">
                     <strong className="prot-badge-codigo">{p.codigo}</strong>
                     <span className={`selo-protocolo selo-prot-${p.status}`}>
-                      {p.status === 'atendido'
-                        ? '✅ Atendido / Matriculado'
-                        : p.status === 'cancelado'
-                          ? '✕ Cancelado'
-                          : '⏳ Aguardando atendimento'}
+                      {p.status === 'atendido' ? (
+                        <>
+                          <Icone nome="check-circle" tamanho={14} /> Atendido / Matriculado
+                        </>
+                      ) : p.status === 'cancelado' ? (
+                        <>
+                          <Icone nome="x" tamanho={14} /> Cancelado
+                        </>
+                      ) : (
+                        <>
+                          <Icone nome="hourglass" tamanho={14} /> Aguardando atendimento
+                        </>
+                      )}
                     </span>
                   </div>
                   <h3>{p.responsavel}</h3>
                   <p>
-                    🎒 <strong>{p.turma}</strong> ({p.periodo === 'integral' ? 'Integral' : 'Meio período'}) · 📅 Visita:{' '}
-                    <strong>{p.dataVisita.split('-').reverse().join('/')}</strong> (
-                    {p.turnoVisita === 'manha' ? 'Manhã' : 'Tarde'}) · 📋 Docs:{' '}
+                    <Icone nome="backpack" tamanho={14} /> <strong>{p.turma}</strong> (
+                    {p.periodo === 'integral' ? 'Integral' : 'Meio período'}) · <Icone nome="calendar" tamanho={14} />{' '}
+                    Visita: <strong>{p.dataVisita.split('-').reverse().join('/')}</strong> (
+                    {p.turnoVisita === 'manha' ? 'Manhã' : 'Tarde'}) · <Icone nome="list" tamanho={14} /> Docs:{' '}
                     <strong>
                       {p.documentosMarcados.length}/{p.totalObrigatorios}
                     </strong>
-                    {p.telefone ? ` · 📞 ${p.telefone}` : ''}
+                    {p.telefone ? (
+                      <>
+                        {' '}
+                        · <Icone nome="phone" tamanho={14} /> {p.telefone}
+                      </>
+                    ) : (
+                      ''
+                    )}
                   </p>
                 </div>
 
@@ -407,19 +455,19 @@ function PainelUnidade({
                       onClick={async () => {
                         await vagasStore.atualizarStatusProtocolo(p.codigo, 'atendido');
                         toast(`Matrícula do protocolo ${p.codigo} confirmada! 1 vaga ocupada.`, {
-                          emoji: '✅',
+                          emoji: 'check-circle',
                           tom: 'ok',
                         });
                       }}
                     >
-                      ✅ Confirmar matrícula
+                      <Icone nome="check" tamanho={15} /> Confirmar matrícula
                     </button>
                     <button
                       type="button"
                       className="btn btn-fantasma btn-pequeno"
                       onClick={async () => {
                         await vagasStore.atualizarStatusProtocolo(p.codigo, 'cancelado');
-                        toast(`Protocolo ${p.codigo} cancelado.`, { emoji: 'ℹ️', tom: 'aviso' });
+                        toast(`Protocolo ${p.codigo} cancelado.`, { emoji: 'info', tom: 'aviso' });
                       }}
                     >
                       Cancelar
@@ -433,7 +481,9 @@ function PainelUnidade({
       </section>
 
       <div className="painel-dica">
-        <span aria-hidden="true">💡</span>
+        <span aria-hidden="true">
+          <Icone nome="lightbulb" tamanho={20} />
+        </span>
         <p>
           Ao ajustar as vagas nos botões <strong>+</strong> e <strong>−</strong> abaixo, o banco SQLite de Patos - PB é
           atualizado e todas as telas abertas (pais e Secretaria) recebem a mudança via <strong>SSE na hora</strong>.
@@ -452,17 +502,17 @@ function PainelUnidade({
           className="btn btn-secundario"
           onClick={() => {
             void vagasStore.confirmarDados(escola.id);
-            toast('Quadros de vagas confirmados no servidor de Patos - PB!', { emoji: '✅', tom: 'ok' });
+            toast('Quadros de vagas confirmados no servidor de Patos - PB!', { emoji: 'check-circle', tom: 'ok' });
           }}
         >
-          <span aria-hidden="true">👍</span> Confirmar quadro de vagas hoje
+          <Icone nome="thumbs-up" tamanho={16} /> Confirmar quadro de vagas hoje
         </button>
         <button
           type="button"
           className="link-sutil"
           onClick={() => {
             void vagasStore.resetar();
-            toast('Dados iniciais de Patos - PB restaurados.', { emoji: '♻️' });
+            toast('Dados iniciais de Patos - PB restaurados.', { emoji: 'refresh' });
           }}
         >
           Restaurar dados iniciais de Patos - PB
@@ -470,7 +520,9 @@ function PainelUnidade({
       </div>
 
       <section className="historico">
-        <h2>📜 Histórico de auditoria da unidade</h2>
+        <h2>
+          <Icone nome="scroll" tamanho={20} /> Histórico de auditoria da unidade
+        </h2>
         {historico.length === 0 ? (
           <p className="legenda">Nenhuma alteração registrada nesta sessão ainda.</p>
         ) : (
@@ -481,7 +533,11 @@ function PainelUnidade({
                   {new Date(h.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                 </time>
                 <span>
-                  {ETAPAS[h.etapa].emoji} {ETAPAS[h.etapa].nome} ({h.periodo}): <strong>{h.de} → {h.para}</strong> vagas
+                  <IconeEtapa etapa={h.etapa} tamanho={15} /> {ETAPAS[h.etapa].nome} ({h.periodo}):{' '}
+                  <strong>
+                    {h.de} → {h.para}
+                  </strong>{' '}
+                  vagas
                 </span>
                 <em>{h.origem === 'protocolo' ? 'Protocolo QR' : h.origem === 'escola' ? 'Secretaria' : 'Sistema'}</em>
               </li>
@@ -512,7 +568,9 @@ function Login({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id: string
 
   return (
     <form className="login-card" onSubmit={enviar} noValidate>
-      <p className="login-emoji" aria-hidden="true">🏫</p>
+      <p className="login-emoji" aria-hidden="true">
+        <Icone nome="school" tamanho={40} />
+      </p>
       <h1>Acesso da Unidade · Patos - PB</h1>
       <p className="legenda">Selecione a creche ou escola municipal de Patos - PB para gerenciar suas vagas e protocolos.</p>
       <div className="campo">
@@ -544,7 +602,7 @@ function Login({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id: string
         />
         {erro && (
           <p id={erroId} className="erro-campo" role="alert">
-            <span aria-hidden="true">⚠️</span> {erro}
+            <Icone nome="alert-triangle" tamanho={16} /> {erro}
           </p>
         )}
       </div>
@@ -566,11 +624,14 @@ function LinhaOferta({ escolaId, oferta }: { escolaId: string; oferta: Oferta })
   return (
     <article className="oferta" style={{ ['--cor-etapa' as string]: e.cor }}>
       <header className="oferta-topo">
-        <span className="oferta-emoji" aria-hidden="true">{e.emoji}</span>
+        <span className="oferta-emoji" aria-hidden="true">
+          <IconeEtapa etapa={oferta.etapa} tamanho={26} />
+        </span>
         <div>
           <h2>{e.nome}</h2>
           <p>
-            {oferta.periodo === 'integral' ? '🌞 Integral' : '🌤️ Meio período'} · {oferta.capacidade} lugares
+            <Icone nome={oferta.periodo === 'integral' ? 'sun' : 'cloud-sun'} tamanho={14} />{' '}
+            {oferta.periodo === 'integral' ? 'Integral' : 'Meio período'} · {oferta.capacidade} lugares
           </p>
         </div>
         <StatusPill status={status} />

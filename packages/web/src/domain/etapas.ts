@@ -9,11 +9,11 @@ export interface EtapaInfo {
 }
 
 export const ETAPAS: Record<EtapaId, EtapaInfo> = {
-  bercario: { id: 'bercario', nome: 'Berçário', emoji: '🍼', faixa: '0 a 1 ano', cor: '#FFB4C6' },
-  maternal: { id: 'maternal', nome: 'Maternal', emoji: '🧸', faixa: '2 a 3 anos', cor: '#FFD27A' },
-  pre: { id: 'pre', nome: 'Pré-escola', emoji: '🖍️', faixa: '4 a 5 anos', cor: '#9BE3C3' },
-  fund1: { id: 'fund1', nome: 'Fundamental I', emoji: '✏️', faixa: '1º ao 5º ano', cor: '#A9C8FF' },
-  fund2: { id: 'fund2', nome: 'Fundamental II', emoji: '📚', faixa: '6º ao 9º ano', cor: '#CDB8FF' },
+  bercario: { id: 'bercario', nome: 'Berçário', emoji: 'bercario', faixa: '0 a 1 ano', cor: '#FFB4C6' },
+  maternal: { id: 'maternal', nome: 'Maternal', emoji: 'maternal', faixa: '2 a 3 anos', cor: '#FFD27A' },
+  pre: { id: 'pre', nome: 'Pré-escola', emoji: 'pre', faixa: '4 a 5 anos', cor: '#9BE3C3' },
+  fund1: { id: 'fund1', nome: 'Fundamental I', emoji: 'fund1', faixa: '1º ao 5º ano', cor: '#A9C8FF' },
+  fund2: { id: 'fund2', nome: 'Fundamental II', emoji: 'fund2', faixa: '6º ao 9º ano', cor: '#CDB8FF' },
 };
 
 export const ORDEM_ETAPAS: EtapaId[] = ['bercario', 'maternal', 'pre', 'fund1', 'fund2'];
@@ -42,7 +42,7 @@ export type ResultadoEtapa =
 export function calcularEtapa(nascimentoISO: string, hoje = new Date()): ResultadoEtapa {
   const nasc = new Date(nascimentoISO + 'T12:00:00');
   if (Number.isNaN(nasc.getTime())) return { ok: false, motivo: 'Data inválida.' };
-  if (nasc > hoje) return { ok: false, motivo: 'Essa data ainda não chegou 🙂 Confira o ano.' };
+  if (nasc > hoje) return { ok: false, motivo: 'Essa data ainda não chegou. Confira o ano.' };
 
   const ano = anoLetivo(hoje);
   const corte = new Date(ano, 2, 31, 12);
@@ -83,8 +83,8 @@ export function statusDaOferta(o: Pick<Oferta, 'vagas'>): StatusVaga {
 }
 
 export const STATUS_INFO: Record<StatusVaga, { rotulo: string; icone: string; frase: (v: number, fila: number) => string }> = {
-  aberta: { rotulo: 'Tem vaga', icone: '✅', frase: (v) => `${v} vagas livres` },
-  ultimas: { rotulo: 'Últimas vagas', icone: '⚡', frase: (v) => (v === 1 ? 'Só 1 vaga!' : `Só ${v} vagas!`) },
-  espera: { rotulo: 'Lista de espera', icone: '⏳', frase: (_v, fila) => `${fila} na fila` },
+  aberta: { rotulo: 'Tem vaga', icone: 'check-circle', frase: (v) => `${v} vagas livres` },
+  ultimas: { rotulo: 'Últimas vagas', icone: 'bolt', frase: (v) => (v === 1 ? 'Só 1 vaga!' : `Só ${v} vagas!`) },
+  espera: { rotulo: 'Lista de espera', icone: 'hourglass', frase: (_v, fila) => `${fila} na fila` },
 };
 

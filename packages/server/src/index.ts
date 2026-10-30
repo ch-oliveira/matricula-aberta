@@ -262,6 +262,6 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(
-    `🚀 [Matrícula Aberta · Patos-PB] Monolito Modular ativo em http://localhost:${PORT} (SQLite WAL + SSE)`,
+    `[Matrícula Aberta · Patos-PB] Monolito Modular ativo em http://localhost:${PORT} (SQLite WAL + SSE)`,
   );
 });

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { Icone } from './Icone';
 
 interface Props {
   open: boolean;
@@ -50,7 +51,7 @@ export function Sheet({ open, onClose, titulo, children, rodape }: Props) {
       <header className="sheet-topo">
         <h2 id={tituloId}>{titulo}</h2>
         <button type="button" className="btn-icone" aria-label="Fechar" onClick={() => ref.current?.close()}>
-          ✕
+          <Icone nome="x" tamanho={18} />
         </button>
       </header>
       <div className="sheet-corpo">{children}</div>

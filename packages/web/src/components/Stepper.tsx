@@ -1,3 +1,5 @@
+import { Icone } from './Icone';
+
 export const PASSOS = [
   { id: 0, num: '01', curto: 'Criança', desc: 'Idade ou etapa' },
   { id: 1, num: '02', curto: 'Região', desc: 'GPS ou bairro' },
@@ -22,7 +24,7 @@ export function Stepper({ atual, maxLiberado, onIr }: Props) {
             <li key={p.id} className={`passo passo-${estado}`} aria-current={p.id === atual ? 'step' : undefined}>
               <button type="button" disabled={!clicavel} onClick={() => onIr(p.id)}>
                 <span className="passo-bolha" aria-hidden="true">
-                  {estado === 'feito' ? '✓' : p.num}
+                  {estado === 'feito' ? <Icone nome="check" tamanho={15} /> : p.num}
                 </span>
                 <span className="passo-textos">
                   <span className="passo-rotulo">

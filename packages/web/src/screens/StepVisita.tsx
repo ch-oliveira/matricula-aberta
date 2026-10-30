@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Icone, IconeDocumento, IconeUnidade } from '../components/Icone';
 import { toast } from '../components/Toasts';
 import { DicaAjudante, Ocupacao, StatusPill, TituloEtapa } from '../components/ui';
 import { buscar } from '../domain/busca';
@@ -87,18 +88,18 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
     return () => clearTimeout(t);
   }, [completo]);
 
-  if (!r) return <p className="aviso-suave">Unidade escolar não encontrada em Patos - PB. Volte e escolha outra 🙂</p>;
+  if (!r) return <p className="aviso-suave">Unidade escolar não encontrada em Patos - PB. Volte e escolha outra.</p>;
   const { escola, oferta, status, distanciaKm } = r;
 
   const mapa = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${escola.lat},${escola.lng}`)}`;
-  const faltando = obrig.filter((d) => !marcados.includes(d.id)).map((d) => `▫️ ${d.nome}`);
+  const faltando = obrig.filter((d) => !marcados.includes(d.id)).map((d) => `- ${d.nome}`);
   const msgWhats = encodeURIComponent(
-    `🎒 *Matrícula Aberta · Patos - PB*\n\n` +
-      (protocoloAtivo ? `🎟️ *Protocolo:* ${protocoloAtivo.codigo}\n` : '') +
-      `🏫 ${escola.nome}\n📍 ${escola.endereco}\n🕗 ${escola.atendimento}\n` +
-      `${STATUS_INFO[status].icone} ${STATUS_INFO[status].frase(oferta.vagas, oferta.fila)} (${ETAPAS[oferta.etapa].nome})\n\n` +
-      (faltando.length ? `📋 Ainda falta separar:\n${faltando.join('\n')}\n\n` : '✅ Documentos todos separados!\n\n') +
-      `🗺️ Como chegar: ${mapa}`,
+    `*Matrícula Aberta · Patos - PB*\n\n` +
+      (protocoloAtivo ? `*Protocolo:* ${protocoloAtivo.codigo}\n` : '') +
+      `${escola.nome}\n${escola.endereco}\nAtendimento: ${escola.atendimento}\n` +
+      `${STATUS_INFO[status].frase(oferta.vagas, oferta.fila)} (${ETAPAS[oferta.etapa].nome})\n\n` +
+      (faltando.length ? `Ainda falta separar:\n${faltando.join('\n')}\n\n` : 'Documentos todos separados!\n\n') +
+      `Como chegar: ${mapa}`,
   );
 
   const fala =
@@ -136,7 +137,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
       setProtocoloLocal(novo);
       setMeusCodigos((ant) => ({ ...ant, [escola.id]: novo.codigo }));
       toast(`Protocolo ${novo.codigo} emitido e enviado para a secretaria da escola!`, {
-        emoji: '🎟️',
+        emoji: 'ticket',
         tom: 'ok',
       });
     } catch {
@@ -151,11 +152,179 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
     [protocoloAtivo],
   );
 
+  function baixarCartaoImagem() {
+    if (!protocoloAtivo) return;
+
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 900;
+      canvas.height = 1260;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Fundo principal
+      ctx.fillStyle = '#FAF7F0';
+      ctx.fillRect(0, 0, 900, 1260);
+
+      // Borda Neo-brutalista
+      ctx.strokeStyle = '#171625';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(20, 20, 860, 1220);
+
+      // Faixa Superior (Amarelo / Sol de Patos)
+      ctx.fillStyle = '#FFE072';
+      ctx.fillRect(24, 24, 852, 140);
+      ctx.fillStyle = '#171625';
+      ctx.strokeRect(24, 24, 852, 140);
+
+      // Textos do Cabeçalho
+      ctx.fillStyle = '#171625';
+      ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
+      ctx.fillText('PREFEITURA MUNICIPAL DE PATOS - PB', 48, 68);
+      ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
+      ctx.fillText('SECRETARIA MUNICIPAL DE EDUCAÇÃO', 48, 108);
+      ctx.font = '600 18px system-ui, -apple-system, sans-serif';
+      ctx.fillText('MATRÍCULA ABERTA · PROTOCOLO OFICIAL DE PRÉ-AGENDAMENTO', 48, 138);
+
+      // Caixa da Escola
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(50, 195, 800, 140);
+      ctx.strokeStyle = '#171625';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(50, 195, 800, 140);
+
+      ctx.fillStyle = '#171625';
+      ctx.font = 'bold 28px system-ui, -apple-system, sans-serif';
+      ctx.fillText(escola.nome, 74, 245);
+      ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#4A485A';
+      ctx.fillText(escola.endereco, 74, 280);
+      ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#227B4E';
+      ctx.fillText(`Atendimento: ${escola.atendimento}`, 74, 312);
+
+      // Bloco do Código de Protocolo
+      ctx.fillStyle = '#171625';
+      ctx.fillRect(50, 360, 800, 100);
+      ctx.fillStyle = '#FFE072';
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText('NÚMERO DO PROTOCOLO (APRESENTE ESTA TELA)', 74, 395);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 44px monospace, system-ui';
+      ctx.fillText(protocoloAtivo.codigo, 74, 442);
+
+      // Desenhar o QR Code (23 x 23 células)
+      const qrTamanho = 320;
+      const qrX = (900 - qrTamanho) / 2;
+      const qrY = 490;
+      const celula = qrTamanho / 23;
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(qrX - 16, qrY - 16, qrTamanho + 32, qrTamanho + 32);
+      ctx.strokeStyle = '#171625';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(qrX - 16, qrY - 16, qrTamanho + 32, qrTamanho + 32);
+
+      ctx.fillStyle = '#171625';
+      matrizQr.forEach((linha, rIdx) => {
+        linha.forEach((preenchido, cIdx) => {
+          if (preenchido) {
+            ctx.fillRect(qrX + cIdx * celula, qrY + rIdx * celula, celula + 0.5, celula + 0.5);
+          }
+        });
+      });
+
+      // Legenda do QR Code
+      ctx.fillStyle = '#171625';
+      ctx.font = 'bold 18px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Apresente este QR Code na secretaria da creche/escola', 450, 855);
+      ctx.textAlign = 'left';
+
+      // Dados da Matrícula
+      ctx.fillStyle = '#F3EFE6';
+      ctx.fillRect(50, 885, 800, 240);
+      ctx.strokeStyle = '#171625';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(50, 885, 800, 240);
+
+      ctx.fillStyle = '#171625';
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Responsável:', 74, 925);
+      ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText(protocoloAtivo.responsavel, 220, 925);
+
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Data da Visita:', 74, 965);
+      ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText(
+        `${formatarDataBR(protocoloAtivo.dataVisita)} · Turno: ${
+          protocoloAtivo.turnoVisita === 'manha' ? 'Manhã (7h30–11h30)' : 'Tarde (13h30–17h)'
+        }`,
+        220,
+        965,
+      );
+
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Turma Solicitada:', 74, 1005);
+      ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText(
+        `${protocoloAtivo.turma} (${protocoloAtivo.periodo === 'integral' ? 'Tempo Integral' : 'Meio Período'})`,
+        250,
+        1005,
+      );
+
+      ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText('Checklist Documental:', 74, 1045);
+      ctx.font = '500 20px system-ui, -apple-system, sans-serif';
+      ctx.fillText(
+        `${protocoloAtivo.documentosMarcados.length} de ${protocoloAtivo.totalObrigatorios} documentos obrigatórios separados`,
+        300,
+        1045,
+      );
+
+      ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#227B4E';
+      ctx.fillText('✓ PROTOCOLO REGISTRADO NO BANCO DE DADOS DA REDE MUNICIPAL DE PATOS', 74, 1095);
+
+      // Rodapé Offline
+      ctx.fillStyle = '#676479';
+      ctx.font = '500 15px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        'Este comprovante tem validade oficial e funciona 100% offline (não precisa de internet na escola).',
+        450,
+        1170,
+      );
+      ctx.fillText(
+        `Emitido em: ${new Date().toLocaleDateString('pt-BR')} · Sistema Matrícula Aberta (Patos - PB)`,
+        450,
+        1195,
+      );
+
+      // Trigger Download
+      const link = document.createElement('a');
+      link.download = `protocolo-${protocoloAtivo.codigo}-patos.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      toast('Cartão com QR Code baixado no seu celular/computador!', {
+        emoji: 'check-circle',
+        tom: 'ok',
+      });
+    } catch {
+      toast('Não foi possível gerar o arquivo. Você pode tirar um print da tela!', {
+        emoji: 'alert-triangle',
+        tom: 'aviso',
+      });
+    }
+  }
+
   return (
     <section className="etapa" aria-labelledby="t-visita">
       <TituloEtapa
         id="t-visita"
-        emoji="✅"
+        emoji="check-circle"
         sticker={folder}
         titulo="Prepare a visita e emita sua senha"
         subtitulo="Confira os documentos da Rede Municipal de Patos - PB e gere seu protocolo digital com QR Code."
@@ -164,7 +333,9 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
 
       <article className={`card-escola card-${status} card-escolhida`}>
         <div className="card-topo">
-          <span className="card-avatar" aria-hidden="true">🏫</span>
+          <span className="card-avatar" aria-hidden="true">
+            <IconeUnidade tipo={escola.tipo} tamanho={24} />
+          </span>
           <div className="card-nome">
             <h2>{escola.nome}</h2>
             <p>{escola.endereco}</p>
@@ -177,39 +348,39 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         <Ocupacao vagas={oferta.vagas} capacidade={oferta.capacidade} status={status} />
         <dl className="info-grade">
           <div>
-            <dt>🎒 Turma</dt>
+            <dt><Icone nome="backpack" tamanho={15} /> Turma</dt>
             <dd>
               {turma ?? ETAPAS[oferta.etapa].nome} ({oferta.periodo === 'integral' ? 'Integral' : 'Meio período'})
             </dd>
           </div>
           <div>
-            <dt>🕗 Atendimento</dt>
+            <dt><Icone nome="clock" tamanho={15} /> Atendimento</dt>
             <dd>{escola.atendimento}</dd>
           </div>
           <div>
-            <dt>🚶 Distância</dt>
+            <dt><Icone nome="walk" tamanho={15} /> Distância</dt>
             <dd>
               {formatarDistancia(distanciaKm)} · {minutosAPe(distanciaKm)} min
             </dd>
           </div>
           <div>
-            <dt>🔄 Atualizado</dt>
+            <dt><Icone nome="refresh" tamanho={15} /> Atualizado</dt>
             <dd>{tempoRelativo(escola.atualizadoEm, agora)}</dd>
           </div>
         </dl>
         <div className="acoes-grade">
           <a className="btn btn-primario" href={mapa} target="_blank" rel="noopener">
-            <span aria-hidden="true">🗺️</span> Como chegar
+            <Icone nome="map" tamanho={16} /> Como chegar
           </a>
           <a className="btn btn-secundario" href={`tel:${escola.telefone.replace(/\D/g, '')}`}>
-            <span aria-hidden="true">📞</span> {escola.telefone}
+            <Icone nome="phone" tamanho={16} /> {escola.telefone}
           </a>
           <a className="btn btn-whats" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener">
-            <span aria-hidden="true">💬</span> Enviar no WhatsApp
+            <Icone nome="message" tamanho={16} /> Enviar no WhatsApp
           </a>
           {status === 'espera' && (
             <button type="button" className="btn btn-secundario" onClick={() => onAlerta(escola.id)}>
-              <span aria-hidden="true">🔔</span> Avise-me
+              <Icone nome="bell" tamanho={16} /> Avise-me
             </button>
           )}
         </div>
@@ -220,15 +391,23 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         <div className="protocolo-cabecalho">
           <div>
             <span className="lp-mini-tag">Atendimento Ágil · Patos - PB</span>
-            <h2>🎟️ Protocolo de Pré-Agendamento Presencial</h2>
+            <h2><Icone nome="ticket" tamanho={20} /> Protocolo de Pré-Agendamento Presencial</h2>
           </div>
           {protocoloAtivo && (
             <span className={`selo-protocolo selo-prot-${protocoloAtivo.status}`}>
-              {protocoloAtivo.status === 'atendido'
-                ? '✅ Matrícula confirmada'
-                : protocoloAtivo.status === 'cancelado'
-                  ? '✕ Cancelado'
-                  : '⏳ Aguardando visita'}
+              {protocoloAtivo.status === 'atendido' ? (
+                <>
+                  <Icone nome="check-circle" tamanho={15} /> Matrícula confirmada
+                </>
+              ) : protocoloAtivo.status === 'cancelado' ? (
+                <>
+                  <Icone nome="x" tamanho={15} /> Cancelado
+                </>
+              ) : (
+                <>
+                  <Icone nome="hourglass" tamanho={15} /> Aguardando visita
+                </>
+              )}
             </span>
           )}
         </div>
@@ -288,20 +467,30 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
               <p className="protocolo-aviso">
                 {protocoloAtivo.status === 'atendido' ? (
                   <>
-                    🎉 <strong>Atendimento confirmado pela secretaria da unidade!</strong> A vaga foi vinculada ao seu
+                    <Icone nome="sparkles" tamanho={16} />{' '}
+                    <strong>Atendimento confirmado pela secretaria da unidade!</strong> A vaga foi vinculada ao seu
                     protocolo.
                   </>
                 ) : (
                   <>
-                    💡 A secretaria da <strong>{escola.nome}</strong> já recebeu seu pré-agendamento em tempo real.
-                    Abra o <a href="#/gestao">Painel da Escola</a> para simular a recepção!
+                    <Icone nome="lightbulb" tamanho={16} /> A secretaria da <strong>{escola.nome}</strong> já recebeu
+                    seu pré-agendamento em tempo real. Abra o <a href="#/gestao">Painel da Escola</a> para simular a
+                    recepção!
                   </>
                 )}
               </p>
 
               <div className="protocolo-acoes">
+                <button
+                  type="button"
+                  className="btn btn-primario btn-pequeno"
+                  onClick={baixarCartaoImagem}
+                  title="Salvar voucher do protocolo em alta definição no celular"
+                >
+                  <Icone nome="file-text" tamanho={15} /> Baixar Cartão no Celular (PNG)
+                </button>
                 <a className="btn btn-whats btn-pequeno" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener">
-                  💬 Salvar protocolo no WhatsApp
+                  <Icone nome="message" tamanho={15} /> Salvar no WhatsApp
                 </a>
                 <button
                   type="button"
@@ -374,7 +563,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                       checked={turnoVisita === 'manha'}
                       onChange={() => setTurnoVisita('manha')}
                     />
-                    <span>🌤️ Manhã</span>
+                    <span><Icone nome="cloud-sun" tamanho={15} /> Manhã</span>
                   </label>
                   <label className="chip">
                     <input
@@ -383,7 +572,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                       checked={turnoVisita === 'tarde'}
                       onChange={() => setTurnoVisita('tarde')}
                     />
-                    <span>☀️ Tarde</span>
+                    <span><Icone nome="sun" tamanho={15} /> Tarde</span>
                   </label>
                 </div>
               </fieldset>
@@ -391,12 +580,12 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
 
             {erroProt && (
               <p className="erro-campo" role="alert">
-                <span aria-hidden="true">⚠️</span> {erroProt}
+                <Icone nome="alert-triangle" tamanho={16} /> {erroProt}
               </p>
             )}
 
             <button type="submit" className="btn btn-primario btn-largo" disabled={emitindo}>
-              <span aria-hidden="true">🎟️</span>{' '}
+              <Icone nome="ticket" tamanho={17} />{' '}
               {emitindo ? 'Gerando protocolo em Patos - PB…' : 'Emitir protocolo com QR Code'}
             </button>
           </form>
@@ -406,16 +595,20 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
       {/* ================= CHECKLIST DE DOCUMENTOS ================= */}
       <div className="checklist">
         <div className="checklist-topo">
-          <h2 id={progressoId}>📋 Checklist de documentos (Patos - PB)</h2>
+          <h2 id={progressoId}><Icone nome="list" tamanho={20} /> Checklist de documentos (Patos - PB)</h2>
           <span className="checklist-contagem">
             {feitos}/{obrig.length}
           </span>
         </div>
         <progress className="barra-progresso" max={Math.max(1, obrig.length)} value={feitos} aria-labelledby={progressoId} />
         <p className="checklist-sub">
-          {completo
-            ? '🎉 Tudo pronto! Seus documentos obrigatórios estão completos.'
-            : 'Marque os documentos que você já separou. Fica salvo no seu celular.'}
+          {completo ? (
+            <>
+              <Icone nome="sparkles" tamanho={16} /> Tudo pronto! Seus documentos obrigatórios estão completos.
+            </>
+          ) : (
+            'Marque os documentos que você já separou. Fica salvo no seu celular.'
+          )}
         </p>
 
         <ul className="docs">
@@ -424,7 +617,9 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
               <label className={`doc ${marcados.includes(d.id) ? 'doc-ok' : ''}`}>
                 <input type="checkbox" checked={marcados.includes(d.id)} onChange={() => alternar(d.id)} />
                 <span className="doc-check" aria-hidden="true" />
-                <span className="doc-emoji" aria-hidden="true">{d.emoji}</span>
+                <span className="doc-emoji" aria-hidden="true">
+                  <IconeDocumento id={d.id} icone={d.emoji} tamanho={22} />
+                </span>
                 <span className="doc-textos">
                   <span className="doc-nome">
                     {d.nome}
@@ -438,6 +633,73 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         </ul>
       </div>
 
+      {/* ================= GUIA LOCAL: ONDE EMITIR EM PATOS - PB ================= */}
+      <div className="guia-documentos-patos" aria-labelledby="t-onde-emitir">
+        <div className="guia-documentos-topo">
+          <span className="guia-documentos-icone" aria-hidden="true">
+            <Icone nome="map" tamanho={22} />
+          </span>
+          <div>
+            <h3 id="t-onde-emitir">Não tem algum documento? Onde emitir em Patos - PB:</h3>
+            <p>Serviços públicos gratuitos na cidade para regularizar a documentação da criança</p>
+          </div>
+        </div>
+
+        <div className="guia-locais-grade">
+          <article className="guia-local-item">
+            <div className="guia-local-cabecalho">
+              <span className="guia-local-tag">Documentos Pessoais</span>
+              <h4>Casa da Cidadania · Patos - PB</h4>
+            </div>
+            <p className="guia-local-desc">
+              Emissão de RG / Carteira de Identidade Nacional (CIN), CPF e 2ª via de Certidão.
+            </p>
+            <p className="guia-local-endereco">
+              <Icone nome="pin" tamanho={14} /> <strong>Guedes Shopping (1º piso)</strong> · R. Pedro Firmino, Centro / Alça Sudeste · Seg a sex, 7h às 17h
+            </p>
+          </article>
+
+          <article className="guia-local-item">
+            <div className="guia-local-cabecalho">
+              <span className="guia-local-tag">Saúde da Criança</span>
+              <h4>UBS do seu bairro (Postos de Saúde)</h4>
+            </div>
+            <p className="guia-local-desc">
+              Emissão do Cartão SUS e atualização da caderneta de vacinação exigida para matrícula.
+            </p>
+            <p className="guia-local-endereco">
+              <Icone nome="pin" tamanho={14} /> Em qualquer UBS de Patos (ex.: UBS Aderbal Martins no Belo Horizonte, UBS Jatobá, UBS Centro)
+            </p>
+          </article>
+
+          <article className="guia-local-item">
+            <div className="guia-local-cabecalho">
+              <span className="guia-local-tag">Prioridade Social</span>
+              <h4>CRAS / CadÚnico (Bolsa Família)</h4>
+            </div>
+            <p className="guia-local-desc">
+              Comprovante do Número do NIS e atualização do CadÚnico para prioridade em vagas de creche.
+            </p>
+            <p className="guia-local-endereco">
+              <Icone nome="pin" tamanho={14} /> CRAS Geralda Medeiros (São Sebastião) · CRAS Capitão Manoel Gomes (Belo Horizonte) · CRAS Morro
+            </p>
+          </article>
+
+          <article className="guia-local-item">
+            <div className="guia-local-cabecalho">
+              <span className="guia-local-tag">Residência & Histórico</span>
+              <h4>SEDUC & Concessionárias</h4>
+            </div>
+            <p className="guia-local-desc">
+              Fatura da Energisa PB ou Cagepa; Declaração de transferência na secretaria da escola anterior ou SEDUC.
+            </p>
+            <p className="guia-local-endereco">
+              <Icone nome="pin" tamanho={14} /> SEDUC: R. Horácio Nóbrega, Belo Horizonte / Centro · Atendimento das 7h às 13h
+            </p>
+          </article>
+        </div>
+      </div>
+
       <DicaAjudante ativo={ajudante}>
         Tire foto dos documentos com o celular e emita o protocolo acima — assim a secretaria da escola em Patos já
         adia a conferência na chegada.
@@ -447,14 +709,14 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         <h2>Como funciona o atendimento presencial em Patos - PB?</h2>
         <ol>
           <li>
-            <span aria-hidden="true">🎟️</span> Apresente o <strong>QR Code do protocolo</strong> e os documentos na
+            <span aria-hidden="true"><Icone nome="ticket" tamanho={18} /></span> Apresente o <strong>QR Code do protocolo</strong> e os documentos na
             secretaria da unidade.
           </li>
           <li>
-            <span aria-hidden="true">⏱️</span> Com o protocolo pré-agendado, a conferência leva menos de 10 minutos.
+            <span aria-hidden="true"><Icone nome="timer" tamanho={18} /></span> Com o protocolo pré-agendado, a conferência leva menos de 10 minutos.
           </li>
           <li>
-            <span aria-hidden="true">📲</span> A secretaria confirma o protocolo no painel e a vaga é atualizada em
+            <span aria-hidden="true"><Icone nome="smartphone" tamanho={18} /></span> A secretaria confirma o protocolo no painel e a vaga é atualizada em
             tempo real.
           </li>
         </ol>
@@ -464,7 +726,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         <div className="confete" aria-hidden="true">
           {Array.from({ length: 18 }, (_, i) => (
             <span key={i} style={{ ['--i' as string]: i }}>
-              {['🎉', '⭐', '🎈', '✨'][i % 4]}
+              <Icone nome={(['sparkles', 'star', 'award', 'check-circle'] as const)[i % 4]} tamanho={20} />
             </span>
           ))}
         </div>

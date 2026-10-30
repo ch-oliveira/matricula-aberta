@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { Icone } from './Icone';
 
 export interface Toast {
   id: number;
@@ -31,7 +32,11 @@ export function Toasts() {
     <div className="toasts" role="status" aria-live="polite">
       {lista.map((t) => (
         <div key={t.id} className={`toast toast-${t.tom ?? 'info'}`}>
-          {t.emoji && <span aria-hidden="true" className="toast-emoji">{t.emoji}</span>}
+          {t.emoji && (
+            <span aria-hidden="true" className="toast-emoji">
+              <Icone nome={t.emoji} tamanho={20} />
+            </span>
+          )}
           <span>{t.texto}</span>
         </div>
       ))}

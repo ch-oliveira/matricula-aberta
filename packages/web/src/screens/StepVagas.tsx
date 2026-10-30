@@ -1,4 +1,8 @@
 import { useMemo, useState } from 'react';
+import { Icone, IconeEtapa, IconeStatus } from '../components/Icone';
+import { RadarMap } from '../components/RadarMap';
+import { SchoolCard } from '../components/SchoolCard';
+import { DicaAjudante, TituloEtapa } from '../components/ui';
 import { buscar, resumo } from '../domain/busca';
 import { ETAPAS } from '../domain/etapas';
 import type { Busca, Resultado } from '../domain/types';
@@ -6,9 +10,6 @@ import { useAgora } from '../hooks';
 import { useEscolas } from '../services/vagasStore';
 import { school, search } from '../stickers/icons';
 import { Sticker } from '../stickers/Sticker';
-import { RadarMap } from '../components/RadarMap';
-import { SchoolCard } from '../components/SchoolCard';
-import { DicaAjudante, TituloEtapa } from '../components/ui';
 
 interface Props {
   busca: Busca;
@@ -66,10 +67,15 @@ export function StepVagas(p: Props) {
     <section className="etapa" aria-labelledby="t-vagas">
       <TituloEtapa
         id="t-vagas"
-        emoji="🏫"
+        emoji="school"
         sticker={school}
         titulo="Vagas perto de você"
-        subtitulo={`${etapa?.emoji} ${etapa?.nome} · até ${busca.raioKm} km de ${busca.local?.rotulo}`}
+        subtitulo={
+          <>
+            {busca.etapa && <IconeEtapa etapa={busca.etapa} tamanho={16} />} {etapa?.nome} · até {busca.raioKm} km de{' '}
+            {busca.local?.rotulo}
+          </>
+        }
         fala={fala}
       />
 
@@ -80,9 +86,9 @@ export function StepVagas(p: Props) {
           <span className="selo-vivo"><span className="ponto-vivo" aria-hidden="true" /> Ao vivo</span>
         </div>
         <ul className="placar-semaforo" aria-label="Resumo por situação">
-          <li className="s-aberta"><span aria-hidden="true">✅</span> <strong>{res.aberta}</strong> com vaga</li>
-          <li className="s-ultimas"><span aria-hidden="true">⚡</span> <strong>{res.ultimas}</strong> últimas</li>
-          <li className="s-espera"><span aria-hidden="true">⏳</span> <strong>{res.espera}</strong> em espera</li>
+          <li className="s-aberta"><IconeStatus status="aberta" tamanho={16} /> <strong>{res.aberta}</strong> com vaga</li>
+          <li className="s-ultimas"><IconeStatus status="ultimas" tamanho={16} /> <strong>{res.ultimas}</strong> últimas</li>
+          <li className="s-espera"><IconeStatus status="espera" tamanho={16} /> <strong>{res.espera}</strong> em espera</li>
         </ul>
       </div>
 
@@ -91,7 +97,9 @@ export function StepVagas(p: Props) {
           {(['lista', 'mapa'] as const).map((v) => (
             <label key={v}>
               <input type="radio" name="vista" checked={vista === v} onChange={() => setVista(v)} />
-              <span>{v === 'lista' ? '📋 Lista' : '🗺️ Mapa'}</span>
+              <span>
+                <Icone nome={v === 'lista' ? 'list' : 'map'} tamanho={15} /> {v === 'lista' ? 'Lista' : 'Mapa'}
+              </span>
             </label>
           ))}
         </div>
@@ -109,7 +117,7 @@ export function StepVagas(p: Props) {
       </div>
 
       <DicaAjudante ativo={p.ajudante}>
-        Verde ✅ = tem vaga. Amarelo ⚡ = poucas vagas, vale ir logo. Vermelho ⏳ = fila de espera: toque em “Avise-me” para receber mensagem quando abrir.
+        Verde <IconeStatus status="aberta" tamanho={15} /> = tem vaga. Amarelo <IconeStatus status="ultimas" tamanho={15} /> = poucas vagas, vale ir logo. Vermelho <IconeStatus status="espera" tamanho={15} /> = fila de espera: toque em “Avise-me” para receber mensagem quando abrir.
       </DicaAjudante>
 
       {vista === 'mapa' && busca.local && (
@@ -130,7 +138,7 @@ export function StepVagas(p: Props) {
               </button>
             )}
             <button type="button" className="btn btn-primario" onClick={() => p.onAlerta()}>
-              <span aria-hidden="true">🔔</span> Me avise quando abrir
+              <Icone nome="bell" tamanho={16} /> Me avise quando abrir
             </button>
           </div>
         </div>
@@ -153,7 +161,7 @@ export function StepVagas(p: Props) {
               />
             ))}
             <button type="button" className="card-alerta-geral" onClick={() => p.onAlerta()}>
-              <span aria-hidden="true">🔔</span>
+              <span aria-hidden="true"><Icone nome="bell" tamanho={20} /></span>
               <span>
                 <strong>Não achou a ideal?</strong>
                 <small>Receba no WhatsApp quando abrir vaga de {etapa?.nome} perto de você.</small>
@@ -169,10 +177,10 @@ export function StepVagas(p: Props) {
             <strong>{p.comparar.length}</strong> de 3 para comparar
           </span>
           <button type="button" className="btn btn-escuro" onClick={p.onAbrirComparador} disabled={p.comparar.length < 2}>
-            ⚖️ {p.comparar.length < 2 ? 'Escolha mais 1' : 'Comparar agora'}
+            <Icone nome="scale" tamanho={16} /> {p.comparar.length < 2 ? 'Escolha mais 1' : 'Comparar agora'}
           </button>
           <button type="button" className="btn-icone" aria-label="Limpar comparação" onClick={() => p.setComparar(() => [])}>
-            ✕
+            <Icone nome="x" tamanho={16} />
           </button>
         </div>
       )}

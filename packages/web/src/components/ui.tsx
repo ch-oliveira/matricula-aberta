@@ -5,12 +5,13 @@ import { useFala } from '../hooks';
 import type { Icon } from '../stickers/fun';
 import { bulb } from '../stickers/icons';
 import { Sticker } from '../stickers/Sticker';
+import { Icone, IconeStatus } from './Icone';
 
 export function StatusPill({ status, grande }: { status: StatusVaga; grande?: boolean }) {
   const s = STATUS_INFO[status];
   return (
     <span className={`pill pill-${status} ${grande ? 'pill-grande' : ''}`}>
-      <span aria-hidden="true">{s.icone}</span> {s.rotulo}
+      <IconeStatus status={status} tamanho={grande ? 17 : 15} /> {s.rotulo}
     </span>
   );
 }
@@ -34,7 +35,7 @@ export function DicaAjudante({ ativo, children }: { ativo: boolean; children: Re
         <Sticker icon={bulb} replayOnHover style={{ width: 56 }} />
       </div>
       <div>
-        <strong>🧒 Dica para quem está ajudando</strong>
+        <strong><Icone nome="user-heart" tamanho={16} /> Dica para quem está ajudando</strong>
         <p>{children}</p>
       </div>
     </aside>
@@ -51,10 +52,10 @@ export function TituloEtapa({
   fala,
 }: {
   id: string;
-  emoji: string;
+  emoji?: string;
   sticker?: Icon;
   titulo: string;
-  subtitulo?: string;
+  subtitulo?: ReactNode;
   fala: string;
 }) {
   const { suportado, falando, falar, parar } = useFala();
@@ -65,7 +66,9 @@ export function TituloEtapa({
           <Sticker icon={sticker} enter={0.05} replayOnHover style={{ width: 68 }} />
         </div>
       ) : (
-        <span className="titulo-emoji" aria-hidden="true">{emoji}</span>
+        <span className="titulo-emoji" aria-hidden="true">
+          <Icone nome={emoji ?? 'school'} tamanho={32} />
+        </span>
       )}
       <div className="titulo-textos">
         <h1 id={id} tabIndex={-1}>{titulo}</h1>
@@ -78,7 +81,7 @@ export function TituloEtapa({
           onClick={() => (falando ? parar() : falar(fala))}
           aria-pressed={falando}
         >
-          <span aria-hidden="true">{falando ? '⏹️' : '🔊'}</span> {falando ? 'Parar' : 'Ouvir'}
+          <Icone nome={falando ? 'stop' : 'volume'} tamanho={16} /> {falando ? 'Parar' : 'Ouvir'}
         </button>
       )}
     </div>

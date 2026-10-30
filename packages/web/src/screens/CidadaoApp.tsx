@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { Icone } from '../components/Icone';
 import { Stepper } from '../components/Stepper';
 import { toast } from '../components/Toasts';
 import { buscar, pulsoDaCidade, resumo } from '../domain/busca';
@@ -54,6 +55,15 @@ export function CidadaoApp() {
   const [alerta, setAlerta] = useState<{ open: boolean; escolaId?: string }>({ open: false });
   const [destaque, setDestaque] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const [meusCodigos] = usePersistido<Record<string, string>>('ma:protocolos:por-escola:v1', {});
+
+  const protocoloMaisRecente = useMemo(() => {
+    const entries = Object.entries(meusCodigos);
+    if (entries.length === 0) return null;
+    const [escId, cod] = entries[entries.length - 1];
+    const esc = escolas.find((e) => e.id === escId);
+    return { escolaId: escId, codigo: cod, escolaNome: esc?.nome ?? 'Unidade Municipal' };
+  }, [meusCodigos, escolas]);
 
   const setBusca = (fn: (b: Busca) => Busca) => {
     setErro(null);
@@ -83,11 +93,11 @@ export function CidadaoApp() {
           const esc = vagasStore.getEscolas().find((e) => e.id === ev.escolaId);
           const perto = esc && distanciaKm(b.local, esc) <= b.raioKm;
           if (perto && abriu) {
-            toast(`Abriu vaga de ${ETAPAS[ev.etapa].nome} na ${ev.escolaNome}!`, { emoji: '🎉', tom: 'ok' });
+            toast(`Abriu vaga de ${ETAPAS[ev.etapa].nome} na ${ev.escolaNome}!`, { emoji: 'sparkles', tom: 'ok' });
             setDestaque(ev.escolaId);
             setTimeout(() => setDestaque(null), 2600);
           } else if (perto) {
-            toast(`${ev.escolaNome}: 1 vaga foi preenchida.`, { emoji: '📉', tom: 'aviso' });
+            toast(`${ev.escolaNome}: 1 vaga foi preenchida.`, { emoji: 'trending-down', tom: 'aviso' });
           }
         }
         if (!abriu) return;
@@ -98,7 +108,7 @@ export function CidadaoApp() {
           const bate = a.escolaId ? a.escolaId === ev.escolaId : esc && distanciaKm(a.local, esc) <= a.raioKm;
           if (!bate) continue;
           const msg = `Abriu vaga de ${ETAPAS[ev.etapa].nome} na ${ev.escolaNome} (Patos - PB)!`;
-          toast(`Seu alerta tocou: ${msg}`, { emoji: '🔔', tom: 'ok' });
+          toast(`Seu alerta tocou: ${msg}`, { emoji: 'bell', tom: 'ok' });
           if (a.canal === 'push') notificar('Matrícula Aberta · Patos-PB', msg);
           break;
         }
@@ -130,11 +140,22 @@ export function CidadaoApp() {
     });
   }
 
+  function abrirProtocolo(escolaId: string) {
+    const esc = escolas.find((e) => e.id === escolaId);
+    const bairro = catalogo.bairros.find((b) => b.rotulo === esc?.bairro) ?? catalogo.centro;
+    transicionar(() => {
+      setBuscaRaw((b) => ({ ...b, local: b.local ?? bairro }));
+      setEscolhida(escolaId);
+      setPasso(3);
+      setModo('consulta');
+    });
+  }
+
   function comecarDaLanding(etapaPre?: EtapaId) {
     transicionar(() => {
       if (etapaPre) {
         setBuscaRaw((b) => ({ ...b, etapa: etapaPre, nascimento: null }));
-        setPasso(busca.local ? 2 : 1);
+        setPasso(1); // Atalho direto para escolha do bairro (Etapa 2)
       } else {
         setPasso(0);
       }
@@ -222,6 +243,17 @@ export function CidadaoApp() {
 
           <div className="topo-acoes">
             <div className="topo-grupo-acess" role="group" aria-label="Preferências e acessibilidade">
+              {protocoloMaisRecente && (
+                <button
+                  type="button"
+                  className="btn-barra btn-barra-protocolo"
+                  onClick={() => abrirProtocolo(protocoloMaisRecente.escolaId)}
+                  title={`Abrir protocolo ativo ${protocoloMaisRecente.codigo}`}
+                >
+                  <Icone nome="ticket" tamanho={16} /> <span className="rotulo-topo">Meu Protocolo</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 className={`btn-barra ${ajudante ? 'ativo' : ''}`}
@@ -230,7 +262,7 @@ export function CidadaoApp() {
                   setAjudante((v) => {
                     const novo = !v;
                     toast(novo ? 'Modo Ajudante ativado: dicas visíveis em cada etapa.' : 'Modo Ajudante desativado.', {
-                      emoji: '🧒',
+                      emoji: 'user-heart',
                       tom: novo ? 'ok' : 'info',
                     });
                     return novo;
@@ -238,7 +270,7 @@ export function CidadaoApp() {
                 }}
                 title="Mostra dicas para o filho ou neto que está ajudando os pais"
               >
-                <span aria-hidden="true">🧒</span> <span className="rotulo-topo">Ajudante</span>
+                <Icone nome="user-heart" tamanho={16} /> <span className="rotulo-topo">Ajudante</span>
               </button>
 
               <button
@@ -259,7 +291,7 @@ export function CidadaoApp() {
                 aria-label={tema === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
                 title={tema === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
               >
-                <span aria-hidden="true">{tema === 'dark' ? '☀' : '☾'}</span>
+                <Icone nome={tema === 'dark' ? 'sun' : 'moon'} tamanho={16} />
               </button>
             </div>
 
@@ -273,10 +305,36 @@ export function CidadaoApp() {
 
       <main id="conteudo" className="conteudo-container">
         {modo === 'landing' ? (
-          <Landing onComecar={comecarDaLanding} onVerEscola={verEscolaDaLanding} />
+          <Landing
+            onComecar={comecarDaLanding}
+            onVerEscola={verEscolaDaLanding}
+            protocoloAtivo={protocoloMaisRecente}
+            onAbrirProtocolo={abrirProtocolo}
+          />
         ) : (
           <div className="consulta-grid">
             <div className="consulta-principal">
+              {protocoloMaisRecente && passo !== 3 && (
+                <aside className="banner-atalho-protocolo" role="status" aria-label="Acesso rápido ao protocolo">
+                  <div className="banner-atalho-conteudo">
+                    <span className="banner-atalho-tag">
+                      <Icone nome="ticket" tamanho={15} /> Protocolo emitido
+                    </span>
+                    <p>
+                      Você já tem a senha <strong>{protocoloMaisRecente.codigo}</strong> para{' '}
+                      <strong>{protocoloMaisRecente.escolaNome}</strong>.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-primario btn-pequeno"
+                    onClick={() => abrirProtocolo(protocoloMaisRecente.escolaId)}
+                  >
+                    Ver meu QR Code <span aria-hidden="true">→</span>
+                  </button>
+                </aside>
+              )}
+
               <Stepper atual={passo} maxLiberado={maxLiberado} onIr={ir} />
 
               <div className="palco-etapa">
@@ -360,7 +418,10 @@ export function CidadaoApp() {
                   <Sticker icon={school} palette={PALETTES.riso} replayOnHover style={{ width: 54 }} />
                   <div>
                     <h2>Resumo · Patos - PB</h2>
-                    <p>{apiOnline ? '🟢 Conectado à API de Patos em tempo real' : '⚡ Cache local sincronizado'}</p>
+                    <p>
+                      <Icone nome={apiOnline ? 'wifi' : 'bolt'} tamanho={14} />{' '}
+                      {apiOnline ? 'Conectado à API de Patos em tempo real' : 'Cache local sincronizado'}
+                    </p>
                   </div>
                 </div>
 
@@ -448,7 +509,13 @@ export function CidadaoApp() {
                   aria-pressed={ajudante}
                   onClick={() => setAjudante((v) => !v)}
                 >
-                  {ajudante ? 'Modo Ajudante ativo ✓' : 'Ativar Modo Ajudante'}
+                  {ajudante ? (
+                    <>
+                      Modo Ajudante ativo <Icone nome="check" tamanho={15} />
+                    </>
+                  ) : (
+                    'Ativar Modo Ajudante'
+                  )}
                 </button>
               </div>
             </aside>

@@ -1,11 +1,12 @@
 import { useMemo, type ReactNode } from 'react';
+import { Icone } from '../components/Icone';
+import { Sheet } from '../components/Sheet';
+import { StatusPill } from '../components/ui';
 import { buscar } from '../domain/busca';
 import { STATUS_INFO } from '../domain/etapas';
 import { formatarDistancia, minutosAPe, tempoRelativo } from '../domain/geo';
 import type { Busca } from '../domain/types';
 import { useEscolas } from '../services/vagasStore';
-import { Sheet } from '../components/Sheet';
-import { StatusPill } from '../components/ui';
 
 interface Props {
   open: boolean;
@@ -32,7 +33,12 @@ export function CompareSheet({ open, onClose, busca, ids, onEscolher }: Props) {
       celula: (i) => (
         <>
           {STATUS_INFO[i.status].frase(i.oferta.vagas, i.oferta.fila)}
-          {i.oferta.vagas === maisVagas && maisVagas > 0 && <span className="trofeu" title="Mais vagas"> 🏆</span>}
+          {i.oferta.vagas === maisVagas && maisVagas > 0 && (
+            <span className="trofeu" title="Mais vagas">
+              {' '}
+              <Icone nome="award" tamanho={16} />
+            </span>
+          )}
         </>
       ),
     },
@@ -40,20 +46,51 @@ export function CompareSheet({ open, onClose, busca, ids, onEscolher }: Props) {
       rotulo: 'Distância',
       celula: (i) => (
         <>
-          {formatarDistancia(i.distanciaKm)} · 🚶{minutosAPe(i.distanciaKm)}min
-          {i.distanciaKm === maisPerto && <span className="trofeu" title="Mais perto"> 🏆</span>}
+          {formatarDistancia(i.distanciaKm)} · <Icone nome="walk" tamanho={14} /> {minutosAPe(i.distanciaKm)}min
+          {i.distanciaKm === maisPerto && (
+            <span className="trofeu" title="Mais perto">
+              {' '}
+              <Icone nome="award" tamanho={16} />
+            </span>
+          )}
         </>
       ),
     },
-    { rotulo: 'Período', celula: (i) => (i.oferta.periodo === 'integral' ? '🌞 Integral' : '🌤️ Meio período') },
-    { rotulo: 'Acessível', celula: (i) => (i.escola.acessivel ? '♿ Sim' : '— Não') },
+    {
+      rotulo: 'Período',
+      celula: (i) => (
+        <>
+          <Icone nome={i.oferta.periodo === 'integral' ? 'sun' : 'cloud-sun'} tamanho={15} />{' '}
+          {i.oferta.periodo === 'integral' ? 'Integral' : 'Meio período'}
+        </>
+      ),
+    },
+    {
+      rotulo: 'Acessível',
+      celula: (i) =>
+        i.escola.acessivel ? (
+          <>
+            <Icone nome="accessibility" tamanho={15} /> Sim
+          </>
+        ) : (
+          '— Não'
+        ),
+    },
     { rotulo: 'Destaques', celula: (i) => i.escola.destaques.join(', ') },
     { rotulo: 'Atendimento', celula: (i) => i.escola.atendimento },
     { rotulo: 'Atualizado', celula: (i) => tempoRelativo(i.escola.atualizadoEm, agora) },
   ];
 
   return (
-    <Sheet open={open && itens.length > 0} onClose={onClose} titulo="⚖️ Comparando escolas">
+    <Sheet
+      open={open && itens.length > 0}
+      onClose={onClose}
+      titulo={
+        <>
+          <Icone nome="scale" tamanho={18} /> Comparando escolas
+        </>
+      }
+    >
       <div className="tabela-rolagem" tabIndex={0} role="region" aria-label="Tabela de comparação">
         <table className="comparador">
           <thead>
@@ -86,7 +123,9 @@ export function CompareSheet({ open, onClose, busca, ids, onEscolher }: Props) {
           </tbody>
         </table>
       </div>
-      <p className="legenda">🏆 = melhor opção naquele quesito</p>
+      <p className="legenda">
+        <Icone nome="award" tamanho={15} /> = melhor opção naquele quesito
+      </p>
     </Sheet>
   );
 }

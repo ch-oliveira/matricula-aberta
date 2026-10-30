@@ -30,7 +30,7 @@ export function useAgora(intervalo = 30_000) {
   return agora;
 }
 
-/** 🔊 Leitura em voz alta (Web Speech API). */
+/** Leitura em voz alta (Web Speech API). */
 export function useFala() {
   const suportado = typeof window !== 'undefined' && 'speechSynthesis' in window;
   const [falando, setFalando] = useState(false);

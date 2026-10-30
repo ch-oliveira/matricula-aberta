@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
+import { Icone, IconeEtapa } from '../components/Icone';
 import { Sheet } from '../components/Sheet';
 import { toast } from '../components/Toasts';
 import { ETAPAS } from '../domain/etapas';
@@ -57,7 +58,7 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
     });
     setErro(null);
     setCriado(true);
-    toast('Alerta registrado na Rede Municipal de Patos - PB!', { emoji: '🔔', tom: 'ok' });
+    toast('Alerta registrado na Rede Municipal de Patos - PB!', { emoji: 'bell', tom: 'ok' });
   }
 
   function fechar() {
@@ -69,19 +70,39 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
   const alvo = escola ? escola.nome : `unidades até ${busca.raioKm} km de ${busca.local?.rotulo} (Patos - PB)`;
 
   return (
-    <Sheet open={open} onClose={fechar} titulo="🔔 Me avise quando abrir vaga">
+    <Sheet
+      open={open}
+      onClose={fechar}
+      titulo={
+        <>
+          <Icone nome="bell" tamanho={18} /> Me avise quando abrir vaga
+        </>
+      }
+    >
       {criado ? (
         <div className="alerta-ok">
-          <p className="alerta-ok-emoji" aria-hidden="true">🎉</p>
+          <p className="alerta-ok-emoji" aria-hidden="true">
+            <Icone nome="sparkles" tamanho={36} />
+          </p>
           <p>
             <strong>Alerta gravado no servidor!</strong> Assim que abrir vaga de {etapa?.nome} em {alvo}, você recebe
             uma mensagem assim:
           </p>
           <div className={`bolha ${canal === 'whatsapp' ? 'bolha-whats' : 'bolha-push'}`}>
-            <strong>{canal === 'whatsapp' ? 'Matrícula Aberta · Patos-PB 🎒' : '🔔 Matrícula Aberta · Patos-PB'}</strong>
+            <strong>
+              {canal === 'whatsapp' ? (
+                <>
+                  Matrícula Aberta · Patos-PB <Icone nome="backpack" tamanho={15} />
+                </>
+              ) : (
+                <>
+                  <Icone nome="bell" tamanho={15} /> Matrícula Aberta · Patos-PB
+                </>
+              )}
+            </strong>
             <p>
               Oba! Abriu 1 vaga de {etapa?.nome} na {escola?.nome ?? 'Creche Municipal Tia Luci'} em Patos - PB. Toque
-              para emitir seu protocolo de visita 👉
+              para emitir seu protocolo de visita <span aria-hidden="true">→</span>
             </p>
           </div>
           <p className="legenda">
@@ -95,7 +116,8 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
       ) : (
         <form onSubmit={enviar} noValidate>
           <p className="alerta-alvo">
-            <span aria-hidden="true">{etapa?.emoji}</span> <strong>{etapa?.nome}</strong> em <strong>{alvo}</strong>
+            {busca.etapa && <IconeEtapa etapa={busca.etapa} tamanho={18} />} <strong>{etapa?.nome}</strong> em{' '}
+            <strong>{alvo}</strong>
           </p>
 
           <fieldset className="grupo">
@@ -109,7 +131,9 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
                   checked={canal === 'whatsapp'}
                   onChange={() => setCanal('whatsapp')}
                 />
-                <span className="opcao-emoji" aria-hidden="true">💬</span>
+                <span className="opcao-emoji" aria-hidden="true">
+                  <Icone nome="message" tamanho={22} />
+                </span>
                 <span>
                   <strong>WhatsApp</strong>
                   <small>Mensagem no seu celular</small>
@@ -123,7 +147,9 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
                   checked={canal === 'push'}
                   onChange={() => setCanal('push')}
                 />
-                <span className="opcao-emoji" aria-hidden="true">📲</span>
+                <span className="opcao-emoji" aria-hidden="true">
+                  <Icone nome="smartphone" tamanho={22} />
+                </span>
                 <span>
                   <strong>Notificação</strong>
                   <small>Sem informar telefone</small>
@@ -170,12 +196,12 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
 
           {erro && (
             <p id={erroId} className="erro-campo" role="alert">
-              <span aria-hidden="true">⚠️</span> {erro}
+              <Icone nome="alert-triangle" tamanho={16} /> {erro}
             </p>
           )}
 
           <button type="submit" className="btn btn-primario btn-largo">
-            <span aria-hidden="true">🔔</span> Criar alerta
+            <Icone nome="bell" tamanho={16} /> Criar alerta
           </button>
 
           {alertas.length > 0 && (
@@ -185,8 +211,8 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
                 {alertas.slice(0, 6).map((a) => (
                   <li key={a.id}>
                     <span>
-                      {a.canal === 'whatsapp' ? '💬' : '📲'} {ETAPAS[a.etapa].nome} ·{' '}
-                      {a.escolaNome ?? `${a.raioKm} km de ${a.local.rotulo}`}
+                      <Icone nome={a.canal === 'whatsapp' ? 'message' : 'smartphone'} tamanho={15} />{' '}
+                      {ETAPAS[a.etapa].nome} · {a.escolaNome ?? `${a.raioKm} km de ${a.local.rotulo}`}
                       {a.telefone ? ` (${a.telefone})` : ''}
                     </span>
                     <button type="button" className="link-sutil" onClick={() => alertasStore.remover(a.id)}>

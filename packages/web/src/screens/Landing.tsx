@@ -1,25 +1,24 @@
 import { useMemo } from 'react';
-import { Ocupacao, StatusPill } from '../components/ui';
+import { CenaEscola3D } from '../components/CenaEscola3D';
+import { Icone, IconeEtapa } from '../components/Icone';
 import { pulsoDaCidade } from '../domain/busca';
-import { ETAPAS, ORDEM_ETAPAS, STATUS_INFO, statusDaOferta } from '../domain/etapas';
-import { tempoRelativo } from '../domain/geo';
+import { ETAPAS, ORDEM_ETAPAS } from '../domain/etapas';
 import type { EtapaId } from '../domain/types';
-import { useAgora, useFala } from '../hooks';
-import { useCatalogo, useEscolas, useStatusApi } from '../services/vagasStore';
+import { useFala } from '../hooks';
+import { useEscolas } from '../services/vagasStore';
 import { PALETTES } from '../stickers/fun';
-import { bell, bulb, calendar, folder, padlock, pin, school, search, toggle, trophy } from '../stickers/icons';
+import { calendar, folder, padlock, pin } from '../stickers/icons';
 import { Sticker } from '../stickers/Sticker';
 
 interface Props {
   onComecar: (etapa?: EtapaId) => void;
   onVerEscola: (escolaId: string, etapa: EtapaId) => void;
+  protocoloAtivo?: { escolaId: string; codigo: string; escolaNome: string } | null;
+  onAbrirProtocolo?: (escolaId: string) => void;
 }
 
-export function Landing({ onComecar, onVerEscola }: Props) {
+export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) {
   const escolas = useEscolas();
-  const catalogo = useCatalogo();
-  const apiOnline = useStatusApi();
-  const agora = useAgora();
   const { suportado, falando, falar, parar } = useFala();
 
   const pulso = useMemo(() => pulsoDaCidade(escolas), [escolas]);
@@ -29,35 +28,37 @@ export function Landing({ onComecar, onVerEscola }: Props) {
     [escolas],
   );
 
-  // 3 unidades reais de Patos - PB demonstrando os 3 estados do semáforo em tempo real
-  const vitrine = useMemo(() => {
-    const aberta = escolas.find((e) => e.ofertas.some((o) => o.vagas > 3)) ?? escolas[0];
-    const ultimas =
-      escolas.find((e) => e.id !== aberta?.id && e.ofertas.some((o) => o.vagas > 0 && o.vagas <= 3)) ?? escolas[1];
-    const espera =
-      escolas.find(
-        (e) => e.id !== aberta?.id && e.id !== ultimas?.id && e.ofertas.some((o) => o.vagas === 0),
-      ) ?? escolas[2];
-
-    return [aberta, ultimas, espera].filter(Boolean).map((escola) => {
-      const oferta =
-        escola === aberta
-          ? escola.ofertas.find((o) => o.vagas > 3) ?? escola.ofertas[0]
-          : escola === ultimas
-            ? escola.ofertas.find((o) => o.vagas > 0 && o.vagas <= 3) ?? escola.ofertas[0]
-            : escola.ofertas.find((o) => o.vagas === 0) ?? escola.ofertas[0];
-      return { escola, oferta, status: statusDaOferta(oferta) };
-    });
-  }, [escolas]);
-
   const textoAudio =
     `Bem-vindo ao Matrícula Aberta de Patos, Paraíba! Consulte em segundos quais creches e escolas municipais perto do seu bairro têm vaga aberta agora, sem cadastro e sem CPF. ` +
     `Hoje temos ${totalVagas} vagas abertas em ${totalEscolasComVaga} unidades da Rede Municipal de Ensino de Patos. ` +
-    `Toque em Consultar vagas agora ou escolha uma etapa de ensino abaixo para começar.`;
+    `Toque em Consultar vagas em Patos ou escolha uma etapa de ensino abaixo para começar.`;
 
   return (
     <div className="landing">
-      {/* ================= BLOCO 1: HERO + FAIXA DE ETAPAS INTEGRADA ================= */}
+      {/* Banner de protocolo ativo caso o cidadão já tenha emitido senha */}
+      {protocoloAtivo && onAbrirProtocolo && (
+        <aside className="lp-banner-protocolo" role="status" aria-label="Protocolo ativo">
+          <div className="lp-banner-protocolo-conteudo">
+            <span className="lp-banner-protocolo-tag">
+              <Icone nome="ticket" tamanho={16} /> Protocolo emitido
+            </span>
+            <p>
+              Você já tem uma senha ativa: <strong>{protocoloAtivo.codigo}</strong> na{' '}
+              <strong>{protocoloAtivo.escolaNome}</strong>.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primario btn-pequeno"
+            onClick={() => onAbrirProtocolo(protocoloAtivo.escolaId)}
+          >
+            <span>Ver meu QR Code</span>
+            <span aria-hidden="true">→</span>
+          </button>
+        </aside>
+      )}
+
+      {/* ================= BLOCO 1: HERO DIRETO COM PERSONAGEM 3D + ATALHOS POR ETAPA ================= */}
       <section className="lp-hero-wrapper" aria-labelledby="lp-titulo">
         <div className="lp-hero">
           <div className="lp-hero-texto">
@@ -65,7 +66,6 @@ export function Landing({ onComecar, onVerEscola }: Props) {
               <span className="ponto-vivo" aria-hidden="true" />
               <span>
                 Patos - PB ao vivo · <strong>{totalVagas} vagas abertas</strong> em {totalEscolasComVaga} unidades
-                municipais
               </span>
             </div>
 
@@ -74,9 +74,8 @@ export function Landing({ onComecar, onVerEscola }: Props) {
             </h1>
 
             <p className="lp-subtitulo">
-              Descubra em 30 segundos onde há vagas no seu bairro (Jatobá, Belo Horizonte, Maternidade, Centro e toda a
-              rede), compare unidades, receba alertas no WhatsApp e emita seu <strong>Protocolo com QR Code</strong>.{' '}
-              <strong>Feito para pais e filhos usarem juntos.</strong>
+              Consulte em 30 segundos onde há vagas no seu bairro, confira os documentos necessários e emita seu{' '}
+              <strong>Protocolo com QR Code</strong> para atendimento rápido na escola.
             </p>
 
             <div className="lp-cta-linha">
@@ -91,7 +90,7 @@ export function Landing({ onComecar, onVerEscola }: Props) {
                   onClick={() => (falando ? parar() : falar(textoAudio))}
                   aria-pressed={falando}
                 >
-                  <span aria-hidden="true">{falando ? '⏹' : '🔊'}</span>
+                  <Icone nome={falando ? 'stop' : 'volume'} tamanho={16} />
                   <span>{falando ? 'Parar áudio' : 'Ouvir explicação'}</span>
                 </button>
               )}
@@ -99,85 +98,34 @@ export function Landing({ onComecar, onVerEscola }: Props) {
 
             <ul className="lp-garantias" aria-label="Garantias da plataforma">
               <li>
-                <span className="lp-check" aria-hidden="true">✓</span> 100% anônimo na busca
+                <span className="lp-check" aria-hidden="true"><Icone nome="check" tamanho={13} /></span> Sem cadastro na busca
               </li>
               <li>
-                <span className="lp-check" aria-hidden="true">✓</span> Protocolo QR Code oficial
+                <span className="lp-check" aria-hidden="true"><Icone nome="check" tamanho={13} /></span> Protocolo QR Code oficial
               </li>
               <li>
-                <span className="lp-check" aria-hidden="true">✓</span> Alertas no WhatsApp (DDD 83)
+                <span className="lp-check" aria-hidden="true"><Icone nome="check" tamanho={13} /></span> Alertas no WhatsApp (DDD 83)
               </li>
             </ul>
           </div>
 
-          {/* Mostruário ao vivo enxuto e integrado */}
-          <div className="lp-vitrine" aria-label="Unidades de Patos - PB em tempo real">
-            <div className="lp-vitrine-moldura">
-              <header className="lp-vitrine-topo">
-                <div className="lp-vitrine-cabecalho-esq">
-                  <div className="lp-vitrine-sticker" aria-hidden="true">
-                    <Sticker icon={school} palette={PALETTES.riso} enter={0.1} replayOnHover style={{ width: 58 }} />
-                  </div>
-                  <div>
-                    <strong className="lp-vitrine-titulo">Rede Municipal de Patos - PB</strong>
-                    <span className="lp-vitrine-sub">
-                      {apiOnline ? 'Sincronizado via SQLite + SSE · Toque para abrir' : 'Conectando à API de Patos…'}
-                    </span>
-                  </div>
-                </div>
-                <span className="lp-badge-sse">
-                  <span className="ponto-vivo" aria-hidden="true" /> AO VIVO
-                </span>
-              </header>
-
-              <div className="lp-vitrine-lista">
-                {vitrine.map(({ escola, oferta, status }) => {
-                  const etapa = ETAPAS[oferta.etapa];
-                  return (
-                    <button
-                      key={escola.id}
-                      type="button"
-                      className={`lp-mini-card lp-mini-${status}`}
-                      onClick={() => onVerEscola(escola.id, oferta.etapa)}
-                    >
-                      <div className="lp-mini-linha1">
-                        <strong>{escola.nome}</strong>
-                        <StatusPill status={status} />
-                      </div>
-                      <div className="lp-mini-linha2">
-                        <span>
-                          {etapa.nome} ({oferta.periodo === 'integral' ? 'Integral' : 'Parcial'}) · {escola.bairro}
-                        </span>
-                        <span className="lp-mini-num">{STATUS_INFO[status].frase(oferta.vagas, oferta.fila)}</span>
-                      </div>
-                      <Ocupacao vagas={oferta.vagas} capacidade={oferta.capacidade} status={status} />
-                      <div className="lp-mini-rodape">
-                        <span>Atualizado {tempoRelativo(escola.atualizadoEm, agora)}</span>
-                        <span className="lp-mini-acao">Emitir protocolo →</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+          {/* Apenas a Mãe e o Filho em 3D Interativo (clicáveis, olham pro mouse e riem) */}
+          <div className="lp-hero-ilustracao">
+            <CenaEscola3D />
           </div>
         </div>
 
-        {/* Faixa única de disponibilidade por etapa na Rede Municipal de Patos */}
-        <div className="lp-faixa-etapas" aria-label="Disponibilidade por faixa etária em Patos - PB">
+        {/* Faixa direta de atalho por etapa */}
+        <div className="lp-faixa-etapas" aria-label="Escolha a etapa de ensino">
           <div className="lp-faixa-topo">
-            <div>
-              <h2>Vagas abertas agora na rede de Patos - PB</h2>
-              <p>Selecione a etapa de ensino da criança para filtrar imediatamente as creches e EMEFs com vaga:</p>
-            </div>
-            <span className="lp-faixa-dica">Não sabe a etapa? Digite só a data de nascimento no passo 1.</span>
+            <h2>Ou comece clicando direto na etapa da criança:</h2>
+            <span className="lp-faixa-dica">Não sabe a etapa? Calculamos pela data de nascimento.</span>
           </div>
 
           <div className="lp-etapas-grid">
             {ORDEM_ETAPAS.map((id) => {
               const e = ETAPAS[id];
               const p = pulso[id];
-              const status = statusDaOferta({ vagas: p.vagas });
               return (
                 <button
                   key={id}
@@ -191,19 +139,16 @@ export function Landing({ onComecar, onVerEscola }: Props) {
                       <strong>{e.nome}</strong>
                       <small>{e.faixa}</small>
                     </div>
-                    <span className="lp-etapa-icone" aria-hidden="true">{e.emoji}</span>
+                    <span className="lp-etapa-icone" aria-hidden="true">
+                      <IconeEtapa etapa={id} tamanho={24} />
+                    </span>
                   </div>
-
-                  <div className="lp-etapa-card-meio">
-                    <span className="lp-etapa-num">{p.vagas}</span>
-                    <span className="lp-etapa-rotulo">vagas livres</span>
-                  </div>
-
-                  <Ocupacao vagas={p.vagas} capacidade={p.capacidade} status={status} />
 
                   <div className="lp-etapa-card-rodape">
-                    <span>{p.escolasComVaga} unidades em Patos</span>
-                    <span className="lp-etapa-cta">Consultar →</span>
+                    <span className="lp-etapa-vagas-pill">
+                      <strong>{p.vagas}</strong> vagas livres
+                    </span>
+                    <span className="lp-etapa-cta" aria-hidden="true">→</span>
                   </div>
                 </button>
               );
@@ -212,24 +157,24 @@ export function Landing({ onComecar, onVerEscola }: Props) {
         </div>
       </section>
 
-      {/* ================= BLOCO 2: COMO FUNCIONA (4 ETAPAS ENXUTAS) ================= */}
+      {/* ================= BLOCO 2: COMO FUNCIONA EM 3 PASSOS DIRETOS ================= */}
       <section id="como-funciona" className="lp-secao" aria-labelledby="t-passos">
         <div className="lp-secao-cabecalho">
-          <span className="lp-tag">Jornada guiada em 4 passos</span>
-          <h2 id="t-passos">Da consulta ao protocolo presencial com QR Code</h2>
+          <span className="lp-tag">Rápido e sem burocracia</span>
+          <h2 id="t-passos">Como garantir o atendimento em 3 passos</h2>
         </div>
 
-        <ol className="lp-passos-grade">
+        <ol className="lp-passos-grade lp-passos-3">
           <li className="lp-passo-card" onClick={() => onComecar()}>
             <div className="lp-passo-topo">
               <span className="lp-passo-num">01</span>
               <div className="lp-passo-sticker" aria-hidden="true">
-                <Sticker icon={calendar} palette={PALETTES.riso} offset={0} replayOnHover style={{ width: 82 }} />
+                <Sticker icon={calendar} palette={PALETTES.riso} offset={0} replayOnHover style={{ width: 72 }} />
               </div>
             </div>
             <h3>Idade da criança</h3>
             <p>
-              Informe a data de nascimento. O sistema calcula a turma certa pelo corte nacional (31/03), sem pedir CPF.
+              Informe a data de nascimento ou a etapa. O sistema indica a turma certa pelo corte do MEC (31/03).
             </p>
           </li>
 
@@ -237,13 +182,12 @@ export function Landing({ onComecar, onVerEscola }: Props) {
             <div className="lp-passo-topo">
               <span className="lp-passo-num">02</span>
               <div className="lp-passo-sticker" aria-hidden="true">
-                <Sticker icon={pin} palette={PALETTES.sunset} offset={35} replayOnHover style={{ width: 82 }} />
+                <Sticker icon={pin} palette={PALETTES.sunset} offset={35} replayOnHover style={{ width: 72 }} />
               </div>
             </div>
-            <h3>Seu bairro em Patos - PB</h3>
+            <h3>Bairro no mapa de Patos</h3>
             <p>
-              Ative o GPS ou escolha entre os {catalogo.bairros.length} bairros catalogados de Patos. Filtre por turno
-              integral e Sala AEE.
+              Toque no seu bairro no mapa interativo de Patos - PB para ver as creches e escolas mais próximas com vaga.
             </p>
           </li>
 
@@ -251,115 +195,31 @@ export function Landing({ onComecar, onVerEscola }: Props) {
             <div className="lp-passo-topo">
               <span className="lp-passo-num">03</span>
               <div className="lp-passo-sticker" aria-hidden="true">
-                <Sticker icon={search} palette={PALETTES.aqua} offset={70} replayOnHover style={{ width: 82 }} />
+                <Sticker icon={folder} palette={PALETTES.candy} offset={70} replayOnHover style={{ width: 72 }} />
               </div>
             </div>
-            <h3>Semáforo e comparação</h3>
+            <h3>Checklist e Protocolo QR</h3>
             <p>
-              Veja onde há vagas imediatas nas creches e EMEFs de Patos, compare até 3 unidades ou ative um alerta no
-              WhatsApp.
-            </p>
-          </li>
-
-          <li className="lp-passo-card" onClick={() => onComecar()}>
-            <div className="lp-passo-topo">
-              <span className="lp-passo-num">04</span>
-              <div className="lp-passo-sticker" aria-hidden="true">
-                <Sticker icon={folder} palette={PALETTES.candy} offset={105} replayOnHover style={{ width: 82 }} />
-              </div>
-            </div>
-            <h3>Checklist + Protocolo QR</h3>
-            <p>
-              Marque os documentos (Energisa/Cagepa, SUS, vacina) e emita seu protocolo <strong>PATOS-2027-XXXX</strong>{' '}
-              com QR Code para atendimento rápido.
+              Confira os documentos necessários e emita o protocolo <strong>PATOS-2027-XXXX</strong> para levar à escola.
             </p>
           </li>
         </ol>
       </section>
 
-      {/* ================= BLOCO 3: DIFERENCIAIS ENXUTOS (4 CARTÕES BENTO) ================= */}
-      <section className="lp-secao" aria-labelledby="t-recursos">
-        <div className="lp-secao-cabecalho">
-          <span className="lp-tag">Inovação pública municipal</span>
-          <h2 id="t-recursos">Tecnologia pensada para as famílias e para a Secretaria de Educação de Patos</h2>
-        </div>
-
-        <div className="lp-bento-4">
-          <article className="lp-bento-card lp-bento-destaque">
-            <div className="lp-bento-sticker" aria-hidden="true">
-              <Sticker icon={bulb} palette={PALETTES.riso} replayOnHover style={{ width: 84 }} />
-            </div>
-            <div>
-              <span className="lp-mini-tag">Inclusão digital familiar</span>
-              <h3>Modo Ajudante + Leitura em Voz Alta</h3>
-              <p>
-                Muitas vezes os filhos ajudam os pais pelo celular. O <strong>Modo Ajudante</strong> traz dicas práticas
-                em cada passo, acompanhado de <strong>áudio em voz alta</strong> e fonte ampliada (<strong>A+</strong>).
-              </p>
-            </div>
-          </article>
-
-          <article className="lp-bento-card">
-            <div className="lp-bento-sticker" aria-hidden="true">
-              <Sticker icon={bell} palette={PALETTES.sunset} offset={25} replayOnHover style={{ width: 76 }} />
-            </div>
-            <div>
-              <span className="lp-mini-tag">Protocolo Presencial Digital</span>
-              <h3>Pré-Agendamento com QR Code</h3>
-              <p>
-                Emita a senha oficial <strong>PATOS-2027-XXXX</strong> na Etapa 4. Quando a secretaria da escola
-                confirma sua presença, a vaga é abatida automaticamente no banco de dados.
-              </p>
-            </div>
-          </article>
-
-          <article className="lp-bento-card">
-            <div className="lp-bento-sticker" aria-hidden="true">
-              <Sticker icon={trophy} palette={PALETTES.candy} offset={50} replayOnHover style={{ width: 76 }} />
-            </div>
-            <div>
-              <span className="lp-mini-tag">Decisão rápida</span>
-              <h3>Comparador de Creches e EMEFs</h3>
-              <p>
-                Compare até 3 unidades próximas em Patos - PB lado a lado: distância a pé, vagas livres, período
-                integral, Sala AEE e horário de atendimento.
-              </p>
-            </div>
-          </article>
-
-          <article className="lp-bento-card">
-            <div className="lp-bento-sticker" aria-hidden="true">
-              <Sticker icon={toggle} palette={PALETTES.matcha} offset={75} replayOnHover style={{ width: 76 }} />
-            </div>
-            <div>
-              <span className="lp-mini-tag">Gestão & Inteligência Pública</span>
-              <h3>Painel da Unidade + Visão Macro da Secretaria</h3>
-              <p>
-                Enquanto as escolas atualizam vagas em 10 segundos, a <strong>Secretaria Municipal de Educação</strong>{' '}
-                acompanha o mapa de demanda reprimida por bairro de Patos - PB em tempo real.
-              </p>
-              <a className="lp-link-direto" href="#/gestao">
-                Abrir Painel da Secretaria e Unidades →
-              </a>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      {/* ================= BLOCO 4: FAQ + CHAMADA FINAL LADO A LADO ================= */}
+      {/* ================= BLOCO 3: DÚVIDAS RÁPIDAS + ACESSO GESTÃO ================= */}
       <section id="duvidas" className="lp-rodape-duplo" aria-labelledby="t-faq">
         <div className="lp-cta-lateral">
           <div className="lp-cta-lateral-topo">
-            <Sticker icon={padlock} palette={PALETTES.clay} replayOnHover style={{ width: 76 }} />
+            <Sticker icon={padlock} palette={PALETTES.clay} replayOnHover style={{ width: 68 }} />
             <span className="lp-tag">Patos - PB · 100% Gratuito</span>
           </div>
-          <h2>Pronto para consultar as vagas do seu bairro em Patos?</h2>
+          <h2>Vai matricular ou transferir seu filho?</h2>
           <p>
-            A consulta não exige cadastro, não pede CPF e já gera seu protocolo de atendimento presencial com QR Code.
+            Consulte agora sem precisar de senha ou CPF, ou acesse o painel exclusivo das escolas e da Secretaria.
           </p>
           <div className="lp-cta-final-botoes">
             <button type="button" className="btn btn-primario btn-largo" onClick={() => onComecar()}>
-              <span>Começar consulta agora</span>
+              <span>Consultar vagas agora</span>
               <span aria-hidden="true">→</span>
             </button>
             <a className="btn btn-secundario btn-largo" href="#/gestao">
@@ -369,38 +229,29 @@ export function Landing({ onComecar, onVerEscola }: Props) {
         </div>
 
         <div className="lp-faq-coluna">
-          <h2 id="t-faq">Perguntas frequentes (Patos - PB)</h2>
+          <h2 id="t-faq">Dúvidas rápidas</h2>
           <div className="lp-faq">
             <details className="lp-faq-item" name="faq-matricula" open>
-              <summary>Preciso informar CPF ou nome da criança para consultar as vagas?</summary>
+              <summary>Preciso informar CPF para consultar as vagas?</summary>
               <p>
-                <strong>Não.</strong> A busca é totalmente anônima. Você só informa o nome do responsável na última
-                etapa se quiser emitir o <strong>Protocolo de Pré-Agendamento com QR Code</strong>.
+                <strong>Não.</strong> A consulta é 100% livre e anônima. Você só informa seu nome no último passo se
+                quiser gerar o <strong>Protocolo com QR Code</strong>.
               </p>
             </details>
 
             <details className="lp-faq-item" name="faq-matricula">
-              <summary>Como funciona o Protocolo de Atendimento Presencial (PATOS-2027-XXXX)?</summary>
+              <summary>Como funciona o protocolo presencial (PATOS-2027-XXXX)?</summary>
               <p>
-                Ao escolher a creche ou escola em Patos - PB, você gera gratuitamente seu protocolo digital com QR Code
-                e escolhe o dia e turno da visita. A secretaria da unidade já recebe seus dados na fila de recepção.
+                Ao escolher a unidade, você agenda o dia e turno (manhã ou tarde) e leva o QR Code com os documentos do
+                checklist direto à secretaria da escola, sem enfrentar fila na madrugada.
               </p>
             </details>
 
             <details className="lp-faq-item" name="faq-matricula">
-              <summary>Como é calculada a turma pela data de corte de 31 de março?</summary>
+              <summary>E se a creche do meu bairro estiver sem vaga no momento?</summary>
               <p>
-                Seguimos a diretriz nacional do MEC (Resolução CNE/CEB nº 2/2018) adotada pela Secretaria Municipal de
-                Educação de Patos - PB: considera-se a idade completa até <strong>31 de março</strong> do ano letivo.
-              </p>
-            </details>
-
-            <details className="lp-faq-item" name="faq-matricula">
-              <summary>O que fazer quando a creche desejada está em lista de espera?</summary>
-              <p>
-                Toque em <strong>“Avise-me quando abrir”</strong> para registrar seu WhatsApp (DDD 83). Além de avisar
-                você na hora em que abrir vaga, seu alerta ajuda a Secretaria de Educação de Patos a mapear onde abrir
-                novas turmas.
+                Basta tocar em <strong>“Avise-me”</strong> para receber um alerta no seu WhatsApp (DDD 83) assim que
+                abrir vaga na unidade escolhida.
               </p>
             </details>
           </div>

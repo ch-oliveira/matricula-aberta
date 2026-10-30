@@ -32,17 +32,17 @@ const BAIRROS_PATOS_INICIAL: Array<Local & { id: string; zona: string }> = [
 ];
 
 const DOCUMENTOS_INICIAL: Documento[] = [
-  { id: 'certidao', nome: 'Certidão de nascimento da criança', dica: 'Original e uma cópia legível.', emoji: '📄', obrigatorio: true },
-  { id: 'cpf-crianca', nome: 'CPF da criança', dica: 'Pode constar na própria certidão de nascimento.', emoji: '🪪', obrigatorio: true },
-  { id: 'doc-resp', nome: 'Documento oficial com foto do responsável', dica: 'RG, CIN, CNH ou Carteira de Trabalho.', emoji: '🧑', obrigatorio: true },
-  { id: 'cpf-resp', nome: 'CPF do pai, mãe ou responsável legal', dica: 'Pode estar no RG ou CNH.', emoji: '🔢', obrigatorio: true },
-  { id: 'residencia', nome: 'Comprovante de residência em Patos - PB', dica: 'Conta da Energisa, Cagepa ou contrato de aluguel recente.', emoji: '🏠', obrigatorio: true },
-  { id: 'vacina', nome: 'Carteira de vacinação atualizada (UBS)', dica: 'Emitida ou atualizada em qualquer UBS de Patos.', emoji: '💉', obrigatorio: true, etapas: ['bercario', 'maternal', 'pre', 'fund1'] },
-  { id: 'sus', nome: 'Cartão Nacional do SUS da criança', dica: 'Obrigatório para cadastro na Rede Municipal de Patos.', emoji: '🏥', obrigatorio: true, etapas: ['bercario', 'maternal', 'pre'] },
-  { id: 'historico', nome: 'Declaração provisória ou Histórico Escolar', dica: 'Solicite na escola anterior (prazo de 30 dias para o definitivo).', emoji: '🎓', obrigatorio: true, etapas: ['fund1', 'fund2'] },
-  { id: 'trabalho', nome: 'Comprovante de trabalho dos responsáveis', dica: 'Prioridade para vagas de tempo integral nas creches municipais.', emoji: '💼', obrigatorio: false, etapas: ['bercario', 'maternal'] },
-  { id: 'nis', nome: 'Número do NIS / Cartão Bolsa Família (CadÚnico)', dica: 'Garante prioridade social conforme diretriz municipal.', emoji: '💳', obrigatorio: false },
-  { id: 'laudo', nome: 'Laudo médico ou parecer multiprofissional (AEE)', dica: 'Para estudantes com deficiência, TEA ou altas habilidades.', emoji: '🩺', obrigatorio: false },
+  { id: 'certidao', nome: 'Certidão de nascimento da criança', dica: 'Original e uma cópia legível.', emoji: 'file-text', obrigatorio: true },
+  { id: 'cpf-crianca', nome: 'CPF da criança', dica: 'Pode constar na própria certidão de nascimento.', emoji: 'id-card', obrigatorio: true },
+  { id: 'doc-resp', nome: 'Documento oficial com foto do responsável', dica: 'RG, CIN, CNH ou Carteira de Trabalho.', emoji: 'user-check', obrigatorio: true },
+  { id: 'cpf-resp', nome: 'CPF do pai, mãe ou responsável legal', dica: 'Pode estar no RG ou CNH.', emoji: 'id-badge', obrigatorio: true },
+  { id: 'residencia', nome: 'Comprovante de residência em Patos - PB', dica: 'Conta da Energisa, Cagepa ou contrato de aluguel recente.', emoji: 'home', obrigatorio: true },
+  { id: 'vacina', nome: 'Carteira de vacinação atualizada (UBS)', dica: 'Emitida ou atualizada em qualquer UBS de Patos.', emoji: 'syringe', obrigatorio: true, etapas: ['bercario', 'maternal', 'pre', 'fund1'] },
+  { id: 'sus', nome: 'Cartão Nacional do SUS da criança', dica: 'Obrigatório para cadastro na Rede Municipal de Patos.', emoji: 'heart-pulse', obrigatorio: true, etapas: ['bercario', 'maternal', 'pre'] },
+  { id: 'historico', nome: 'Declaração provisória ou Histórico Escolar', dica: 'Solicite na escola anterior (prazo de 30 dias para o definitivo).', emoji: 'graduation-cap', obrigatorio: true, etapas: ['fund1', 'fund2'] },
+  { id: 'trabalho', nome: 'Comprovante de trabalho dos responsáveis', dica: 'Prioridade para vagas de tempo integral nas creches municipais.', emoji: 'briefcase', obrigatorio: false, etapas: ['bercario', 'maternal'] },
+  { id: 'nis', nome: 'Número do NIS / Cartão Bolsa Família (CadÚnico)', dica: 'Garante prioridade social conforme diretriz municipal.', emoji: 'credit-card', obrigatorio: false },
+  { id: 'laudo', nome: 'Laudo médico ou parecer multiprofissional (AEE)', dica: 'Para estudantes com deficiência, TEA ou altas habilidades.', emoji: 'stethoscope', obrigatorio: false },
 ];
 
 export function garantirSeedCatalogoPatos() {
@@ -73,6 +73,11 @@ export function garantirSeedCatalogoPatos() {
         d.etapas ? JSON.stringify(d.etapas) : null,
         idx + 1,
       );
+    });
+  } else {
+    const updDoc = db.prepare('UPDATE documentos_catalogo SET emoji = ? WHERE id = ?');
+    DOCUMENTOS_INICIAL.forEach((d) => {
+      updDoc.run(d.emoji, d.id);
     });
   }
 }

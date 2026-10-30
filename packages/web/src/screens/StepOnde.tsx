@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
+import { Icone } from '../components/Icone';
+import { BAIRROS_MAPA_PATOS, MapaPatos } from '../components/MapaPatos';
 import { DicaAjudante, TituloEtapa } from '../components/ui';
-import { buscar, resumo } from '../domain/busca';
-import { ETAPAS } from '../domain/etapas';
 import { distanciaKm } from '../domain/geo';
-import type { Busca } from '../domain/types';
+import type { Busca, Local } from '../domain/types';
 import { useCatalogo, useEscolas } from '../services/vagasStore';
 import { pin } from '../stickers/icons';
 
@@ -21,8 +21,6 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
   const catalogo = useCatalogo();
   const [gps, setGps] = useState<'parado' | 'buscando' | 'erro' | 'fora'>('parado');
 
-  const previa = useMemo(() => resumo(buscar(escolas, busca)), [escolas, busca]);
-
   function usarLocalizacao() {
     if (!('geolocation' in navigator)) {
       setGps('erro');
@@ -36,7 +34,7 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
           setGps('fora');
           setBusca((b) => ({
             ...b,
-            local: { ...catalogo.centro, rotulo: 'Centro · Patos - PB' },
+            local: { ...catalogo.centro, rotulo: 'Centro' },
           }));
           return;
         }
@@ -48,106 +46,100 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
     );
   }
 
-  const etapa = busca.etapa ? ETAPAS[busca.etapa] : null;
+  const bairrosLista: Local[] = useMemo(
+    () =>
+      catalogo.bairros.length > 0
+        ? catalogo.bairros
+        : BAIRROS_MAPA_PATOS.map((b) => ({
+            id: b.id,
+            rotulo: b.rotulo,
+            zona: b.zona,
+            lat: b.lat,
+            lng: b.lng,
+          })),
+    [catalogo.bairros],
+  );
 
   return (
     <section className="etapa" aria-labelledby="t-onde">
       <TituloEtapa
         id="t-onde"
-        emoji="📍"
+        emoji="pin"
         sticker={pin}
         titulo="Qual o seu bairro em Patos - PB?"
-        subtitulo="Usamos isso só para ordenar as creches e escolas municipais mais próximas. Não guardamos sua localização."
-        fala="Qual o seu bairro em Patos? Toque em usar minha localização, ou escolha o seu bairro abaixo. Depois escolha a distância máxima até a escola."
+        subtitulo="Toque no seu bairro no mapa abaixo ou use o GPS. Não guardamos sua localização."
+        fala="Qual o seu bairro em Patos? Toque direto no seu bairro no mapa de Patos, ou em usar meu GPS. Depois escolha a distância máxima até a escola."
       />
 
-      <button type="button" className="btn-gps" onClick={usarLocalizacao} aria-busy={gps === 'buscando'}>
-        <span aria-hidden="true" className="btn-gps-icone">{gps === 'buscando' ? '🛰️' : '📍'}</span>
-        <span>
-          <strong>{gps === 'buscando' ? 'Localizando em Patos - PB…' : 'Usar minha localização atual'}</strong>
-          <small>Cálculo direto por GPS no seu celular</small>
-        </span>
-      </button>
+      <MapaPatos
+        bairrosCatalogo={bairrosLista}
+        escolas={escolas}
+        busca={busca}
+        onSelecionarBairro={(local) => setBusca((x) => ({ ...x, local }))}
+        onUsarGps={usarLocalizacao}
+        gpsStatus={gps}
+      />
+
+      {erro && (
+        <p className="erro-campo" role="alert">
+          <Icone nome="alert-triangle" tamanho={16} /> {erro}
+        </p>
+      )}
       {gps === 'erro' && (
         <p className="aviso-suave" role="alert">
-          <span aria-hidden="true">🙈</span> Não conseguimos ler o GPS. Sem problema — escolha seu bairro de Patos abaixo.
+          <Icone nome="eye-off" tamanho={16} /> Não conseguimos ler o GPS. Toque no seu bairro direto no mapa acima.
         </p>
       )}
       {gps === 'fora' && (
         <p className="aviso-suave" role="status">
-          <span aria-hidden="true">🗺️</span> Você parece estar fora do perímetro urbano de Patos - PB. Selecionamos o{' '}
-          <strong>Centro de Patos</strong> como ponto de partida.
+          <Icone nome="map" tamanho={16} /> Você parece estar fora de Patos - PB. Selecionamos o{' '}
+          <strong>Centro</strong> como ponto de partida.
         </p>
       )}
 
-      <fieldset className="grupo">
-        <legend>Ou escolha o seu bairro em Patos - PB</legend>
-        <div className="chips">
-          {catalogo.bairros.map((b) => (
-            <label key={b.id ?? b.rotulo} className="chip">
-              <input
-                type="radio"
-                name="bairro"
-                checked={busca.local?.rotulo === b.rotulo}
-                onChange={() => setBusca((x) => ({ ...x, local: b }))}
-              />
-              <span>{b.rotulo}</span>
-            </label>
-          ))}
-        </div>
-        {erro && (
-          <p className="erro-campo" role="alert">
-            <span aria-hidden="true">⚠️</span> {erro}
-          </p>
-        )}
-      </fieldset>
+      <div className="onde-filtros-duplos">
+        <fieldset className="grupo">
+          <legend>Até que distância?</legend>
+          <div className="chips chips-iguais">
+            {RAIOS.map((r) => (
+              <label key={r} className="chip">
+                <input
+                  type="radio"
+                  name="raio"
+                  checked={busca.raioKm === r}
+                  onChange={() => setBusca((b) => ({ ...b, raioKm: r }))}
+                />
+                <span>{r} km</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
-      {busca.local && (
-        <p className="local-escolhido">
-          <span aria-hidden="true">📌</span> Ponto de partida em Patos - PB: <strong>{busca.local.rotulo}</strong>
-          {busca.local.zona ? ` (${busca.local.zona})` : ''}
-        </p>
-      )}
-
-      <fieldset className="grupo">
-        <legend>Até que distância?</legend>
-        <div className="chips chips-iguais">
-          {RAIOS.map((r) => (
-            <label key={r} className="chip">
-              <input
-                type="radio"
-                name="raio"
-                checked={busca.raioKm === r}
-                onChange={() => setBusca((b) => ({ ...b, raioKm: r }))}
-              />
-              <span>{r} km</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="grupo">
-        <legend>Qual período?</legend>
-        <div className="chips chips-iguais">
-          {(
-            [
-              ['tanto-faz', '🤷 Tanto faz'],
-              ['integral', '🌞 Integral'],
-              ['parcial', '🌤️ Meio período'],
-            ] as const
-          ).map(([v, r]) => (
-            <label key={v} className="chip">
-              <input
-                type="radio"
-                name="periodo"
-                checked={busca.periodo === v}
-                onChange={() => setBusca((b) => ({ ...b, periodo: v }))}
-              />
-              <span>{r}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+        <fieldset className="grupo">
+          <legend>Qual período?</legend>
+          <div className="chips chips-iguais">
+            {(
+              [
+                ['tanto-faz', 'clock', 'Tanto faz'],
+                ['integral', 'sun', 'Integral'],
+                ['parcial', 'cloud-sun', 'Meio período'],
+              ] as const
+            ).map(([v, icone, r]) => (
+              <label key={v} className="chip">
+                <input
+                  type="radio"
+                  name="periodo"
+                  checked={busca.periodo === v}
+                  onChange={() => setBusca((b) => ({ ...b, periodo: v }))}
+                />
+                <span>
+                  <Icone nome={icone} tamanho={15} /> {r}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      </div>
 
       <label className="toggle-linha">
         <input
@@ -156,7 +148,9 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
           onChange={(e) => setBusca((b) => ({ ...b, soAcessivel: e.target.checked }))}
         />
         <span>
-          <strong>♿ Só unidades com acessibilidade e Sala AEE</strong>
+          <strong>
+            <Icone nome="accessibility" tamanho={16} /> Só unidades com acessibilidade e Sala AEE
+          </strong>
           <small>Rampas, banheiros adaptados e Atendimento Educacional Especializado</small>
         </span>
       </label>
@@ -165,25 +159,6 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
         Pergunte se a família prefere a unidade perto de casa (ex.: Jatobá, Belo Horizonte, Maternidade) ou perto do
         trabalho no Centro de Patos.
       </DicaAjudante>
-
-      {busca.local && etapa && (
-        <div className="previa" aria-live="polite">
-          <span className="previa-emoji" aria-hidden="true">🔎</span>
-          <p>
-            {previa.total === 0 ? (
-              <>
-                Nenhuma unidade de <strong>{etapa.nome}</strong> nesse raio. Tente aumentar a distância para 3 km ou 5
-                km.
-              </>
-            ) : (
-              <>
-                Encontramos <strong>{previa.total} {previa.total === 1 ? 'unidade' : 'unidades'}</strong> de{' '}
-                {etapa.nome} com <strong>{previa.vagas} vagas livres</strong> em até {busca.raioKm} km.
-              </>
-            )}
-          </p>
-        </div>
-      )}
     </section>
   );
 }
