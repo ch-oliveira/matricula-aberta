@@ -85,7 +85,7 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
             <Icone nome="sparkles" tamanho={36} />
           </p>
           <p>
-            <strong>Alerta gravado no servidor!</strong> Assim que abrir vaga de {etapa?.nome} em {alvo}, você recebe
+            <strong>Alerta ativado!</strong> Assim que abrir vaga de {etapa?.nome} em {alvo}, você recebe
             uma mensagem assim:
           </p>
           <div className={`bolha ${canal === 'whatsapp' ? 'bolha-whats' : 'bolha-push'}`}>

@@ -59,9 +59,28 @@ export function StepVagas(p: Props) {
 
   const fala =
     res.total === 0
-      ? `Não encontramos escolas de ${etapa?.nome} nesse raio.`
-      : `Encontramos ${res.total} escolas. ${res.comVaga} têm vaga, somando ${res.vagas} vagas. ` +
-        lista.slice(0, 3).map((r) => `${r.escola.nome}, a ${r.distanciaKm.toFixed(1).replace('.', ' vírgula ')} quilômetros, ${r.status === 'espera' ? 'lista de espera' : `${r.oferta.vagas} vagas`}.`).join(' ');
+      ? `Não encontramos unidades de ${etapa?.nome ?? 'ensino'} nessa distância. Toque no botão abaixo para ampliar a busca para os bairros vizinhos.`
+      : `Encontramos ${res.total} ${res.total === 1 ? 'unidade próxima' : 'unidades próximas'}. ` +
+        (res.comVaga > 0
+          ? `${res.comVaga} ${res.comVaga === 1 ? 'tem vaga aberta agora' : 'têm vagas abertas agora'}, somando ${res.vagas} vagas disponíveis. `
+          : 'No momento, todas estão em lista de espera. ') +
+        lista
+          .slice(0, 3)
+          .map((r) => {
+            const distFalada =
+              r.distanciaKm < 1
+                ? `a cerca de ${Math.max(50, Math.round((r.distanciaKm * 1000) / 50) * 50)} metros`
+                : `a ${r.distanciaKm.toFixed(1).replace('.0', '').replace('.', ' vírgula ')} quilômetros`;
+            const vagaFalada =
+              r.status === 'espera'
+                ? 'está em lista de espera'
+                : r.oferta.vagas === 1
+                  ? 'tem 1 vaga livre'
+                  : `tem ${r.oferta.vagas} vagas livres`;
+            return `${r.escola.nome}, ${distFalada}, ${vagaFalada}.`;
+          })
+          .join(' ') +
+        ' Toque em Quero esta escola na unidade desejada para ver os documentos e emitir sua senha.';
 
   return (
     <section className="etapa" aria-labelledby="t-vagas">

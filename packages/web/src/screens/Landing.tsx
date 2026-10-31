@@ -29,9 +29,10 @@ export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) 
   );
 
   const textoAudio =
-    `Bem-vindo ao Matrícula Aberta de Patos, Paraíba! Consulte em segundos quais creches e escolas municipais perto do seu bairro têm vaga aberta agora, sem cadastro e sem CPF. ` +
-    `Hoje temos ${totalVagas} vagas abertas em ${totalEscolasComVaga} unidades da Rede Municipal de Ensino de Patos. ` +
-    `Toque em Consultar vagas em Patos ou escolha uma etapa de ensino abaixo para começar.`;
+    `Olá! Bem-vindo ao Matrícula Aberta de Patos, na Paraíba. ` +
+    `Aqui você descobre rapidinho quais creches e escolas municipais perto da sua casa têm vaga aberta agora, sem precisar de cadastro nem de CPF. ` +
+    `Neste momento, temos ${totalVagas} vagas disponíveis em ${totalEscolasComVaga} unidades da nossa rede municipal. ` +
+    `Para começar, toque no botão Consultar vagas em Patos, ou escolha a idade da criança logo abaixo.`;
 
   return (
     <div className="landing">
@@ -215,16 +216,13 @@ export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) 
           </div>
           <h2>Vai matricular ou transferir seu filho?</h2>
           <p>
-            Consulte agora sem precisar de senha ou CPF, ou acesse o painel exclusivo das escolas e da Secretaria.
+            Consulte as vagas abertas perto da sua casa agora mesmo, sem precisar de senha ou CPF, e gere seu protocolo digital.
           </p>
           <div className="lp-cta-final-botoes">
             <button type="button" className="btn btn-primario btn-largo" onClick={() => onComecar()}>
               <span>Consultar vagas agora</span>
               <span aria-hidden="true">→</span>
             </button>
-            <a className="btn btn-secundario btn-largo" href="#/gestao">
-              Painel da Secretaria / Escola
-            </a>
           </div>
         </div>
 

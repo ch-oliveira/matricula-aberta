@@ -9,7 +9,7 @@ import { distanciaKm } from '../domain/geo';
 import type { Busca, EtapaId } from '../domain/types';
 import { usePersistido, useTema } from '../hooks';
 import { alertasStore, notificar } from '../services/alertas';
-import { useCatalogo, useEscolas, useStatusApi, vagasStore } from '../services/vagasStore';
+import { useCatalogo, useEscolas, vagasStore } from '../services/vagasStore';
 import { PALETTES } from '../stickers/fun';
 import { bell, bulb, school } from '../stickers/icons';
 import { Sticker } from '../stickers/Sticker';
@@ -41,7 +41,6 @@ function transicionar(fn: () => void) {
 export function CidadaoApp() {
   const escolas = useEscolas();
   const catalogo = useCatalogo();
-  const apiOnline = useStatusApi();
   const [modo, setModo] = usePersistido<'landing' | 'consulta'>('ma:modo:v1', 'landing');
   const [busca, setBuscaRaw] = usePersistido<Busca>('ma:busca:v1', BUSCA_INICIAL);
   const [passo, setPasso] = usePersistido<number>('ma:passo:v1', 0);
@@ -294,11 +293,6 @@ export function CidadaoApp() {
                 <Icone nome={tema === 'dark' ? 'sun' : 'moon'} tamanho={16} />
               </button>
             </div>
-
-            <a className="btn-topo btn-topo-escola" href="#/gestao" title="Painel da Secretaria e Unidades de Patos - PB">
-              <span className="rotulo-topo">Secretaria / Escola</span>
-              <span aria-hidden="true">→</span>
-            </a>
           </div>
         </div>
       </header>
@@ -418,10 +412,7 @@ export function CidadaoApp() {
                   <Sticker icon={school} palette={PALETTES.riso} replayOnHover style={{ width: 54 }} />
                   <div>
                     <h2>Resumo · Patos - PB</h2>
-                    <p>
-                      <Icone nome={apiOnline ? 'wifi' : 'bolt'} tamanho={14} />{' '}
-                      {apiOnline ? 'Conectado à API de Patos em tempo real' : 'Cache local sincronizado'}
-                    </p>
+                    <p>Sua consulta na rede municipal</p>
                   </div>
                 </div>
 
@@ -523,26 +514,136 @@ export function CidadaoApp() {
         )}
       </main>
 
-      <footer className="rodape">
+      <footer className="rodape" aria-label="Informações institucionais e navegação">
         <div className="rodape-interno">
-          <div>
-            <strong>Matrícula Aberta · Patos - PB</strong> · {catalogo.orgao} ({catalogo.enderecoSecretaria})
-            {apiOnline && <span className="rodape-status-api"> · Monolito Modular SQLite + SSE ativo</span>}
-            <p className="rodape-credito">
-              Made with fun-isometric by Kelvin Adithya (x.com/KelvinAdithya), heavily inspired by Slush (slush.app),
-              more at skills.klvn.dev/fun-isometric.
-            </p>
+          <div className="rodape-grade">
+            {/* Coluna 1: Identidade + Atendimento SEDUC */}
+            <div className="rodape-col rodape-col-identidade">
+              <a
+                className="marca rodape-marca"
+                href="#inicio"
+                onClick={(e) => {
+                  e.preventDefault();
+                  transicionar(() => setModo('landing'));
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              >
+                <div className="marca-sticker" aria-hidden="true">
+                  <Sticker icon={school} palette={PALETTES.riso} loop={false} replayOnHover style={{ width: 36 }} />
+                </div>
+                <span className="marca-nome">
+                  Matrícula<b>Aberta</b>
+                  <small>Rede Municipal · Patos - PB</small>
+                </span>
+              </a>
+
+              <address className="rodape-endereco-compacto">
+                <strong>{catalogo.orgao}</strong>
+                <span>
+                  <Icone nome="pin" tamanho={14} /> {catalogo.enderecoSecretaria}
+                </span>
+                <span>
+                  <Icone nome="phone" tamanho={14} />{' '}
+                  <a href={`tel:+55${catalogo.telefoneSecretaria.replace(/\D/g, '')}`}>
+                    {catalogo.telefoneSecretaria}
+                  </a>{' '}
+                  · Seg a sex, 7h30 às 13h30
+                </span>
+              </address>
+            </div>
+
+            {/* Coluna 2: Navegação rápida para a Família */}
+            <nav className="rodape-col rodape-col-nav" aria-label="Atalhos para pais e responsáveis">
+              <h2 className="rodape-titulo">Para a Família</h2>
+              <ul className="rodape-lista-links">
+                <li>
+                  <button
+                    type="button"
+                    className="rodape-item-link"
+                    onClick={() => {
+                      transicionar(() => setModo('landing'));
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                  >
+                    <Icone nome="home" tamanho={14} /> Visão geral
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="rodape-item-link"
+                    onClick={() => transicionar(() => setModo('consulta'))}
+                  >
+                    <Icone nome="map" tamanho={14} /> Consultar vagas
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="rodape-item-link"
+                    onClick={() => setAlerta({ open: true })}
+                  >
+                    <Icone nome="bell" tamanho={14} /> Alerta no WhatsApp
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    className="rodape-item-link"
+                    onClick={() => {
+                      transicionar(() => setModo('landing'));
+                      setTimeout(() => {
+                        document.getElementById('duvidas')?.scrollIntoView({ behavior: 'smooth' });
+                      }, 60);
+                    }}
+                  >
+                    <Icone nome="info" tamanho={14} /> Dúvidas rápidas
+                  </button>
+                </li>
+              </ul>
+            </nav>
+
+            {/* Coluna 3 (Exclusivo Versão Web / Desktop): Fluxo de Secretaria e Escola */}
+            <div className="rodape-col rodape-col-gestao so-desktop">
+              <div className="rodape-gestao-card">
+                <div className="rodape-gestao-cabecalho">
+                  <span className="rodape-gestao-tag">
+                    <Icone nome="school" tamanho={12} /> Exclusivo Web
+                  </span>
+                  <h2 className="rodape-gestao-titulo">Secretaria / Escola</h2>
+                </div>
+                <p className="rodape-gestao-texto">
+                  Gestão de vagas da SEDUC e recepção de protocolos QR Code nas unidades.
+                </p>
+                <div className="rodape-gestao-acoes">
+                  <a className="btn btn-primario btn-pequeno" href="#/gestao">
+                    <Icone nome="landmark" tamanho={14} />
+                    <span>Secretaria</span>
+                    <span aria-hidden="true">→</span>
+                  </a>
+                  <a className="btn btn-secundario btn-pequeno" href="#/gestao/unidade">
+                    <Icone nome="qr-code" tamanho={14} />
+                    <span>Unidade Escolar</span>
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="rodape-links">
-            <button type="button" className="link-sutil" onClick={() => transicionar(() => setModo('landing'))}>
-              Visão geral
+
+          <div className="rodape-base">
+            <p className="rodape-copyright">
+              © {new Date().getFullYear()} <strong>Prefeitura Municipal de Patos - PB</strong> · Consulta pública 100%
+              gratuita e anônima (LGPD).
+            </p>
+
+            <button
+              type="button"
+              className="rodape-pill-btn"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              title="Voltar ao topo da página"
+            >
+              Voltar ao topo ↑
             </button>
-            <button type="button" className="link-sutil" onClick={() => transicionar(() => setModo('consulta'))}>
-              Consultar vagas
-            </button>
-            <a className="link-sutil" href="#/gestao">
-              Painel da Secretaria / Escola
-            </a>
           </div>
         </div>
       </footer>

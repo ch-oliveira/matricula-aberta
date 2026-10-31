@@ -60,7 +60,7 @@ export function StepQuem({ busca, setBusca, ajudante, erro }: Props) {
         sticker={calendar}
         titulo="Quem vai estudar?"
         subtitulo="Só precisamos da data de nascimento. Nada de nome ou CPF."
-        fala="Quem vai estudar? Digite a data de nascimento da criança. Não precisa de nome nem de CPF. Ou toque direto na etapa da escola."
+        fala="Primeiro passo: quem vai estudar? Digite a data de nascimento da criança, ou toque direto em uma das faixas de idade logo abaixo. Fique tranquilo, não precisa informar nome nem CPF."
       />
 
       <div className="campo">

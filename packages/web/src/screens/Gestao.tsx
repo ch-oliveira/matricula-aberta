@@ -5,7 +5,7 @@ import { Ocupacao, StatusPill } from '../components/ui';
 import { ETAPAS, statusDaOferta } from '../domain/etapas';
 import { desatualizado, tempoRelativo } from '../domain/geo';
 import type { Escola, Oferta, PainelSecretariaDTO, ProtocoloVisita } from '../domain/types';
-import { useAgora } from '../hooks';
+import { useAgora, useHashRoute } from '../hooks';
 import {
   useEscolas,
   useHistorico,
@@ -20,7 +20,15 @@ import { Sticker } from '../stickers/Sticker';
 export function Gestao() {
   const escolas = useEscolas();
   const painelSecretaria = usePainelSecretaria();
-  const [aba, setAba] = useState<'secretaria' | 'unidade'>('secretaria');
+  const rota = useHashRoute();
+  const [aba, setAba] = useState<'secretaria' | 'unidade'>(() =>
+    window.location.hash.includes('unidade') ? 'unidade' : 'secretaria',
+  );
+
+  useEffect(() => {
+    if (rota.includes('unidade')) setAba('unidade');
+    else if (rota === '#/gestao' || rota === '#/gestao/secretaria') setAba('secretaria');
+  }, [rota]);
 
   const [authSecretaria, setAuthSecretariaRaw] = useState<boolean>(() => {
     try {
@@ -72,119 +80,150 @@ export function Gestao() {
 
   return (
     <div className="gestao">
-      <header className="gestao-topo">
-        <div className="gestao-topo-interno">
-          <a className="marca" href="#">
-            <div className="marca-sticker" aria-hidden="true">
-              <Sticker icon={school} palette={PALETTES.riso} loop={false} replayOnHover style={{ width: 40 }} />
-            </div>
-            <span className="marca-nome">
-              Matrícula<b>Aberta</b>
-              <small>Gestão Municipal · Patos - PB</small>
-            </span>
-          </a>
-
-          <nav className="topo-nav" aria-label="Modo de gestão">
-            <button
-              type="button"
-              className={`nav-link ${aba === 'secretaria' ? 'ativo' : ''}`}
-              onClick={() => setAba('secretaria')}
-            >
-              <Icone nome="building" tamanho={16} /> Secretaria de Educação
-              {authSecretaria && <span className="ponto-vivo" title="Sessão autenticada ativa" />}
-            </button>
-            <button
-              type="button"
-              className={`nav-link ${aba === 'unidade' ? 'ativo' : ''}`}
-              onClick={() => setAba('unidade')}
-            >
-              <Icone nome="school" tamanho={16} /> Painel da Unidade
-              {authUnidade && <span className="ponto-vivo" title="Sessão autenticada ativa" />}
-            </button>
-          </nav>
-
-          <div className="gestao-topo-acoes">
-            {aba === 'secretaria' && authSecretaria && (
-              <button
-                type="button"
-                className="btn btn-fantasma btn-pequeno"
-                onClick={() => {
-                  setAuthSecretaria(false);
-                  toast('Sessão da Secretaria de Educação encerrada.', { emoji: 'info', tom: 'info' });
-                }}
-              >
-                <Icone nome="x" tamanho={14} /> Sair da Secretaria
-              </button>
-            )}
-
-            {aba === 'unidade' && authUnidade && (
-              <button
-                type="button"
-                className="btn btn-fantasma btn-pequeno"
-                onClick={() => {
-                  setAuthUnidade(null);
-                  toast('Sessão da Unidade Escolar encerrada.', { emoji: 'info', tom: 'info' });
-                }}
-              >
-                <Icone nome="x" tamanho={14} /> Sair da Unidade
-              </button>
-            )}
-
-            <a className="btn btn-secundario btn-pequeno" href="#" title="Voltar ao portal dos pais">
-              <span className="btn-voltar-texto-longo">← Voltar ao portal dos pais</span>
-              <span className="btn-voltar-texto-curto">← Voltar</span>
-            </a>
+      {/* Aviso exclusivo caso alguém acesse a rota #/gestao pelo celular */}
+      <section className="gestao-bloqueio-mobile so-mobile" aria-labelledby="t-gestao-web-only">
+        <div className="gestao-bloqueio-card">
+          <div className="login-card-topo">
+            <Sticker icon={padlock} palette={PALETTES.clay} loop={false} replayOnHover style={{ width: 52 }} />
+            <span className="lp-tag">Exclusivo Versão Web</span>
           </div>
+          <h1 id="t-gestao-web-only">Fluxo de Secretaria e Escola disponível apenas no computador</h1>
+          <p className="legenda">
+            O painel administrativo da <strong>Secretaria Municipal de Educação (SEDUC)</strong> e das{' '}
+            <strong>Unidades Escolares de Patos - PB</strong> é exclusivo para a versão web em computadores e notebooks.
+          </p>
+          <p className="legenda">
+            Pelo celular, acesse o portal público de consulta de vagas, checklist de documentos e emissão de protocolo
+            com QR Code para pais e responsáveis.
+          </p>
+          <a className="btn btn-primario btn-largo" href="#">
+            <span aria-hidden="true">←</span> Ir para Consulta de Vagas (Pais)
+          </a>
         </div>
-      </header>
+      </section>
 
-      <main className="gestao-conteudo">
-        {aba === 'secretaria' ? (
-          authSecretaria ? (
-            painelSecretaria ? (
-              <PainelMacroSecretaria
-                painel={painelSecretaria}
-                onAbrirUnidade={(id) => {
-                  setAuthUnidade(id);
-                  setAba('unidade');
+      <div className="gestao-desktop-shell so-desktop">
+        <header className="gestao-topo">
+          <div className="gestao-topo-interno">
+            <a className="marca" href="#">
+              <div className="marca-sticker" aria-hidden="true">
+                <Sticker icon={school} palette={PALETTES.riso} loop={false} replayOnHover style={{ width: 40 }} />
+              </div>
+              <span className="marca-nome">
+                Matrícula<b>Aberta</b>
+                <small>Gestão Municipal · Patos - PB</small>
+              </span>
+            </a>
+
+            <nav className="topo-nav" aria-label="Modo de gestão">
+              <button
+                type="button"
+                className={`nav-link ${aba === 'secretaria' ? 'ativo' : ''}`}
+                onClick={() => {
+                  setAba('secretaria');
+                  window.history.replaceState(null, '', '#/gestao');
                 }}
-                onSair={() => {
-                  setAuthSecretaria(false);
-                  toast('Sessão da Secretaria encerrada com sucesso.', { emoji: 'info', tom: 'info' });
+              >
+                <Icone nome="landmark" tamanho={16} /> Secretaria de Educação
+                {authSecretaria && <span className="ponto-vivo" title="Sessão autenticada ativa" />}
+              </button>
+              <button
+                type="button"
+                className={`nav-link ${aba === 'unidade' ? 'ativo' : ''}`}
+                onClick={() => {
+                  setAba('unidade');
+                  window.history.replaceState(null, '', '#/gestao/unidade');
+                }}
+              >
+                <Icone nome="school" tamanho={16} /> Painel da Unidade
+                {authUnidade && <span className="ponto-vivo" title="Sessão autenticada ativa" />}
+              </button>
+            </nav>
+
+            <div className="gestao-topo-acoes">
+              {aba === 'secretaria' && authSecretaria && (
+                <button
+                  type="button"
+                  className="btn btn-fantasma btn-pequeno"
+                  onClick={() => {
+                    setAuthSecretaria(false);
+                    toast('Sessão da Secretaria de Educação encerrada.', { emoji: 'info', tom: 'info' });
+                  }}
+                >
+                  <Icone nome="x" tamanho={14} /> Sair da Secretaria
+                </button>
+              )}
+
+              {aba === 'unidade' && authUnidade && (
+                <button
+                  type="button"
+                  className="btn btn-fantasma btn-pequeno"
+                  onClick={() => {
+                    setAuthUnidade(null);
+                    toast('Sessão da Unidade Escolar encerrada.', { emoji: 'info', tom: 'info' });
+                  }}
+                >
+                  <Icone nome="x" tamanho={14} /> Sair da Unidade
+                </button>
+              )}
+
+              <a className="btn btn-secundario btn-pequeno" href="#" title="Voltar ao portal dos pais">
+                <span className="btn-voltar-texto-longo">← Voltar ao portal dos pais</span>
+                <span className="btn-voltar-texto-curto">← Voltar</span>
+              </a>
+            </div>
+          </div>
+        </header>
+
+        <main className="gestao-conteudo">
+          {aba === 'secretaria' ? (
+            authSecretaria ? (
+              painelSecretaria ? (
+                <PainelMacroSecretaria
+                  painel={painelSecretaria}
+                  onAbrirUnidade={(id) => {
+                    setAuthUnidade(id);
+                    setAba('unidade');
+                    window.history.replaceState(null, '', '#/gestao/unidade');
+                  }}
+                  onSair={() => {
+                    setAuthSecretaria(false);
+                    toast('Sessão da Secretaria encerrada com sucesso.', { emoji: 'info', tom: 'info' });
+                  }}
+                />
+              ) : (
+                <p className="aviso-suave">Carregando indicadores da Secretaria Municipal de Educação de Patos - PB…</p>
+              )
+            ) : (
+              <LoginSecretaria
+                onEntrar={() => {
+                  setAuthSecretaria(true);
+                  toast('Bem-vindo à Secretaria Municipal de Educação de Patos - PB!', { emoji: 'check-circle', tom: 'ok' });
                 }}
               />
-            ) : (
-              <p className="aviso-suave">Carregando indicadores da Secretaria Municipal de Educação de Patos - PB…</p>
             )
-          ) : (
-            <LoginSecretaria
-              onEntrar={() => {
-                setAuthSecretaria(true);
-                toast('Bem-vindo à Secretaria Municipal de Educação de Patos - PB!', { emoji: 'check-circle', tom: 'ok' });
+          ) : authUnidade && escola ? (
+            <PainelUnidade
+              escola={escola}
+              escolas={escolas}
+              onTrocarEscola={(id) => setAuthUnidade(id)}
+              onSair={() => {
+                setAuthUnidade(null);
+                toast('Sessão da Unidade encerrada.', { emoji: 'info', tom: 'info' });
               }}
             />
-          )
-        ) : authUnidade && escola ? (
-          <PainelUnidade
-            escola={escola}
-            escolas={escolas}
-            onTrocarEscola={(id) => setAuthUnidade(id)}
-            onSair={() => {
-              setAuthUnidade(null);
-              toast('Sessão da Unidade encerrada.', { emoji: 'info', tom: 'info' });
-            }}
-          />
-        ) : (
-          <LoginUnidade
-            escolas={escolas}
-            onEntrar={(id) => {
-              setAuthUnidade(id);
-              const esc = escolas.find((e) => e.id === id);
-              toast(`Acesso liberado: ${esc?.nome ?? 'Unidade Escolar'}`, { emoji: 'check-circle', tom: 'ok' });
-            }}
-          />
-        )}
-      </main>
+          ) : (
+            <LoginUnidade
+              escolas={escolas}
+              onEntrar={(id) => {
+                setAuthUnidade(id);
+                const esc = escolas.find((e) => e.id === id);
+                toast(`Acesso liberado: ${esc?.nome ?? 'Unidade Escolar'}`, { emoji: 'check-circle', tom: 'ok' });
+              }}
+            />
+          )}
+        </main>
+      </div>
     </div>
   );
 }
@@ -205,7 +244,7 @@ function PainelMacroSecretaria({
     <div className="secretaria-grid">
       <section className="painel-cabecalho secretaria-hero">
         <div>
-          <span className="lp-tag">Visão Executiva em Tempo Real · IBGE {painel.codigoIbge}</span>
+          <span className="lp-tag">Gestão Municipal · Patos - PB</span>
           <h1>{painel.orgao}</h1>
           <p>
             Monitoramento integrado de vagas livres, demanda reprimida por bairro de <strong>Patos - PB</strong>,
@@ -213,16 +252,6 @@ function PainelMacroSecretaria({
           </p>
         </div>
         <div className="secretaria-acoes-topo">
-          <button
-            type="button"
-            className="btn btn-secundario btn-pequeno"
-            onClick={() => {
-              void vagasStore.resetar();
-              toast('Dados oficiais de demonstração de Patos - PB restaurados.', { emoji: 'refresh', tom: 'info' });
-            }}
-          >
-            <Icone nome="refresh" tamanho={15} /> Restaurar cenários de Patos-PB
-          </button>
           <button
             type="button"
             className="btn btn-fantasma btn-pequeno"
@@ -502,7 +531,7 @@ function PainelUnidade({
         <div className="kpi kpi-destaque">
           <span className="kpi-num">{aguardandoAlerta}</span>
           <span>
-            alertas ativos no banco <Icone nome="bell" tamanho={14} />
+            alertas de vaga ativos <Icone nome="bell" tamanho={14} />
           </span>
         </div>
         <div className="kpi">
@@ -521,16 +550,15 @@ function PainelUnidade({
               <Icone nome="ticket" tamanho={20} /> Protocolos de Atendimento Presencial ({protocolos.length})
             </h2>
             <p className="legenda">
-              Protocolos gerados pelos pais na Etapa 4. Ao confirmar a matrícula, o sistema ocupa automaticamente 1 vaga
-              na turma correspondente e registra na auditoria.
+              Protocolos emitidos pelos responsáveis. Ao confirmar a matrícula, 1 vaga é ocupada automaticamente na
+              turma correspondente.
             </p>
           </div>
         </div>
 
         {protocolos.length === 0 ? (
           <p className="legenda">
-            Nenhum protocolo emitido para esta unidade ainda. Gere um protocolo na Etapa 4 da consulta pública para ver
-            aparecer aqui instantaneamente!
+            Nenhum protocolo de atendimento presencial emitido para esta unidade no momento.
           </p>
         ) : (
           <ul className="lista-protocolos-gestao">
@@ -613,8 +641,8 @@ function PainelUnidade({
           <Icone nome="lightbulb" tamanho={20} />
         </span>
         <p>
-          Ao ajustar as vagas nos botões <strong>+</strong> e <strong>−</strong> abaixo, o banco SQLite de Patos - PB é
-          atualizado e todas as telas abertas (pais e Secretaria) recebem a mudança via <strong>SSE na hora</strong>.
+          Ao ajustar as vagas nos botões <strong>+</strong> e <strong>−</strong> abaixo, o quadro de vagas da rede de
+          Patos - PB é atualizado imediatamente para os pais e para a Secretaria.
         </p>
       </div>
 
@@ -630,20 +658,10 @@ function PainelUnidade({
           className="btn btn-secundario"
           onClick={() => {
             void vagasStore.confirmarDados(escola.id);
-            toast('Quadros de vagas confirmados no servidor de Patos - PB!', { emoji: 'check-circle', tom: 'ok' });
+            toast('Quadro de vagas confirmado com sucesso!', { emoji: 'check-circle', tom: 'ok' });
           }}
         >
           <Icone nome="thumbs-up" tamanho={16} /> Confirmar quadro de vagas hoje
-        </button>
-        <button
-          type="button"
-          className="link-sutil"
-          onClick={() => {
-            void vagasStore.resetar();
-            toast('Dados iniciais de Patos - PB restaurados.', { emoji: 'refresh' });
-          }}
-        >
-          Restaurar dados iniciais de Patos - PB
         </button>
       </div>
 
@@ -797,27 +815,6 @@ function LoginSecretaria({ onEntrar }: { onEntrar: () => void }) {
       <button type="submit" className="btn btn-primario btn-largo">
         Entrar na Secretaria de Educação <span aria-hidden="true">→</span>
       </button>
-
-      <div className="login-dica-homologacao">
-        <p>
-          <strong>Credenciais oficiais de teste (SEDUC Patos-PB):</strong>
-          <br />
-          E-mail: <code>secretaria@patos.pb.gov.br</code>
-          <br />
-          Senha: <code>patos2026</code>
-        </p>
-        <button
-          type="button"
-          className="btn btn-fantasma btn-pequeno"
-          onClick={() => {
-            setEmail('secretaria@patos.pb.gov.br');
-            setSenha('patos2026');
-            setErro(null);
-          }}
-        >
-          Preencher credenciais de teste
-        </button>
-      </div>
     </form>
   );
 }
@@ -860,7 +857,7 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
       pinLimpo === 'escola123';
 
     if (!pinValido) {
-      setErro('PIN de segurança incorreto para esta unidade escolar. Tente 2026 ou 1234.');
+      setErro('PIN de segurança incorreto para esta unidade escolar.');
       return;
     }
 
@@ -955,27 +952,6 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
       <button type="submit" className="btn btn-primario btn-largo">
         Entrar no painel da unidade <span aria-hidden="true">→</span>
       </button>
-
-      <div className="login-dica-homologacao">
-        <p>
-          <strong>Credenciais oficiais de teste (Unidade Escolar):</strong>
-          <br />
-          Gestor: <code>gestor@patos.pb.gov.br</code>
-          <br />
-          PIN da Unidade: <code>2026</code>
-        </p>
-        <button
-          type="button"
-          className="btn btn-fantasma btn-pequeno"
-          onClick={() => {
-            setGestor('gestor@patos.pb.gov.br');
-            setPin('2026');
-            setErro(null);
-          }}
-        >
-          Preencher credenciais de teste
-        </button>
-      </div>
     </form>
   );
 }

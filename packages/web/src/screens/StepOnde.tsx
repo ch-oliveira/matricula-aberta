@@ -68,7 +68,7 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
         sticker={pin}
         titulo="Qual o seu bairro em Patos - PB?"
         subtitulo="Toque no seu bairro no mapa abaixo ou use o GPS. Não guardamos sua localização."
-        fala="Qual o seu bairro em Patos? Toque direto no seu bairro no mapa de Patos, ou em usar meu GPS. Depois escolha a distância máxima até a escola."
+        fala="Segundo passo: qual é o seu bairro em Patos? Toque no nome do seu bairro direto no mapa, ou use o botão da sua localização atual. Mais abaixo, você também pode escolher a distância máxima até a escola."
       />
 
       <MapaPatos

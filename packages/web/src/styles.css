@@ -2718,36 +2718,267 @@ legend {
   animation-delay: calc(var(--i) * 40ms);
 }
 
-/* ---------- Rodapé ---------- */
+/* ---------- Visibilidade Web (Desktop) vs Mobile ---------- */
+
+.so-desktop-inline {
+  display: inline;
+}
+.so-mobile {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .so-desktop,
+  .so-desktop-inline,
+  .btn-topo-escola {
+    display: none !important;
+  }
+  .so-mobile {
+    display: flex;
+  }
+}
+
+.gestao-bloqueio-mobile {
+  min-block-size: 80dvh;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 8px;
+}
+.gestao-bloqueio-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  inline-size: 100%;
+  max-inline-size: 460px;
+  padding: 22px 18px;
+  background: var(--surface);
+  border: 2.5px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow);
+}
+.gestao-bloqueio-card h1 {
+  font-size: 1.3rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+.gestao-bloqueio-card .legenda {
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* ---------- Rodapé Institucional Enxuto ---------- */
 
 .rodape {
-  border-block-start: 2px solid var(--soft-line);
+  border-block-start: 2px solid var(--line);
   background: var(--surface);
-  padding: 20px;
+  padding-block: 24px 18px;
+  padding-inline: 20px;
+  margin-block-start: auto;
 }
+
 .rodape-interno {
   max-inline-size: 1180px;
   margin-inline: auto;
   display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-size: 0.88rem;
+}
+
+.rodape-grade {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1.15fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .rodape-grade {
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .rodape-col-gestao {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .rodape-grade {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.rodape-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-inline-size: 0;
+}
+
+.rodape-marca {
+  align-self: flex-start;
+}
+
+.rodape-endereco-compacto {
+  font-style: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.84rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.rodape-endereco-compacto strong {
+  color: var(--ink);
+  font-weight: 800;
+}
+.rodape-endereco-compacto span {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.rodape-endereco-compacto a {
+  font-weight: 800;
+  text-decoration: none;
+}
+.rodape-endereco-compacto a:hover {
+  text-decoration: underline;
+}
+
+.rodape-titulo {
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.rodape-lista-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
+.rodape-item-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  inline-size: 100%;
+  min-block-size: 32px;
+  padding: 4px 8px;
+  margin-inline-start: -8px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.14s, color 0.14s;
+}
+.rodape-item-link:hover {
+  background: var(--surface-2);
+  color: var(--primary);
+}
+
+/* Card Exclusivo Versão Web (Secretaria / Escola) no Rodapé */
+.rodape-gestao-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 2px solid var(--line);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-sm);
+}
+.rodape-gestao-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.rodape-gestao-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--sun);
+  color: #181528;
+  border: 1.5px solid #181528;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  order: 2;
+}
+.rodape-gestao-titulo {
+  font-size: 0.96rem;
+  font-weight: 900;
+  color: var(--ink);
+  order: 1;
+}
+.rodape-gestao-texto {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.rodape-gestao-acoes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-block-start: 2px;
+}
+.rodape-gestao-acoes .btn-pequeno {
+  min-block-size: 36px;
+  padding-inline: 10px;
+  font-size: 0.82rem;
+}
+
+/* Barra Inferior do Rodapé */
+.rodape-base {
+  display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  font-size: 0.9rem;
+  gap: 10px;
+  padding-block-start: 12px;
+  border-block-start: 1.5px solid var(--soft-line);
 }
-.rodape-status-api {
-  color: var(--ok);
-  font-weight: 800;
-}
-.rodape-credito {
-  font-size: 0.78rem;
+.rodape-copyright {
+  font-size: 0.8rem;
   color: var(--muted);
-  margin-block-start: 3px;
 }
-.rodape-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.rodape-copyright strong {
+  color: var(--ink);
+}
+.rodape-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-block-size: 30px;
+  padding-inline: 10px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color 0.14s, transform 0.12s;
+}
+.rodape-pill-btn:hover {
+  background: var(--surface-2);
+  transform: translateY(-1px);
 }
 
 /* ---------- Sheet (dialog) ---------- */
@@ -4587,22 +4818,41 @@ td.vis-desktop {
 
   /* Rodapé */
   .rodape {
-    padding: 16px 12px calc(18px + env(safe-area-inset-bottom));
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
   }
   .rodape-interno {
-    font-size: 0.8rem;
-    gap: 10px;
-    flex-direction: column;
-    align-items: flex-start;
+    font-size: 0.82rem;
+    gap: 14px;
   }
-  .rodape-credito {
-    font-size: 0.72rem;
-    line-height: 1.35;
-    margin-block-start: 4px;
+  .rodape-grade {
+    gap: 14px;
   }
-  .rodape-links {
-    gap: 6px 12px;
-    flex-wrap: wrap;
+  .rodape-col {
+    gap: 6px;
+  }
+  .rodape-endereco-compacto {
+    font-size: 0.78rem;
+  }
+  .rodape-titulo {
+    font-size: 0.76rem;
+  }
+  .rodape-item-link {
+    font-size: 0.82rem;
+    min-block-size: 32px;
+    padding: 4px 6px;
+    margin-inline-start: -6px;
+  }
+  .rodape-base {
+    padding-block-start: 10px;
+    gap: 8px;
+  }
+  .rodape-copyright {
+    font-size: 0.75rem;
+  }
+  .rodape-pill-btn {
+    font-size: 0.74rem;
+    min-block-size: 28px;
+    padding-inline: 9px;
   }
   .link-sutil {
     font-size: 0.82rem;

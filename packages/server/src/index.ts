@@ -63,6 +63,84 @@ async function lerJson<T>(req: IncomingMessage): Promise<T> {
   return raw ? (JSON.parse(raw) as T) : ({} as T);
 }
 
+const cacheTts = new Map<string, Buffer>();
+
+function dividirFrasesTts(texto: string, limite = 175): string[] {
+  const limpo = texto.replace(/\s+/g, ' ').trim();
+  if (!limpo) return [];
+  const sentencas = limpo.split(/(?<=[.!?])\s+/);
+  const blocos: string[] = [];
+
+  for (const s of sentencas) {
+    if (s.length <= limite) {
+      blocos.push(s);
+      continue;
+    }
+    const partes = s.split(/(?<=[,;:])\s+/);
+    let atual = '';
+    for (const p of partes) {
+      if ((atual ? `${atual} ${p}` : p).length <= limite) {
+        atual = atual ? `${atual} ${p}` : p;
+      } else {
+        if (atual) blocos.push(atual);
+        if (p.length <= limite) {
+          atual = p;
+        } else {
+          const palavras = p.split(' ');
+          let fatia = '';
+          for (const pl of palavras) {
+            if ((fatia ? `${fatia} ${pl}` : pl).length <= limite) {
+              fatia = fatia ? `${fatia} ${pl}` : pl;
+            } else {
+              if (fatia) blocos.push(fatia);
+              fatia = pl;
+            }
+          }
+          atual = fatia;
+        }
+      }
+    }
+    if (atual) blocos.push(atual);
+  }
+
+  return blocos.filter(Boolean);
+}
+
+async function sintetizarVozNeuralPtBr(texto: string): Promise<Buffer> {
+  const chave = texto.slice(0, 900).trim();
+  const emCache = cacheTts.get(chave);
+  if (emCache) return emCache;
+
+  const trechos = dividirFrasesTts(chave);
+  if (trechos.length === 0) throw new Error('Texto vazio para síntese de voz.');
+
+  const buffers = await Promise.all(
+    trechos.map(async (trecho) => {
+      const endpoint =
+        `https://translate.google.com/translate_tts?ie=UTF-8&tl=pt-BR&client=tw-ob&ttsspeed=1&q=` +
+        encodeURIComponent(trecho);
+      const r = await fetch(endpoint, {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+          Referer: 'https://translate.google.com/',
+        },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!r.ok) throw new Error(`TTS upstream status ${r.status}`);
+      return Buffer.from(await r.arrayBuffer());
+    }),
+  );
+
+  const audioFinal = Buffer.concat(buffers);
+  if (cacheTts.size >= 120) {
+    const primeiraChave = cacheTts.keys().next().value;
+    if (primeiraChave) cacheTts.delete(primeiraChave);
+  }
+  cacheTts.set(chave, audioFinal);
+  return audioFinal;
+}
+
 const server = createServer(async (req, res) => {
   cors(res);
   if (req.method === 'OPTIONS') {
@@ -97,6 +175,25 @@ const server = createServer(async (req, res) => {
     // 2. Módulo Catálogo Municipal (Patos-PB: bairros, centro e documentos)
     if (req.method === 'GET' && path === '/api/v1/catalogo') {
       return json(res, 200, obterCatalogoMunicipio());
+    }
+
+    // 2.1. Síntese de Voz Neural em Português Brasileiro (acessibilidade cidadã)
+    if (req.method === 'GET' && path === '/api/v1/tts') {
+      const q = (url.searchParams.get('q') ?? '').trim();
+      if (!q) return json(res, 400, { erro: 'Informe o parâmetro q.' });
+      try {
+        const mp3 = await sintetizarVozNeuralPtBr(q);
+        cors(res);
+        res.writeHead(200, {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': String(mp3.length),
+          'Cache-Control': 'public, max-age=86400',
+        });
+        res.end(mp3);
+        return;
+      } catch {
+        return json(res, 503, { erro: 'Serviço de voz neural temporariamente indisponível.' });
+      }
     }
 
     // 3. Módulo Unidades Escolares e Vagas

@@ -103,10 +103,12 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
   );
 
   const fala =
-    `${escola.nome}, no bairro ${escola.bairro} em Patos, ${escola.endereco}. Atendimento: ${escola.atendimento.replace('·', ',')}. ` +
-    `${STATUS_INFO[status].frase(oferta.vagas, oferta.fila)}. Leve estes documentos: ` +
-    obrig.map((d) => d.nome).join('; ') +
-    '. Você também pode emitir um protocolo digital com QR Code para agilizar o atendimento na secretaria.';
+    `Você escolheu a unidade ${escola.nome}, localizada no bairro ${escola.bairro}, em ${escola.endereco}. ` +
+    `O atendimento funciona ${escola.atendimento.replace('·', ',')}. ` +
+    `No momento, a turma está assim: ${STATUS_INFO[status].frase(oferta.vagas, oferta.fila)}. ` +
+    `Para fazer a matrícula sem precisar dar duas viagens, leve os seguintes documentos: ` +
+    obrig.map((d) => d.nome).join(', ') +
+    '. Mais abaixo, você pode informar seu nome para gerar o protocolo digital e ser atendido mais rápido na secretaria.';
 
   function alternar(id: string) {
     setMarcados((m) => (m.includes(id) ? m.filter((x) => x !== id) : [...m, id]));
@@ -285,7 +287,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
 
       ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
       ctx.fillStyle = '#227B4E';
-      ctx.fillText('✓ PROTOCOLO REGISTRADO NO BANCO DE DADOS DA REDE MUNICIPAL DE PATOS', 74, 1095);
+      ctx.fillText('✓ PROTOCOLO OFICIAL DA REDE MUNICIPAL DE ENSINO DE PATOS - PB', 74, 1095);
 
       // Rodapé Offline
       ctx.fillStyle = '#676479';
@@ -474,8 +476,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 ) : (
                   <>
                     <Icone nome="lightbulb" tamanho={16} /> A secretaria da <strong>{escola.nome}</strong> já recebeu
-                    seu pré-agendamento em tempo real. Abra o <a href="#/gestao">Painel da Escola</a> para simular a
-                    recepção!
+                    seu pré-agendamento. Apresente este QR Code com os documentos na data agendada.
                   </>
                 )}
               </p>
