@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { extrairCodigoProtocolo } from '../domain/qr';
 import type { Escola, ProtocoloVisita } from '../domain/types';
+import { vagasStore } from '../services/vagasStore';
 import { Icone } from './Icone';
 
 interface Props {
@@ -29,6 +30,9 @@ function tocarSomBip() {
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.22);
     osc.connect(gain);
     gain.connect(ctx.destination);
+    osc.onended = () => {
+      void ctx.close().catch(() => {});
+    };
     osc.start();
     osc.stop(ctx.currentTime + 0.22);
   } catch {
@@ -73,14 +77,21 @@ export function LeitorQrModal({
   }
 
   // Busca e exibe o protocolo a partir de uma string
-  function processarCodigoLido(codigoBruto: string) {
+  async function processarCodigoLido(codigoBruto: string) {
     const cod = extrairCodigoProtocolo(codigoBruto);
     if (!cod) return;
 
     tocarSomBip();
-    const achado = protocolos.find((p) => p.codigo.toUpperCase() === cod.toUpperCase());
-    if (achado) {
-      setProtocoloEncontrado(achado);
+    const achadoLocal = protocolos.find((p) => p.codigo.toUpperCase() === cod.toUpperCase());
+    if (achadoLocal) {
+      setProtocoloEncontrado(achadoLocal);
+      setCodigoNaoEncontrado(null);
+      return;
+    }
+
+    const achadoRemoto = await vagasStore.buscarProtocoloPorCodigo(cod);
+    if (achadoRemoto) {
+      setProtocoloEncontrado(achadoRemoto);
       setCodigoNaoEncontrado(null);
     } else {
       setProtocoloEncontrado(null);
@@ -510,3 +521,4 @@ export function LeitorQrModal({
     </div>
   );
 }
+

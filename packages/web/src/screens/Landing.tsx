@@ -166,7 +166,18 @@ export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) 
         </div>
 
         <ol className="lp-passos-grade lp-passos-3">
-          <li className="lp-passo-card" onClick={() => onComecar()}>
+          <li
+            className="lp-passo-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onComecar()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onComecar();
+              }
+            }}
+          >
             <div className="lp-passo-topo">
               <span className="lp-passo-num">01</span>
               <div className="lp-passo-sticker" aria-hidden="true">
@@ -179,7 +190,18 @@ export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) 
             </p>
           </li>
 
-          <li className="lp-passo-card" onClick={() => onComecar()}>
+          <li
+            className="lp-passo-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onComecar()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onComecar();
+              }
+            }}
+          >
             <div className="lp-passo-topo">
               <span className="lp-passo-num">02</span>
               <div className="lp-passo-sticker" aria-hidden="true">
@@ -192,7 +214,18 @@ export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) 
             </p>
           </li>
 
-          <li className="lp-passo-card" onClick={() => onComecar()}>
+          <li
+            className="lp-passo-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onComecar()}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onComecar();
+              }
+            }}
+          >
             <div className="lp-passo-topo">
               <span className="lp-passo-num">03</span>
               <div className="lp-passo-sticker" aria-hidden="true">

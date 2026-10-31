@@ -1,8 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import type { Alerta, Canal, EtapaId, Periodo } from '../../../../shared/src/index.ts';
+import { gerarTokenCancelamentoAlerta } from '../../infra/auth.ts';
 import { db } from '../../infra/db.ts';
 
 const NOVENTA_DIAS_MS = 90 * 24 * 3600 * 1000;
+const LGPD_SALT = (process.env.LGPD_HASH_SALT ?? 'ma-lgpd-patos-pb-2510808').trim();
 
 export function mascararTelefoneLGPD(tel?: string): { mascarado: string | null; hash: string | null } {
   if (!tel) return { mascarado: null, hash: null };
@@ -11,11 +13,11 @@ export function mascararTelefoneLGPD(tel?: string): { mascarado: string | null; 
   const ddd = digitos.slice(0, 2);
   const final = digitos.slice(-4);
   const mascarado = `(${ddd}) 9••••-${final}`;
-  const hash = createHash('sha256').update(`ma-lgpd-patos:${digitos}`).digest('hex');
+  const hash = createHmac('sha256', LGPD_SALT).update(digitos).digest('hex');
   return { mascarado, hash };
 }
 
-export function garantirSeedAlertasPatos(forcarReset = false) {
+export function garantirSeedAlertasPatos(forcarReset = false): void {
   const count = (db.prepare('SELECT COUNT(*) as c FROM alertas').get() as { c: number }).c;
   if (count > 0 && !forcarReset) return;
 
@@ -151,7 +153,7 @@ export function listarAlertas(): Alerta[] {
   const agora = Date.now();
   db.prepare('DELETE FROM alertas WHERE expira_em < ?').run(agora);
 
-  const rows = db.prepare('SELECT * FROM alertas ORDER BY criado_em DESC').all() as Array<{
+  const rows = db.prepare('SELECT * FROM alertas ORDER BY criado_em DESC LIMIT 200').all() as Array<{
     id: string;
     canal: Canal;
     telefone_mascarado: string | null;
@@ -228,6 +230,7 @@ export function criarAlerta(dados: {
     escolaId: dados.escolaId,
     escolaNome: dados.escolaNome,
     criadoEm,
+    tokenCancelamento: gerarTokenCancelamentoAlerta(id),
   };
 }
 
@@ -235,4 +238,3 @@ export function removerAlerta(id: string): boolean {
   const res = db.prepare('DELETE FROM alertas WHERE id = ?').run(id);
   return res.changes > 0;
 }
-

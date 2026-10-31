@@ -1,59 +1,132 @@
-import type { ServerResponse } from 'node:http';
-import type { EventoVaga, SyncFrameDTO } from '../../../shared/src/index.ts';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { EventoVaga, SessaoGestaoDTO, SyncFrameDTO } from '../../../shared/src/index.ts';
 import { obterCatalogoMunicipio } from '../modules/catalogo/catalogo.module.ts';
 import { listarProtocolos } from '../modules/protocolos/protocolos.module.ts';
 import { obterPainelSecretariaPatos } from '../modules/secretaria/secretaria.module.ts';
 import { listarEscolas, listarHistorico } from '../modules/unidades/unidades.module.ts';
+import { resolverOrigemCors } from './security.ts';
 
-const clientesSSE = new Set<ServerResponse>();
+interface ClienteSSE {
+  res: ServerResponse;
+  sessao: SessaoGestaoDTO | null;
+}
 
-export function construirSnapshotSincronizacao(incluirCatalogo = false, evento?: EventoVaga): SyncFrameDTO {
+const clientesSSE = new Set<ClienteSSE>();
+const MAX_CLIENTES_SSE = 250;
+
+export function construirSnapshotSincronizacao(opcoes: {
+  incluirCatalogo?: boolean;
+  incluirDadosGestao?: boolean;
+  escolaIdFiltro?: string;
+  evento?: EventoVaga;
+}): SyncFrameDTO {
+  const {
+    incluirCatalogo = false,
+    incluirDadosGestao = false,
+    escolaIdFiltro,
+    evento,
+  } = opcoes;
+
   return {
     tipo: 'sync',
     ...(incluirCatalogo ? { catalogo: obterCatalogoMunicipio() } : {}),
     escolas: listarEscolas(),
     historico: listarHistorico(40),
-    protocolos: listarProtocolos(),
-    secretaria: obterPainelSecretariaPatos(),
+    ...(incluirDadosGestao
+      ? {
+          protocolos: listarProtocolos(escolaIdFiltro),
+          secretaria: obterPainelSecretariaPatos(),
+        }
+      : {}),
     ...(evento ? { evento } : {}),
   };
 }
 
-export function registrarClienteSSE(res: ServerResponse): void {
+export function registrarClienteSSE(
+  req: IncomingMessage,
+  res: ServerResponse,
+  sessao: SessaoGestaoDTO | null,
+): void {
+  if (clientesSSE.size >= MAX_CLIENTES_SSE) {
+    // Desconecta o cliente mais antigo caso atinja o teto de segurança
+    const maisAntigo = clientesSSE.values().next().value;
+    if (maisAntigo) {
+      try {
+        maisAntigo.res.end();
+      } catch {
+        /* ignore */
+      }
+      clientesSSE.delete(maisAntigo);
+    }
+  }
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
+    'X-Accel-Buffering': 'no',
+    'Access-Control-Allow-Origin': resolverOrigemCors(req),
   });
 
-  const inicial = JSON.stringify(construirSnapshotSincronizacao(true));
+  const inicial = JSON.stringify(
+    construirSnapshotSincronizacao({
+      incluirCatalogo: true,
+      incluirDadosGestao: Boolean(sessao),
+    }),
+  );
   res.write(`data: ${inicial}\n\n`);
-  clientesSSE.add(res);
+
+  const cliente: ClienteSSE = { res, sessao };
+  clientesSSE.add(cliente);
 
   const ping = setInterval(() => {
     try {
       res.write(': ping\n\n');
     } catch {
       clearInterval(ping);
-      clientesSSE.delete(res);
+      clientesSSE.delete(cliente);
     }
   }, 20_000);
 
   res.on('close', () => {
     clearInterval(ping);
-    clientesSSE.delete(res);
+    clientesSSE.delete(cliente);
   });
 }
 
 export function transmitirAtualizacaoSSE(evento?: EventoVaga): void {
   if (clientesSSE.size === 0) return;
-  const payload = JSON.stringify(construirSnapshotSincronizacao(false, evento));
-  for (const res of clientesSSE) {
+
+  let payloadPublico: string | null = null;
+  let payloadGestao: string | null = null;
+
+  for (const cliente of clientesSSE) {
     try {
-      res.write(`data: ${payload}\n\n`);
+      if (cliente.sessao) {
+        if (!payloadGestao) {
+          payloadGestao = JSON.stringify(
+            construirSnapshotSincronizacao({
+              incluirCatalogo: false,
+              incluirDadosGestao: true,
+              evento,
+            }),
+          );
+        }
+        cliente.res.write(`data: ${payloadGestao}\n\n`);
+      } else {
+        if (!payloadPublico) {
+          payloadPublico = JSON.stringify(
+            construirSnapshotSincronizacao({
+              incluirCatalogo: false,
+              incluirDadosGestao: false,
+              evento,
+            }),
+          );
+        }
+        cliente.res.write(`data: ${payloadPublico}\n\n`);
+      }
     } catch {
-      clientesSSE.delete(res);
+      clientesSSE.delete(cliente);
     }
   }
 }
@@ -61,4 +134,3 @@ export function transmitirAtualizacaoSSE(evento?: EventoVaga): void {
 export function totalClientesSSE(): number {
   return clientesSSE.size;
 }
-

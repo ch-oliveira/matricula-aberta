@@ -10,7 +10,8 @@
     "dev": "npm run dev:api & npm run dev:web",
     "dev:api": "npm --prefix packages/server run dev",
     "dev:web": "npm --prefix packages/web run dev",
-    "build": "npm --prefix packages/web run build && cp -r packages/web/dist ./dist",
+    "typecheck": "npm --prefix packages/server run typecheck && packages/web/node_modules/.bin/tsc --project packages/web/tsconfig.json --noEmit",
+    "build": "npm run typecheck && npm --prefix packages/web run build && rm -rf ./dist && cp -r packages/web/dist ./dist",
     "start": "npm --prefix packages/server run start"
   }
 }

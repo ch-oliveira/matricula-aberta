@@ -13,6 +13,14 @@ export type StatusVaga = 'aberta' | 'ultimas' | 'espera';
 export type Canal = 'whatsapp' | 'push';
 export type TurnoVisita = 'manha' | 'tarde';
 export type StatusProtocolo = 'aguardando' | 'atendido' | 'cancelado';
+export type PerfilGestao = 'secretaria' | 'unidade';
+
+export const ORDEM_ETAPAS: EtapaId[] = ['bercario', 'maternal', 'pre', 'fund1', 'fund2'];
+export const PERIODOS_VALIDOS: Periodo[] = ['integral', 'parcial'];
+export const CANAIS_VALIDOS: Canal[] = ['whatsapp', 'push'];
+export const TURNOS_VISITA_VALIDOS: TurnoVisita[] = ['manha', 'tarde'];
+export const STATUS_PROTOCOLO_VALIDOS: StatusProtocolo[] = ['aguardando', 'atendido', 'cancelado'];
+export const TIPOS_UNIDADE_VALIDOS: TipoUnidade[] = ['Creche', 'CMEI', 'EMEF'];
 
 export interface Oferta {
   etapa: EtapaId;
@@ -90,6 +98,8 @@ export interface Alerta {
   escolaId?: string;
   escolaNome?: string;
   criadoEm: number;
+  /** Token de cancelamento individual emitido ao cidadão titular do alerta */
+  tokenCancelamento?: string;
 }
 
 export interface EventoVaga {
@@ -198,9 +208,25 @@ export interface SyncFrameDTO {
   catalogo?: CatalogoMunicipioDTO;
   escolas: Escola[];
   historico: EventoVaga[];
-  protocolos: ProtocoloVisita[];
-  secretaria: PainelSecretariaDTO;
+  protocolos?: ProtocoloVisita[];
+  secretaria?: PainelSecretariaDTO;
   evento?: EventoVaga;
+}
+
+export interface SessaoGestaoDTO {
+  token: string;
+  perfil: PerfilGestao;
+  usuario: string;
+  escolaId?: string;
+  escolaNome?: string;
+  expiraEm: number;
+}
+
+export interface LoginGestaoRequestDTO {
+  perfil: PerfilGestao;
+  usuario: string;
+  senha: string;
+  escolaId?: string;
 }
 
 export interface EtapaInfo {
@@ -218,8 +244,6 @@ export const ETAPAS: Record<EtapaId, EtapaInfo> = {
   fund1: { id: 'fund1', nome: 'Fundamental I', emoji: 'fund1', faixa: '1º ao 5º ano', cor: '#A9C8FF' },
   fund2: { id: 'fund2', nome: 'Fundamental II', emoji: 'fund2', faixa: '6º ao 9º ano', cor: '#CDB8FF' },
 };
-
-export const ORDEM_ETAPAS: EtapaId[] = ['bercario', 'maternal', 'pre', 'fund1', 'fund2'];
 
 export function statusDaOferta(o: Pick<Oferta, 'vagas'>): StatusVaga {
   if (o.vagas <= 0) return 'espera';
@@ -241,6 +265,24 @@ export function distanciaKm(a: { lat: number; lng: number }, b: { lat: number; l
   const dLng = rad(b.lng - a.lng);
   const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** Formata data no fuso horário local (YYYY-MM-DD), evitando desvio UTC à noite no Brasil (UTC-3). */
+export function dataLocalISO(d = new Date()): string {
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+/** Retorna o próximo dia útil no formato YYYY-MM-DD considerando o fuso local. */
+export function proximoDiaUtilISO(diasAdiantados = 1, base = new Date()): string {
+  const d = new Date(base.getTime());
+  d.setDate(d.getDate() + diasAdiantados);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() + 1);
+  }
+  return dataLocalISO(d);
 }
 
 /**
@@ -295,4 +337,3 @@ export function gerarMatrizQrCode(texto: string): boolean[][] {
 
   return mat;
 }
-

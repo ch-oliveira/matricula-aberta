@@ -1,36 +1,82 @@
-import type {
-  EtapaId,
-  EventoVaga,
-  Periodo,
-  ProtocoloVisita,
-  StatusProtocolo,
-  TurnoVisita,
+import { randomInt } from 'node:crypto';
+import {
+  proximoDiaUtilISO,
+  type EtapaId,
+  type EventoVaga,
+  type Periodo,
+  type ProtocoloVisita,
+  type StatusProtocolo,
+  type TurnoVisita,
 } from '../../../../shared/src/index.ts';
 import { db } from '../../infra/db.ts';
 import { mascararTelefoneLGPD } from '../alertas/alertas.module.ts';
 import { atualizarOfertaUnidade } from '../unidades/unidades.module.ts';
 
-function proximoDiaUtilISO(diasAdiantados = 1): string {
-  const d = new Date();
-  d.setDate(d.getDate() + diasAdiantados);
-  while (d.getDay() === 0 || d.getDay() === 6) {
-    d.setDate(d.getDate() + 1);
+interface LinhaProtocoloDB {
+  codigo: string;
+  escola_id: string;
+  escola_nome: string;
+  escola_endereco: string;
+  escola_bairro: string;
+  etapa: EtapaId;
+  turma: string;
+  periodo: Periodo;
+  responsavel: string;
+  telefone_mascarado: string | null;
+  nascimento: string | null;
+  turno_visita: TurnoVisita;
+  data_visita: string;
+  documentos_json: string;
+  total_obrigatorios: number;
+  status: StatusProtocolo;
+  criado_em: number;
+  atendido_em: number | null;
+}
+
+function mapearLinhaProtocolo(r: LinhaProtocoloDB): ProtocoloVisita {
+  let docs: string[] = [];
+  try {
+    const parsed = JSON.parse(r.documentos_json);
+    if (Array.isArray(parsed)) docs = parsed.filter((x): x is string => typeof x === 'string');
+  } catch {
+    docs = [];
   }
-  return d.toISOString().slice(0, 10);
+
+  return {
+    codigo: r.codigo,
+    escolaId: r.escola_id,
+    escolaNome: r.escola_nome,
+    escolaEndereco: r.escola_endereco,
+    escolaBairro: r.escola_bairro,
+    etapa: r.etapa,
+    turma: r.turma,
+    periodo: r.periodo,
+    responsavel: r.responsavel,
+    telefone: r.telefone_mascarado ?? undefined,
+    nascimento: r.nascimento ?? undefined,
+    turnoVisita: r.turno_visita,
+    dataVisita: r.data_visita,
+    documentosMarcados: docs,
+    totalObrigatorios: r.total_obrigatorios,
+    status: r.status,
+    criadoEm: r.criado_em,
+    atendidoEm: r.atendido_em ?? undefined,
+  };
 }
 
 function gerarCodigoProtocolo(): string {
-  const ano = new Date().getMonth() >= 7 ? new Date().getFullYear() + 1 : new Date().getFullYear();
-  for (let tent = 0; tent < 20; tent++) {
-    const num = Math.floor(1000 + Math.random() * 9000);
+  const agora = new Date();
+  const ano = agora.getMonth() >= 7 ? agora.getFullYear() + 1 : agora.getFullYear();
+  for (let tent = 0; tent < 30; tent++) {
+    const num = randomInt(1000, 10000);
     const codigo = `PATOS-${ano}-${num}`;
     const existe = db.prepare('SELECT 1 FROM protocolos_visita WHERE codigo = ?').get(codigo);
     if (!existe) return codigo;
   }
-  return `PATOS-${ano}-${Date.now().toString().slice(-4)}`;
+  return `PATOS-${ano}-${randomInt(10000, 99999)}`;
 }
 
-export function garantirSeedProtocolosPatos(forcarReset = false) {
+export function garantirSeedProtocolosPatos(forcarReset = false): void {
   const count = (db.prepare('SELECT COUNT(*) as c FROM protocolos_visita').get() as { c: number }).c;
   if (count > 0 && !forcarReset) return;
 
@@ -155,52 +201,27 @@ export function garantirSeedProtocolosPatos(forcarReset = false) {
   }
 }
 
+export function obterProtocoloPorCodigo(codigo: string): ProtocoloVisita | null {
+  const limpo = codigo.trim().toUpperCase();
+  if (!limpo) return null;
+
+  const row = db
+    .prepare('SELECT * FROM protocolos_visita WHERE UPPER(codigo) = ? LIMIT 1')
+    .get(limpo) as LinhaProtocoloDB | undefined;
+
+  return row ? mapearLinhaProtocolo(row) : null;
+}
+
 export function listarProtocolos(escolaId?: string): ProtocoloVisita[] {
   const sql = escolaId
-    ? 'SELECT * FROM protocolos_visita WHERE escola_id = ? ORDER BY criado_em DESC LIMIT 50'
-    : 'SELECT * FROM protocolos_visita ORDER BY criado_em DESC LIMIT 60';
+    ? 'SELECT * FROM protocolos_visita WHERE escola_id = ? ORDER BY criado_em DESC LIMIT 80'
+    : 'SELECT * FROM protocolos_visita ORDER BY criado_em DESC LIMIT 100';
 
-  const rows = (escolaId ? db.prepare(sql).all(escolaId) : db.prepare(sql).all()) as Array<{
-    codigo: string;
-    escola_id: string;
-    escola_nome: string;
-    escola_endereco: string;
-    escola_bairro: string;
-    etapa: EtapaId;
-    turma: string;
-    periodo: Periodo;
-    responsavel: string;
-    telefone_mascarado: string | null;
-    nascimento: string | null;
-    turno_visita: TurnoVisita;
-    data_visita: string;
-    documentos_json: string;
-    total_obrigatorios: number;
-    status: StatusProtocolo;
-    criado_em: number;
-    atendido_em: number | null;
-  }>;
+  const rows = (
+    escolaId ? db.prepare(sql).all(escolaId) : db.prepare(sql).all()
+  ) as unknown as LinhaProtocoloDB[];
 
-  return rows.map((r) => ({
-    codigo: r.codigo,
-    escolaId: r.escola_id,
-    escolaNome: r.escola_nome,
-    escolaEndereco: r.escola_endereco,
-    escolaBairro: r.escola_bairro,
-    etapa: r.etapa,
-    turma: r.turma,
-    periodo: r.periodo,
-    responsavel: r.responsavel,
-    telefone: r.telefone_mascarado ?? undefined,
-    nascimento: r.nascimento ?? undefined,
-    turnoVisita: r.turno_visita,
-    dataVisita: r.data_visita,
-    documentosMarcados: JSON.parse(r.documentos_json) as string[],
-    totalObrigatorios: r.total_obrigatorios,
-    status: r.status,
-    criadoEm: r.criado_em,
-    atendidoEm: r.atendido_em ?? undefined,
-  }));
+  return rows.map(mapearLinhaProtocolo);
 }
 
 export function criarProtocoloVisita(dados: {
@@ -253,21 +274,21 @@ export function criarProtocoloVisita(dados: {
     criadoEm,
   );
 
-  return listarProtocolos().find((p) => p.codigo === codigo) ?? null;
+  return obterProtocoloPorCodigo(codigo);
 }
 
 export function atualizarStatusProtocolo(
   codigo: string,
   novoStatus: StatusProtocolo,
 ): { protocolo: ProtocoloVisita | null; evento: EventoVaga | null } {
-  const atual = listarProtocolos().find((p) => p.codigo === codigo);
+  const atual = obterProtocoloPorCodigo(codigo);
   if (!atual) return { protocolo: null, evento: null };
 
   const agora = Date.now();
   db.prepare('UPDATE protocolos_visita SET status = ?, atendido_em = ? WHERE codigo = ?').run(
     novoStatus,
     novoStatus === 'atendido' ? agora : null,
-    codigo,
+    atual.codigo,
   );
 
   let evento: EventoVaga | null = null;
@@ -301,7 +322,6 @@ export function atualizarStatusProtocolo(
     }
   }
 
-  const protocolo = listarProtocolos().find((p) => p.codigo === codigo) ?? null;
+  const protocolo = obterProtocoloPorCodigo(atual.codigo);
   return { protocolo, evento };
 }
-

@@ -206,7 +206,7 @@ export function AlertSheet({ open, onClose, busca, escolaId }: Props) {
 
           {alertas.length > 0 && (
             <div className="meus-alertas">
-              <h3>Alertas ativos na rede ({alertas.length})</h3>
+              <h3>Meus alertas ativos ({alertas.length})</h3>
               <ul>
                 {alertas.slice(0, 6).map((a) => (
                   <li key={a.id}>

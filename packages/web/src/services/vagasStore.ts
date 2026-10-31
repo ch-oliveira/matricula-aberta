@@ -1,12 +1,10 @@
 /**
- * Camada de dados 100% integrada ao Monolito Modular (SQLite + SSE em /api/v1/*)
+ * Camada de dados e autenticação integrada ao Monolito Modular (SQLite + SSE + RBAC em /api/v1/*)
  * Município de Patos - PB (IBGE 2510808).
  *
- * - Zero dados mockados ou seeds hardcoded no cliente.
- * - Hidrata catálogo municipal (bairros de Patos-PB, documentos oficiais), unidades escolares,
- *   protocolos de pré-agendamento e painel macro da Secretaria de Educação direto da API.
- * - Mantém espelho reativo via Server-Sent Events (/api/v1/stream) e cache localStorage de leitura
- *   para resiliência em conexões móveis instáveis.
+ * - Isolamento estrito entre dados públicos (catálogo, escolas, histórico) e dados protegidos
+ *   de gestão (protocolos presenciais e painel macro da SEDUC).
+ * - Autenticação real com token HMAC-SHA256 via Bearer header e reconexão autenticada no SSE.
  */
 import { useSyncExternalStore } from 'react';
 import type {
@@ -14,10 +12,13 @@ import type {
   Escola,
   EtapaId,
   EventoVaga,
+  LoginGestaoRequestDTO,
   Oferta,
   PainelSecretariaDTO,
+  PerfilGestao,
   Periodo,
   ProtocoloVisita,
+  SessaoGestaoDTO,
   StatusProtocolo,
   SyncFrameDTO,
   TurnoVisita,
@@ -25,8 +26,10 @@ import type {
 
 export type { EventoVaga };
 
-const KEY_CACHE = 'ma:patos:snapshot:v3';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+const KEY_CACHE = 'ma:patos:snapshot:v4';
+const KEY_SESSAO_SEC = 'ma:gestao:sessao:secretaria:v2';
+const KEY_SESSAO_UNI = 'ma:gestao:sessao:unidade:v2';
+export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
 const min = (m: number) => Date.now() - m * 60_000;
 const hora = (h: number) => Date.now() - h * 3_600_000;
@@ -299,32 +302,49 @@ const ESCOLAS_PADRAO_PATOS: Escola[] = [
   },
 ];
 
-interface EstadoServidor {
+function lerSessaoSalva(chave: string): SessaoGestaoDTO | null {
+  try {
+    const raw = sessionStorage.getItem(chave);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<SessaoGestaoDTO>;
+    if (
+      parsed &&
+      typeof parsed.token === 'string' &&
+      (parsed.perfil === 'secretaria' || parsed.perfil === 'unidade') &&
+      typeof parsed.usuario === 'string' &&
+      typeof parsed.expiraEm === 'number' &&
+      parsed.expiraEm > Date.now()
+    ) {
+      return parsed as SessaoGestaoDTO;
+    }
+    sessionStorage.removeItem(chave);
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+interface CachePublico {
   catalogo: CatalogoMunicipioDTO;
   escolas: Escola[];
   historico: EventoVaga[];
-  protocolos: ProtocoloVisita[];
-  secretaria: PainelSecretariaDTO | null;
-  carregando: boolean;
-  apiOnline: boolean;
 }
 
-function carregarCacheInicial(): Omit<EstadoServidor, 'carregando' | 'apiOnline'> {
+function carregarCacheInicial(): CachePublico {
   try {
     const raw = localStorage.getItem(KEY_CACHE);
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<EstadoServidor>;
+      const parsed = JSON.parse(raw) as Partial<CachePublico>;
       const cat = parsed.catalogo;
-      const esc = Array.isArray(parsed.escolas) && parsed.escolas.length > 0 ? parsed.escolas : ESCOLAS_PADRAO_PATOS;
+      const esc =
+        Array.isArray(parsed.escolas) && parsed.escolas.length > 0
+          ? parsed.escolas
+          : ESCOLAS_PADRAO_PATOS;
       return {
         catalogo:
-          cat && Array.isArray(cat.bairros) && cat.bairros.length > 0
-            ? cat
-            : CATALOGO_VAZIO,
+          cat && Array.isArray(cat.bairros) && cat.bairros.length > 0 ? cat : CATALOGO_VAZIO,
         escolas: esc,
         historico: Array.isArray(parsed.historico) ? parsed.historico : [],
-        protocolos: Array.isArray(parsed.protocolos) ? parsed.protocolos : [],
-        secretaria: parsed.secretaria ?? null,
       };
     }
   } catch {
@@ -334,8 +354,6 @@ function carregarCacheInicial(): Omit<EstadoServidor, 'carregando' | 'apiOnline'
     catalogo: CATALOGO_VAZIO,
     escolas: ESCOLAS_PADRAO_PATOS,
     historico: [],
-    protocolos: [],
-    secretaria: null,
   };
 }
 
@@ -344,10 +362,15 @@ const cacheInicial = carregarCacheInicial();
 let catalogo: CatalogoMunicipioDTO = cacheInicial.catalogo;
 let escolas: Escola[] = cacheInicial.escolas;
 let historico: EventoVaga[] = cacheInicial.historico;
-let protocolos: ProtocoloVisita[] = cacheInicial.protocolos;
-let secretaria: PainelSecretariaDTO | null = cacheInicial.secretaria;
+let protocolos: ProtocoloVisita[] = [];
+let secretaria: PainelSecretariaDTO | null = null;
+let sessaoSecretaria: SessaoGestaoDTO | null =
+  typeof window !== 'undefined' ? lerSessaoSalva(KEY_SESSAO_SEC) : null;
+let sessaoUnidade: SessaoGestaoDTO | null =
+  typeof window !== 'undefined' ? lerSessaoSalva(KEY_SESSAO_UNI) : null;
 let carregando = escolas.length === 0;
 let apiOnline = false;
+let fonteSSE: EventSource | null = null;
 
 const assinantes = new Set<() => void>();
 const ouvintesEvento = new Set<(e: EventoVaga) => void>();
@@ -356,16 +379,43 @@ function emitir() {
   assinantes.forEach((fn) => fn());
 }
 
-function persistirCache() {
+function obterTokenGestaoPreferencial(escolaIdAlvo?: string): string | null {
+  const agora = Date.now();
+  if (sessaoSecretaria && sessaoSecretaria.expiraEm > agora) {
+    return sessaoSecretaria.token;
+  }
+  if (sessaoUnidade && sessaoUnidade.expiraEm > agora) {
+    if (!escolaIdAlvo || !sessaoUnidade.escolaId || sessaoUnidade.escolaId === escolaIdAlvo) {
+      return sessaoUnidade.token;
+    }
+  }
+  return null;
+}
+
+function headersAutenticados(
+  escolaIdAlvo?: string,
+  comJson = false,
+): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (comJson) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const token = obterTokenGestaoPreferencial(escolaIdAlvo);
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function persistirCachePublico() {
   try {
+    // Nunca persiste dados de gestão ou protocolos de terceiros no localStorage público
     localStorage.setItem(
       KEY_CACHE,
       JSON.stringify({
         catalogo,
         escolas,
         historico: historico.slice(0, 40),
-        protocolos: protocolos.slice(0, 50),
-        secretaria,
       }),
     );
   } catch {
@@ -373,24 +423,35 @@ function persistirCache() {
   }
 }
 
+function mesclarProtocolos(novos: ProtocoloVisita[]) {
+  const mapa = new Map<string, ProtocoloVisita>();
+  for (const p of novos) mapa.set(p.codigo, p);
+  for (const p of protocolos) {
+    if (!mapa.has(p.codigo)) mapa.set(p.codigo, p);
+  }
+  protocolos = Array.from(mapa.values()).sort((a, b) => b.criadoEm - a.criadoEm);
+}
+
 function aplicarSnapshot(dados: Partial<SyncFrameDTO>) {
   if (dados.catalogo) catalogo = dados.catalogo;
   if (Array.isArray(dados.escolas)) escolas = dados.escolas;
   if (Array.isArray(dados.historico)) historico = dados.historico;
-  if (Array.isArray(dados.protocolos)) protocolos = dados.protocolos;
+  if (Array.isArray(dados.protocolos)) mesclarProtocolos(dados.protocolos);
   if (dados.secretaria) secretaria = dados.secretaria;
   carregando = false;
   apiOnline = true;
-  persistirCache();
+  persistirCachePublico();
   emitir();
   if (dados.evento) {
     ouvintesEvento.forEach((fn) => fn(dados.evento!));
   }
 }
 
-// Hidratação imediata via REST + assinatura contínua via SSE (/api/v1/stream)
-if (typeof window !== 'undefined') {
-  fetch(`${API_BASE}/api/v1/escolas`)
+function sincronizarSnapshotHttp() {
+  if (typeof window === 'undefined') return;
+  fetch(`${API_BASE}/api/v1/escolas`, {
+    headers: headersAutenticados(),
+  })
     .then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
     .then((dados: Partial<SyncFrameDTO>) => {
       aplicarSnapshot(dados);
@@ -400,28 +461,66 @@ if (typeof window !== 'undefined') {
       apiOnline = false;
       emitir();
     });
+}
 
-  if ('EventSource' in window) {
-    const es = new EventSource(`${API_BASE}/api/v1/stream`);
-    es.onopen = () => {
-      apiOnline = true;
-      emitir();
-    };
-    es.onmessage = (ev) => {
-      try {
-        const frame = JSON.parse(ev.data) as SyncFrameDTO;
-        if (frame.tipo === 'sync') {
-          aplicarSnapshot(frame);
-        }
-      } catch {
-        /* ignore malformed frame */
-      }
-    };
-    es.onerror = () => {
-      apiOnline = false;
-      emitir();
-    };
+function conectarStreamSSE() {
+  if (typeof window === 'undefined' || !('EventSource' in window)) return;
+  if (fonteSSE) {
+    try {
+      fonteSSE.close();
+    } catch {
+      /* ignore */
+    }
+    fonteSSE = null;
   }
+
+  const token = obterTokenGestaoPreferencial();
+  const sufixo = token ? `?token=${encodeURIComponent(token)}` : '';
+  const es = new EventSource(`${API_BASE}/api/v1/stream${sufixo}`);
+  fonteSSE = es;
+
+  es.onopen = () => {
+    apiOnline = true;
+    emitir();
+  };
+  es.onmessage = (ev) => {
+    try {
+      const frame = JSON.parse(ev.data) as SyncFrameDTO;
+      if (frame.tipo === 'sync') {
+        aplicarSnapshot(frame);
+      }
+    } catch {
+      /* ignore malformed frame */
+    }
+  };
+  es.onerror = () => {
+    apiOnline = false;
+    emitir();
+  };
+}
+
+// Hidratação imediata via REST + assinatura contínua via SSE (/api/v1/stream)
+if (typeof window !== 'undefined') {
+  // Remove chaves legadas inseguras
+  try {
+    localStorage.removeItem('ma:patos:snapshot:v3');
+    sessionStorage.removeItem('ma:gestao:auth:secretaria:v1');
+    sessionStorage.removeItem('ma:gestao:auth:unidade:v1');
+  } catch {
+    /* ignore */
+  }
+  sincronizarSnapshotHttp();
+  conectarStreamSSE();
+}
+
+async function extrairMensagemErro(res: Response, padrao: string): Promise<string> {
+  try {
+    const data = (await res.json()) as { erro?: string };
+    if (data?.erro) return data.erro;
+  } catch {
+    /* ignore */
+  }
+  return padrao;
 }
 
 export const vagasStore = {
@@ -430,6 +529,8 @@ export const vagasStore = {
   getHistorico: () => historico,
   getProtocolos: () => protocolos,
   getSecretaria: () => secretaria,
+  getSessaoSecretaria: () => sessaoSecretaria,
+  getSessaoUnidade: () => sessaoUnidade,
   isCarregando: () => carregando,
   isApiOnline: () => apiOnline,
 
@@ -447,6 +548,69 @@ export const vagasStore = {
     };
   },
 
+  async autenticarGestao(credenciais: LoginGestaoRequestDTO): Promise<SessaoGestaoDTO> {
+    const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credenciais),
+    });
+
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Credenciais inválidas ou acesso não autorizado.');
+      throw new Error(msg);
+    }
+
+    const { sessao } = (await res.json()) as { ok: boolean; sessao: SessaoGestaoDTO };
+    if (sessao.perfil === 'secretaria') {
+      sessaoSecretaria = sessao;
+      try {
+        sessionStorage.setItem(KEY_SESSAO_SEC, JSON.stringify(sessao));
+      } catch {
+        /* ignore */
+      }
+    } else {
+      sessaoUnidade = sessao;
+      try {
+        sessionStorage.setItem(KEY_SESSAO_UNI, JSON.stringify(sessao));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    emitir();
+    sincronizarSnapshotHttp();
+    conectarStreamSSE();
+    return sessao;
+  },
+
+  encerrarSessaoGestao(perfil: PerfilGestao) {
+    if (perfil === 'secretaria') {
+      sessaoSecretaria = null;
+      try {
+        sessionStorage.removeItem(KEY_SESSAO_SEC);
+      } catch {
+        /* ignore */
+      }
+    } else {
+      sessaoUnidade = null;
+      try {
+        sessionStorage.removeItem(KEY_SESSAO_UNI);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!sessaoSecretaria && !sessaoUnidade) {
+      secretaria = null;
+    }
+
+    emitir();
+    conectarStreamSSE();
+    fetch(`${API_BASE}/api/v1/auth/logout`, { method: 'POST' }).catch(() => {
+      /* ignore */
+    });
+  },
+
   async atualizarOferta(
     escolaId: string,
     etapa: EtapaId,
@@ -456,23 +620,36 @@ export const vagasStore = {
   ) {
     const res = await fetch(`${API_BASE}/api/v1/gestao/escolas/${encodeURIComponent(escolaId)}/ofertas`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headersAutenticados(escolaId, true),
       body: JSON.stringify({ etapa, periodo, ...patch, origem }),
     });
-    if (!res.ok) throw new Error('Falha ao atualizar oferta no servidor');
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao atualizar oferta no servidor.');
+      throw new Error(msg);
+    }
     apiOnline = true;
   },
 
   async confirmarDados(escolaId: string) {
     const res = await fetch(`${API_BASE}/api/v1/gestao/escolas/${encodeURIComponent(escolaId)}/confirmar`, {
       method: 'POST',
+      headers: headersAutenticados(escolaId),
     });
-    if (!res.ok) throw new Error('Falha ao confirmar dados no servidor');
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao confirmar dados no servidor.');
+      throw new Error(msg);
+    }
   },
 
   async resetar() {
-    const res = await fetch(`${API_BASE}/api/v1/gestao/reset`, { method: 'POST' });
-    if (!res.ok) throw new Error('Falha ao restaurar banco de Patos-PB');
+    const res = await fetch(`${API_BASE}/api/v1/gestao/reset`, {
+      method: 'POST',
+      headers: headersAutenticados(),
+    });
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao restaurar banco de Patos-PB.');
+      throw new Error(msg);
+    }
   },
 
   async emitirProtocoloVisita(dados: {
@@ -493,19 +670,47 @@ export const vagasStore = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(dados),
     });
-    if (!res.ok) throw new Error('Não foi possível emitir o protocolo');
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Não foi possível emitir o protocolo.');
+      throw new Error(msg);
+    }
     const json = (await res.json()) as { protocolo: ProtocoloVisita };
+    mesclarProtocolos([json.protocolo]);
+    emitir();
     return json.protocolo;
+  },
+
+  async buscarProtocoloPorCodigo(codigo: string): Promise<ProtocoloVisita | null> {
+    const limpo = codigo.trim().toUpperCase();
+    if (!limpo) return null;
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/protocolos/${encodeURIComponent(limpo)}`);
+      if (!res.ok) return null;
+      const json = (await res.json()) as { protocolo?: ProtocoloVisita };
+      if (json.protocolo) {
+        mesclarProtocolos([json.protocolo]);
+        emitir();
+        return json.protocolo;
+      }
+    } catch {
+      /* fallback para lista em memória */
+    }
+    return protocolos.find((p) => p.codigo.toUpperCase() === limpo) ?? null;
   },
 
   async atualizarStatusProtocolo(codigo: string, status: StatusProtocolo): Promise<ProtocoloVisita> {
     const res = await fetch(`${API_BASE}/api/v1/gestao/protocolos/${encodeURIComponent(codigo)}/status`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headersAutenticados(undefined, true),
       body: JSON.stringify({ status }),
     });
-    if (!res.ok) throw new Error('Falha ao atualizar protocolo');
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao atualizar protocolo.');
+      throw new Error(msg);
+    }
     const json = (await res.json()) as { protocolo: ProtocoloVisita };
+    mesclarProtocolos([json.protocolo]);
+    emitir();
     return json.protocolo;
   },
 };
@@ -528,6 +733,14 @@ export function useProtocolos(): ProtocoloVisita[] {
 
 export function usePainelSecretaria(): PainelSecretariaDTO | null {
   return useSyncExternalStore(vagasStore.subscribe, vagasStore.getSecretaria);
+}
+
+export function useSessaoSecretaria(): SessaoGestaoDTO | null {
+  return useSyncExternalStore(vagasStore.subscribe, vagasStore.getSessaoSecretaria);
+}
+
+export function useSessaoUnidade(): SessaoGestaoDTO | null {
+  return useSyncExternalStore(vagasStore.subscribe, vagasStore.getSessaoUnidade);
 }
 
 export function useStatusApi(): boolean {

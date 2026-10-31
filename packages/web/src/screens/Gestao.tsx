@@ -12,6 +12,8 @@ import {
   useHistorico,
   usePainelSecretaria,
   useProtocolos,
+  useSessaoSecretaria,
+  useSessaoUnidade,
   vagasStore,
 } from '../services/vagasStore';
 import { PALETTES } from '../stickers/fun';
@@ -22,52 +24,20 @@ export function Gestao() {
   const escolas = useEscolas();
   const protocolos = useProtocolos();
   const painelSecretaria = usePainelSecretaria();
+  const sessaoSecretaria = useSessaoSecretaria();
+  const sessaoUnidade = useSessaoUnidade();
   const rota = useHashRoute();
   const [leitorQrAberto, setLeitorQrAberto] = useState(false);
   const [aba, setAba] = useState<'secretaria' | 'unidade'>(() =>
     window.location.hash.includes('unidade') ? 'unidade' : 'secretaria',
   );
+  // Permite que um gestor autenticado na SEDUC inspecione qualquer unidade no Painel da Unidade
+  const [escolaInspecionadaSeduc, setEscolaInspecionadaSeduc] = useState<string | null>(null);
 
   useEffect(() => {
     if (rota.includes('unidade')) setAba('unidade');
     else if (rota === '#/gestao' || rota === '#/gestao/secretaria') setAba('secretaria');
   }, [rota]);
-
-  const [authSecretaria, setAuthSecretariaRaw] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem('ma:gestao:auth:secretaria:v1') === 'true';
-    } catch {
-      return false;
-    }
-  });
-
-  const [authUnidade, setAuthUnidadeRaw] = useState<string | null>(() => {
-    try {
-      return sessionStorage.getItem('ma:gestao:auth:unidade:v1');
-    } catch {
-      return null;
-    }
-  });
-
-  const setAuthSecretaria = (val: boolean) => {
-    setAuthSecretariaRaw(val);
-    try {
-      if (val) sessionStorage.setItem('ma:gestao:auth:secretaria:v1', 'true');
-      else sessionStorage.removeItem('ma:gestao:auth:secretaria:v1');
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const setAuthUnidade = (escolaId: string | null) => {
-    setAuthUnidadeRaw(escolaId);
-    try {
-      if (escolaId) sessionStorage.setItem('ma:gestao:auth:unidade:v1', escolaId);
-      else sessionStorage.removeItem('ma:gestao:auth:unidade:v1');
-    } catch {
-      /* ignore */
-    }
-  };
 
   // Limpa legado de autologin antigo se existente
   useEffect(() => {
@@ -79,7 +49,25 @@ export function Gestao() {
     }
   }, []);
 
-  const escola = authUnidade ? escolas.find((e) => e.id === authUnidade) ?? null : null;
+  const authSecretaria = Boolean(sessaoSecretaria);
+  const idUnidadeAtiva =
+    sessaoUnidade?.escolaId ?? (authSecretaria ? escolaInspecionadaSeduc : null);
+  const authUnidade = Boolean(idUnidadeAtiva);
+  const escola = idUnidadeAtiva ? escolas.find((e) => e.id === idUnidadeAtiva) ?? null : null;
+
+  function sairSecretaria() {
+    vagasStore.encerrarSessaoGestao('secretaria');
+    setEscolaInspecionadaSeduc(null);
+    toast('Sessão da Secretaria de Educação encerrada.', { emoji: 'info', tom: 'info' });
+  }
+
+  function sairUnidade() {
+    if (sessaoUnidade) {
+      vagasStore.encerrarSessaoGestao('unidade');
+    }
+    setEscolaInspecionadaSeduc(null);
+    toast('Sessão da Unidade Escolar encerrada.', { emoji: 'info', tom: 'info' });
+  }
 
   return (
     <div className="gestao">
@@ -148,10 +136,7 @@ export function Gestao() {
                 <button
                   type="button"
                   className="btn btn-fantasma btn-pequeno"
-                  onClick={() => {
-                    setAuthSecretaria(false);
-                    toast('Sessão da Secretaria de Educação encerrada.', { emoji: 'info', tom: 'info' });
-                  }}
+                  onClick={sairSecretaria}
                 >
                   <Icone nome="x" tamanho={14} /> Sair da Secretaria
                 </button>
@@ -161,10 +146,7 @@ export function Gestao() {
                 <button
                   type="button"
                   className="btn btn-fantasma btn-pequeno"
-                  onClick={() => {
-                    setAuthUnidade(null);
-                    toast('Sessão da Unidade Escolar encerrada.', { emoji: 'info', tom: 'info' });
-                  }}
+                  onClick={sairUnidade}
                 >
                   <Icone nome="x" tamanho={14} /> Sair da Unidade
                 </button>
@@ -185,15 +167,12 @@ export function Gestao() {
                 <PainelMacroSecretaria
                   painel={painelSecretaria}
                   onAbrirUnidade={(id) => {
-                    setAuthUnidade(id);
+                    setEscolaInspecionadaSeduc(id);
                     setAba('unidade');
                     window.history.replaceState(null, '', '#/gestao/unidade');
                   }}
                   onAbrirLeitor={() => setLeitorQrAberto(true)}
-                  onSair={() => {
-                    setAuthSecretaria(false);
-                    toast('Sessão da Secretaria encerrada com sucesso.', { emoji: 'info', tom: 'info' });
-                  }}
+                  onSair={sairSecretaria}
                 />
               ) : (
                 <p className="aviso-suave">Carregando indicadores da Secretaria Municipal de Educação de Patos - PB…</p>
@@ -201,8 +180,10 @@ export function Gestao() {
             ) : (
               <LoginSecretaria
                 onEntrar={() => {
-                  setAuthSecretaria(true);
-                  toast('Bem-vindo à Secretaria Municipal de Educação de Patos - PB!', { emoji: 'check-circle', tom: 'ok' });
+                  toast('Bem-vindo à Secretaria Municipal de Educação de Patos - PB!', {
+                    emoji: 'check-circle',
+                    tom: 'ok',
+                  });
                 }}
               />
             )
@@ -210,20 +191,27 @@ export function Gestao() {
             <PainelUnidade
               escola={escola}
               escolas={escolas}
-              onTrocarEscola={(id) => setAuthUnidade(id)}
-              onAbrirLeitor={() => setLeitorQrAberto(true)}
-              onSair={() => {
-                setAuthUnidade(null);
-                toast('Sessão da Unidade encerrada.', { emoji: 'info', tom: 'info' });
+              podeTrocarLivremente={authSecretaria}
+              onTrocarEscola={(id) => {
+                if (authSecretaria) {
+                  setEscolaInspecionadaSeduc(id);
+                } else {
+                  vagasStore.encerrarSessaoGestao('unidade');
+                  toast('Faça login com o PIN da unidade selecionada.', { emoji: 'info', tom: 'info' });
+                }
               }}
+              onAbrirLeitor={() => setLeitorQrAberto(true)}
+              onSair={sairUnidade}
             />
           ) : (
             <LoginUnidade
               escolas={escolas}
               onEntrar={(id) => {
-                setAuthUnidade(id);
                 const esc = escolas.find((e) => e.id === id);
-                toast(`Acesso liberado: ${esc?.nome ?? 'Unidade Escolar'}`, { emoji: 'check-circle', tom: 'ok' });
+                toast(`Acesso liberado: ${esc?.nome ?? 'Unidade Escolar'}`, {
+                  emoji: 'check-circle',
+                  tom: 'ok',
+                });
               }}
             />
           )}
@@ -236,11 +224,19 @@ export function Gestao() {
           todasEscolas={escolas}
           protocolos={protocolos}
           onConfirmarMatricula={async (codigo) => {
-            await vagasStore.atualizarStatusProtocolo(codigo, 'atendido');
-            toast(`Matrícula do protocolo ${codigo} confirmada! 1 vaga ocupada.`, {
-              emoji: 'check-circle',
-              tom: 'ok',
-            });
+            try {
+              await vagasStore.atualizarStatusProtocolo(codigo, 'atendido');
+              toast(`Matrícula do protocolo ${codigo} confirmada! 1 vaga ocupada.`, {
+                emoji: 'check-circle',
+                tom: 'ok',
+              });
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Falha ao confirmar protocolo.', {
+                emoji: 'alert-triangle',
+                tom: 'aviso',
+              });
+              throw err;
+            }
           }}
         />
       </div>
@@ -504,12 +500,14 @@ function PainelMacroSecretaria({
 function PainelUnidade({
   escola,
   escolas,
+  podeTrocarLivremente,
   onTrocarEscola,
   onAbrirLeitor,
   onSair,
 }: {
   escola: Escola;
   escolas: Escola[];
+  podeTrocarLivremente: boolean;
   onTrocarEscola: (id: string) => void;
   onAbrirLeitor?: () => void;
   onSair: () => void;
@@ -530,7 +528,16 @@ function PainelUnidade({
         <div>
           <div className="seletor-unidade-rapido">
             <label htmlFor={seletorId}>Unidade ativa em Patos - PB:</label>
-            <select id={seletorId} value={escola.id} onChange={(e) => onTrocarEscola(e.target.value)}>
+            <select
+              id={seletorId}
+              value={escola.id}
+              onChange={(e) => onTrocarEscola(e.target.value)}
+              title={
+                podeTrocarLivremente
+                  ? 'Alternar unidade (sessão SEDUC ativa)'
+                  : 'Trocar de unidade exigirá o PIN da outra escola'
+              }
+            >
               {escolas.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.nome} ({e.bairro})
@@ -654,11 +661,18 @@ function PainelUnidade({
                       type="button"
                       className="btn btn-primario btn-pequeno"
                       onClick={async () => {
-                        await vagasStore.atualizarStatusProtocolo(p.codigo, 'atendido');
-                        toast(`Matrícula do protocolo ${p.codigo} confirmada! 1 vaga ocupada.`, {
-                          emoji: 'check-circle',
-                          tom: 'ok',
-                        });
+                        try {
+                          await vagasStore.atualizarStatusProtocolo(p.codigo, 'atendido');
+                          toast(`Matrícula do protocolo ${p.codigo} confirmada! 1 vaga ocupada.`, {
+                            emoji: 'check-circle',
+                            tom: 'ok',
+                          });
+                        } catch (err) {
+                          toast(err instanceof Error ? err.message : 'Falha ao confirmar matrícula.', {
+                            emoji: 'alert-triangle',
+                            tom: 'aviso',
+                          });
+                        }
                       }}
                     >
                       <Icone nome="check" tamanho={15} /> Confirmar matrícula
@@ -667,8 +681,15 @@ function PainelUnidade({
                       type="button"
                       className="btn btn-fantasma btn-pequeno"
                       onClick={async () => {
-                        await vagasStore.atualizarStatusProtocolo(p.codigo, 'cancelado');
-                        toast(`Protocolo ${p.codigo} cancelado.`, { emoji: 'info', tom: 'aviso' });
+                        try {
+                          await vagasStore.atualizarStatusProtocolo(p.codigo, 'cancelado');
+                          toast(`Protocolo ${p.codigo} cancelado.`, { emoji: 'info', tom: 'aviso' });
+                        } catch (err) {
+                          toast(err instanceof Error ? err.message : 'Falha ao cancelar protocolo.', {
+                            emoji: 'alert-triangle',
+                            tom: 'aviso',
+                          });
+                        }
                       }}
                     >
                       Cancelar
@@ -701,9 +722,16 @@ function PainelUnidade({
         <button
           type="button"
           className="btn btn-secundario"
-          onClick={() => {
-            void vagasStore.confirmarDados(escola.id);
-            toast('Quadro de vagas confirmado com sucesso!', { emoji: 'check-circle', tom: 'ok' });
+          onClick={async () => {
+            try {
+              await vagasStore.confirmarDados(escola.id);
+              toast('Quadro de vagas confirmado com sucesso!', { emoji: 'check-circle', tom: 'ok' });
+            } catch (err) {
+              toast(err instanceof Error ? err.message : 'Falha ao confirmar dados.', {
+                emoji: 'alert-triangle',
+                tom: 'aviso',
+              });
+            }
           }}
         >
           <Icone nome="thumbs-up" tamanho={16} /> Confirmar quadro de vagas hoje
@@ -744,13 +772,14 @@ function LoginSecretaria({ onEntrar }: { onEntrar: () => void }) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [autenticando, setAutenticando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const emailId = useId();
   const senhaId = useId();
   const erroId = useId();
 
-  function enviar(e: FormEvent) {
+  async function enviar(e: FormEvent) {
     e.preventDefault();
     const emailLimpo = email.trim().toLowerCase();
     const senhaLimpa = senha.trim();
@@ -764,25 +793,24 @@ function LoginSecretaria({ onEntrar }: { onEntrar: () => void }) {
       return;
     }
 
-    const emailValido =
-      emailLimpo === 'secretaria@patos.pb.gov.br' ||
-      emailLimpo === 'admin' ||
-      emailLimpo === 'seduc' ||
-      emailLimpo === 'gestor.seduc@patos.pb.gov.br' ||
-      emailLimpo.endsWith('@patos.pb.gov.br');
-
-    const senhaValida =
-      senhaLimpa === 'patos2026' ||
-      senhaLimpa === 'seduc2026' ||
-      senhaLimpa === 'admin123' ||
-      senhaLimpa === '1234';
-
-    if (!emailValido || !senhaValida) {
-      setErro('Credenciais não autorizadas. Verifique o e-mail e a senha de acesso da SEDUC.');
-      return;
+    setAutenticando(true);
+    setErro(null);
+    try {
+      await vagasStore.autenticarGestao({
+        perfil: 'secretaria',
+        usuario: emailLimpo,
+        senha: senhaLimpa,
+      });
+      onEntrar();
+    } catch (err) {
+      setErro(
+        err instanceof Error
+          ? err.message
+          : 'Não foi possível validar suas credenciais no servidor da SEDUC.',
+      );
+    } finally {
+      setAutenticando(false);
     }
-
-    onEntrar();
   }
 
   return (
@@ -857,8 +885,9 @@ function LoginSecretaria({ onEntrar }: { onEntrar: () => void }) {
         </p>
       )}
 
-      <button type="submit" className="btn btn-primario btn-largo">
-        Entrar na Secretaria de Educação <span aria-hidden="true">→</span>
+      <button type="submit" className="btn btn-primario btn-largo" disabled={autenticando}>
+        {autenticando ? 'Autenticando na SEDUC…' : 'Entrar na Secretaria de Educação'}{' '}
+        <span aria-hidden="true">→</span>
       </button>
     </form>
   );
@@ -869,6 +898,7 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
   const [gestor, setGestor] = useState('');
   const [pin, setPin] = useState('');
   const [mostrarPin, setMostrarPin] = useState(false);
+  const [autenticando, setAutenticando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const selId = useId();
@@ -876,7 +906,7 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
   const pinId = useId();
   const erroId = useId();
 
-  function enviar(e: FormEvent) {
+  async function enviar(e: FormEvent) {
     e.preventDefault();
     const idAlvo = escolaId || escolas[0]?.id;
     const gestorLimpo = gestor.trim();
@@ -891,22 +921,29 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
       return;
     }
     if (!pinLimpo) {
-      setErro('Informe o PIN de 4 dígitos da unidade escolar.');
+      setErro('Informe o PIN de segurança da unidade escolar.');
       return;
     }
 
-    const pinValido =
-      pinLimpo === '2026' ||
-      pinLimpo === '1234' ||
-      pinLimpo === 'patos2026' ||
-      pinLimpo === 'escola123';
-
-    if (!pinValido) {
-      setErro('PIN de segurança incorreto para esta unidade escolar.');
-      return;
+    setAutenticando(true);
+    setErro(null);
+    try {
+      await vagasStore.autenticarGestao({
+        perfil: 'unidade',
+        escolaId: idAlvo,
+        usuario: gestorLimpo,
+        senha: pinLimpo,
+      });
+      onEntrar(idAlvo);
+    } catch (err) {
+      setErro(
+        err instanceof Error
+          ? err.message
+          : 'PIN de segurança incorreto para esta unidade escolar.',
+      );
+    } finally {
+      setAutenticando(false);
     }
-
-    onEntrar(idAlvo);
   }
 
   return (
@@ -965,7 +1002,7 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
             inputMode="numeric"
             autoComplete="current-password"
             required
-            maxLength={8}
+            maxLength={12}
             enterKeyHint="done"
             placeholder="••••"
             value={pin}
@@ -994,8 +1031,9 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
         </p>
       )}
 
-      <button type="submit" className="btn btn-primario btn-largo">
-        Entrar no painel da unidade <span aria-hidden="true">→</span>
+      <button type="submit" className="btn btn-primario btn-largo" disabled={autenticando}>
+        {autenticando ? 'Autenticando unidade…' : 'Entrar no painel da unidade'}{' '}
+        <span aria-hidden="true">→</span>
       </button>
     </form>
   );
@@ -1004,8 +1042,16 @@ function LoginUnidade({ escolas, onEntrar }: { escolas: Escola[]; onEntrar: (id:
 function LinhaOferta({ escolaId, oferta }: { escolaId: string; oferta: Oferta }) {
   const e = ETAPAS[oferta.etapa];
   const status = statusDaOferta(oferta);
-  const set = (patch: Partial<Pick<Oferta, 'vagas' | 'fila'>>) =>
-    void vagasStore.atualizarOferta(escolaId, oferta.etapa, oferta.periodo, patch);
+  const set = (patch: Partial<Pick<Oferta, 'vagas' | 'fila'>>) => {
+    vagasStore
+      .atualizarOferta(escolaId, oferta.etapa, oferta.periodo, patch)
+      .catch((err: unknown) => {
+        toast(err instanceof Error ? err.message : 'Falha ao atualizar oferta.', {
+          emoji: 'alert-triangle',
+          tom: 'aviso',
+        });
+      });
+  };
   const idV = useId();
   const idF = useId();
 

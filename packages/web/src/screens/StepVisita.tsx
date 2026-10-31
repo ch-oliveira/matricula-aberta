@@ -7,7 +7,13 @@ import { documentosPara } from '../domain/documentos';
 import { ETAPAS, STATUS_INFO } from '../domain/etapas';
 import { formatarDistancia, minutosAPe, tempoRelativo } from '../domain/geo';
 import { gerarMatrizQrCodeReal } from '../domain/qr';
-import { type Busca, type ProtocoloVisita, type TurnoVisita } from '../domain/types';
+import {
+  dataLocalISO,
+  proximoDiaUtilISO,
+  type Busca,
+  type ProtocoloVisita,
+  type TurnoVisita,
+} from '../domain/types';
 import { useAgora, usePersistido } from '../hooks';
 import { mascararTelefone } from '../services/alertas';
 import { useCatalogo, useEscolas, useProtocolos, vagasStore } from '../services/vagasStore';
@@ -19,15 +25,6 @@ interface Props {
   ajudante: boolean;
   turma: string | null;
   onAlerta: (escolaId: string) => void;
-}
-
-function proximoDiaUtilISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  while (d.getDay() === 0 || d.getDay() === 6) {
-    d.setDate(d.getDate() + 1);
-  }
-  return d.toISOString().slice(0, 10);
 }
 
 function formatarDataBR(iso: string): string {
@@ -56,13 +53,19 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
   const [responsavel, setResponsavel] = useState('');
   const [telefone, setTelefone] = useState('');
   const [turnoVisita, setTurnoVisita] = useState<TurnoVisita>('manha');
-  const [dataVisita, setDataVisita] = useState<string>(() => proximoDiaUtilISO());
+  const [dataVisita, setDataVisita] = useState<string>(() => proximoDiaUtilISO(1));
   const [emitindo, setEmitindo] = useState(false);
   const [erroProt, setErroProt] = useState<string | null>(null);
   const [protocoloLocal, setProtocoloLocal] = useState<ProtocoloVisita | null>(null);
 
-  // Sincroniza protocolo emitido para esta escola com o estado ao vivo do servidor (SSE)
+  // Sincroniza protocolo emitido para esta escola com o estado ao vivo do servidor
   const codigoSalvo = meusCodigos[escolaId];
+
+  useEffect(() => {
+    if (!codigoSalvo) return;
+    void vagasStore.buscarProtocoloPorCodigo(codigoSalvo);
+  }, [codigoSalvo, agora]);
+
   const protocoloAtivo = useMemo(() => {
     if (codigoSalvo) {
       const doServidor = protocolosRede.find((p) => p.codigo === codigoSalvo);
@@ -373,13 +376,13 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
           </div>
         </dl>
         <div className="acoes-grade">
-          <a className="btn btn-primario" href={mapa} target="_blank" rel="noopener">
+          <a className="btn btn-primario" href={mapa} target="_blank" rel="noopener noreferrer">
             <Icone nome="map" tamanho={16} /> Como chegar
           </a>
           <a className="btn btn-secundario" href={`tel:${escola.telefone.replace(/\D/g, '')}`}>
             <Icone nome="phone" tamanho={16} /> {escola.telefone}
           </a>
-          <a className="btn btn-whats" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener">
+          <a className="btn btn-whats" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener noreferrer">
             <Icone nome="message" tamanho={16} /> Enviar no WhatsApp
           </a>
           {status === 'espera' && (
@@ -492,7 +495,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 >
                   <Icone nome="file-text" tamanho={15} /> Baixar Cartão no Celular (PNG)
                 </button>
-                <a className="btn btn-whats btn-pequeno" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener">
+                <a className="btn btn-whats btn-pequeno" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener noreferrer">
                   <Icone nome="message" tamanho={15} /> Salvar no WhatsApp
                 </a>
                 <button
@@ -550,7 +553,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 <input
                   id={dataId}
                   type="date"
-                  min={new Date().toISOString().slice(0, 10)}
+                  min={dataLocalISO()}
                   value={dataVisita}
                   onChange={(e) => setDataVisita(e.target.value)}
                 />

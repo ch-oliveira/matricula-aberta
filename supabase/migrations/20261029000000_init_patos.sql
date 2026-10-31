@@ -117,14 +117,14 @@ ALTER TABLE historico_vagas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alertas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE protocolos_visita ENABLE ROW LEVEL SECURITY;
 
--- Políticas de Acesso Público (Leitura anônima para transparência cidadã)
+-- Políticas de Acesso Público (Leitura anônima restrita a catálogos e quadros agregados; PII protegido via RLS)
 CREATE POLICY "Permitir leitura publica bairros" ON bairros_patos FOR SELECT USING (true);
 CREATE POLICY "Permitir leitura publica documentos" ON documentos_catalogo FOR SELECT USING (true);
 CREATE POLICY "Permitir leitura publica escolas" ON escolas FOR SELECT USING (true);
 CREATE POLICY "Permitir leitura publica ofertas" ON ofertas FOR SELECT USING (true);
 CREATE POLICY "Permitir leitura publica historico" ON historico_vagas FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura publica alertas" ON alertas FOR SELECT USING (true);
-CREATE POLICY "Permitir leitura publica protocolos" ON protocolos_visita FOR SELECT USING (true);
+CREATE POLICY "Restringir leitura alertas apenas autenticados" ON alertas FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Restringir leitura protocolos apenas autenticados" ON protocolos_visita FOR SELECT TO authenticated USING (true);
 
 -- =========================================================================
 -- SEED INICIAL DE PATOS - PB
@@ -146,17 +146,17 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Documentos Oficiais
 INSERT INTO documentos_catalogo (id, nome, dica, emoji, obrigatorio, etapas_json, ordem) VALUES
-  ('certidao', 'Certidão de nascimento da criança', 'Original e uma cópia legível.', '📄', 1, NULL, 1),
-  ('cpf-crianca', 'CPF da criança', 'Pode constar na própria certidão de nascimento.', '🪪', 1, NULL, 2),
-  ('doc-resp', 'Documento oficial com foto do responsável', 'RG, CIN, CNH ou Carteira de Trabalho.', '🧑', 1, NULL, 3),
-  ('cpf-resp', 'CPF do pai, mãe ou responsável legal', 'Pode estar no RG ou CNH.', '🔢', 1, NULL, 4),
-  ('residencia', 'Comprovante de residência em Patos - PB', 'Conta da Energisa, Cagepa ou contrato recente.', '🏠', 1, NULL, 5),
-  ('vacina', 'Carteira de vacinação atualizada (UBS)', 'Emitida ou atualizada em qualquer UBS de Patos.', '💉', 1, '["bercario","maternal","pre","fund1"]', 6),
-  ('sus', 'Cartão Nacional do SUS da criança', 'Obrigatório para cadastro na Rede Municipal de Patos.', '🏥', 1, '["bercario","maternal","pre"]', 7),
-  ('historico', 'Declaração provisória ou Histórico Escolar', 'Solicite na escola anterior (30 dias para o definitivo).', '🎓', 1, '["fund1","fund2"]', 8),
-  ('trabalho', 'Comprovante de trabalho dos responsáveis', 'Prioridade para vagas de tempo integral nas creches.', '💼', 0, '["bercario","maternal"]', 9),
-  ('nis', 'Número do NIS / Cartão Bolsa Família (CadÚnico)', 'Garante prioridade social conforme diretriz municipal.', '💳', 0, NULL, 10),
-  ('laudo', 'Laudo médico ou parecer multiprofissional (AEE)', 'Para estudantes com deficiência, TEA ou altas habilidades.', '🩺', 0, NULL, 11)
+  ('certidao', 'Certidão de nascimento da criança', 'Original e uma cópia legível.', 'file-text', 1, NULL, 1),
+  ('cpf-crianca', 'CPF da criança', 'Pode constar na própria certidão de nascimento.', 'id-card', 1, NULL, 2),
+  ('doc-resp', 'Documento oficial com foto do responsável', 'RG, CIN, CNH ou Carteira de Trabalho.', 'user-check', 1, NULL, 3),
+  ('cpf-resp', 'CPF do pai, mãe ou responsável legal', 'Pode estar no RG ou CNH.', 'id-badge', 1, NULL, 4),
+  ('residencia', 'Comprovante de residência em Patos - PB', 'Conta da Energisa, Cagepa ou contrato recente.', 'home', 1, NULL, 5),
+  ('vacina', 'Carteira de vacinação atualizada (UBS)', 'Emitida ou atualizada em qualquer UBS de Patos.', 'syringe', 1, '["bercario","maternal","pre","fund1"]', 6),
+  ('sus', 'Cartão Nacional do SUS da criança', 'Obrigatório para cadastro na Rede Municipal de Patos.', 'heart-pulse', 1, '["bercario","maternal","pre"]', 7),
+  ('historico', 'Declaração provisória ou Histórico Escolar', 'Solicite na escola anterior (30 dias para o definitivo).', 'graduation-cap', 1, '["fund1","fund2"]', 8),
+  ('trabalho', 'Comprovante de trabalho dos responsáveis', 'Prioridade para vagas de tempo integral nas creches.', 'briefcase', 0, '["bercario","maternal"]', 9),
+  ('nis', 'Número do NIS / Cartão Bolsa Família (CadÚnico)', 'Garante prioridade social conforme diretriz municipal.', 'credit-card', 0, NULL, 10),
+  ('laudo', 'Laudo médico ou parecer multiprofissional (AEE)', 'Para estudantes com deficiência, TEA ou altas habilidades.', 'stethoscope', 0, NULL, 11)
 ON CONFLICT (id) DO NOTHING;
 
 -- 12 Unidades da Rede Municipal de Patos - PB

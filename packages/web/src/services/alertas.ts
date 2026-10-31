@@ -1,34 +1,39 @@
 import { useSyncExternalStore } from 'react';
-import type { EtapaId, Local, Periodo } from '../domain/types';
+import type { Alerta, Canal } from '../domain/types';
+
+export type { Alerta, Canal };
 
 /**
- * Alertas de nova vaga (integrado ao Backend SQLite /api/v1/alertas com fallback offline).
- * Telefone mascarado e com hash SHA-256 no banco, finalidade única e expiração em 90 dias (LGPD).
+ * Alertas de nova vaga do cidadão (integrado ao Backend SQLite /api/v1/alertas com fallback offline).
+ * Telefone mascarado e com HMAC-SHA256 no banco, finalidade única, token individual de cancelamento
+ * e expiração automática em 90 dias (LGPD).
  */
-export type Canal = 'whatsapp' | 'push';
+const KEY = 'ma:alertas:cidadao:v2';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
-export interface Alerta {
-  id: string;
-  canal: Canal;
-  telefone?: string;
-  etapa: EtapaId;
-  periodo: Periodo | 'tanto-faz';
-  local: Local;
-  raioKm: number;
-  escolaId?: string;
-  escolaNome?: string;
-  criadoEm: number;
+function validarAlertaLocal(item: unknown): item is Alerta {
+  if (!item || typeof item !== 'object') return false;
+  const a = item as Partial<Alerta>;
+  return (
+    typeof a.id === 'string' &&
+    (a.canal === 'whatsapp' || a.canal === 'push') &&
+    typeof a.etapa === 'string' &&
+    Boolean(a.local && typeof a.local.lat === 'number' && typeof a.local.lng === 'number') &&
+    typeof a.raioKm === 'number'
+  );
 }
 
-const KEY = 'ma:alertas:v1';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 let alertas: Alerta[] = (() => {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? '[]') as Alerta[];
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter(validarAlertaLocal) : [];
   } catch {
     return [];
   }
 })();
+
 const subs = new Set<() => void>();
 
 function salvar() {
@@ -40,21 +45,6 @@ function salvar() {
   subs.forEach((f) => f());
 }
 
-// Sincroniza alertas existentes na API ao iniciar
-if (typeof window !== 'undefined') {
-  fetch(`${API_BASE}/api/v1/alertas`)
-    .then((r) => (r.ok ? r.json() : null))
-    .then((dados: { alertas?: Alerta[] } | null) => {
-      if (dados && Array.isArray(dados.alertas)) {
-        alertas = dados.alertas;
-        salvar();
-      }
-    })
-    .catch(() => {
-      /* segue com localStorage offline */
-    });
-}
-
 export const alertasStore = {
   get: () => alertas,
   subscribe(fn: () => void) {
@@ -63,7 +53,7 @@ export const alertasStore = {
       subs.delete(fn);
     };
   },
-  criar(a: Omit<Alerta, 'id' | 'criadoEm'>): Alerta {
+  criar(a: Omit<Alerta, 'id' | 'criadoEm' | 'tokenCancelamento'>): Alerta {
     const provisorio: Alerta = { ...a, id: crypto.randomUUID(), criadoEm: Date.now() };
     alertas = [provisorio, ...alertas];
     salvar();
@@ -87,9 +77,19 @@ export const alertasStore = {
     return provisorio;
   },
   remover(id: string) {
+    const alvo = alertas.find((a) => a.id === id);
     alertas = alertas.filter((a) => a.id !== id);
     salvar();
-    fetch(`${API_BASE}/api/v1/alertas/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {
+
+    const headers: Record<string, string> = {};
+    if (alvo?.tokenCancelamento) {
+      headers['X-Alert-Token'] = alvo.tokenCancelamento;
+    }
+
+    fetch(`${API_BASE}/api/v1/alertas/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers,
+    }).catch(() => {
       /* ignore offline */
     });
   },

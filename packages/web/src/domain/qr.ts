@@ -46,3 +46,4 @@ export function extrairCodigoProtocolo(bruto: string): string | null {
 
   return limpo.toUpperCase();
 }
+

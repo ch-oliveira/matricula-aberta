@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --no-warnings --watch --experimental-strip-types --experimental-sqlite src/index.ts",
-    "start": "node --no-warnings --experimental-strip-types --experimental-sqlite src/index.ts"
+    "start": "node --no-warnings --experimental-strip-types --experimental-sqlite src/index.ts",
+    "typecheck": "../web/node_modules/.bin/tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "pg": "^8.13.1"

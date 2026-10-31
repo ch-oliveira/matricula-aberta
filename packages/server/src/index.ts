@@ -1,25 +1,40 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import type {
-  Canal,
-  EtapaId,
-  EventoVaga,
-  Periodo,
-  StatusProtocolo,
-  TurnoVisita,
-} from '../../../shared/src/index.ts';
+import type { LoginGestaoRequestDTO } from '../../shared/src/index.ts';
+import {
+  autenticarCredenciaisGestao,
+  exigirSessaoGestao,
+  extrairSessaoRequisicao,
+  verificarTokenCancelamentoAlerta,
+} from './infra/auth.ts';
+import {
+  aplicarHeadersSeguranca,
+  exigirRateLimit,
+  HttpError,
+  lerJsonSeguro,
+} from './infra/security.ts';
 import { registrarClienteSSE, totalClientesSSE, transmitirAtualizacaoSSE } from './infra/sse.ts';
+import {
+  ehStatusProtocoloValido,
+  validarPayloadAlerta,
+  validarPayloadOferta,
+  validarPayloadProtocolo,
+} from './infra/validation.ts';
 import {
   criarAlerta,
   garantirSeedAlertasPatos,
   listarAlertas,
   removerAlerta,
 } from './modules/alertas/alertas.module.ts';
-import { garantirSeedCatalogoPatos, obterCatalogoMunicipio } from './modules/catalogo/catalogo.module.ts';
+import {
+  garantirSeedCatalogoPatos,
+  obterCatalogoMunicipio,
+} from './modules/catalogo/catalogo.module.ts';
 import {
   atualizarStatusProtocolo,
   criarProtocoloVisita,
   garantirSeedProtocolosPatos,
   listarProtocolos,
+  obterProtocoloPorCodigo,
 } from './modules/protocolos/protocolos.module.ts';
 import { obterPainelSecretariaPatos } from './modules/secretaria/secretaria.module.ts';
 import {
@@ -33,7 +48,7 @@ import {
 const PORT = Number(process.env.PORT ?? 3333);
 
 // Inicializa o banco SQLite de Patos - PB com todos os módulos do Monolito Modular
-function inicializarBancoPatos(forcarReset = false) {
+function inicializarBancoPatos(forcarReset = false): void {
   garantirSeedCatalogoPatos();
   popularUnidadesPatos(forcarReset);
   garantirSeedAlertasPatos(forcarReset);
@@ -42,25 +57,13 @@ function inicializarBancoPatos(forcarReset = false) {
 
 inicializarBancoPatos(false);
 
-function cors(res: ServerResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Idempotency-Key');
-}
-
-function json(res: ServerResponse, status: number, body: unknown) {
-  cors(res);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+function json(req: IncomingMessage, res: ServerResponse, status: number, body: unknown): void {
+  aplicarHeadersSeguranca(req, res);
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store',
+  });
   res.end(JSON.stringify(body));
-}
-
-async function lerJson<T>(req: IncomingMessage): Promise<T> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  const raw = Buffer.concat(chunks).toString('utf-8');
-  return raw ? (JSON.parse(raw) as T) : ({} as T);
 }
 
 const cacheTts = new Map<string, Buffer>();
@@ -107,7 +110,7 @@ function dividirFrasesTts(texto: string, limite = 175): string[] {
 }
 
 async function sintetizarVozNeuralPtBr(texto: string): Promise<Buffer> {
-  const chave = texto.slice(0, 900).trim();
+  const chave = texto.slice(0, 600).trim();
   const emCache = cacheTts.get(chave);
   if (emCache) return emCache;
 
@@ -142,7 +145,8 @@ async function sintetizarVozNeuralPtBr(texto: string): Promise<Buffer> {
 }
 
 const server = createServer(async (req, res) => {
-  cors(res);
+  aplicarHeadersSeguranca(req, res);
+
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
     res.end();
@@ -155,35 +159,61 @@ const server = createServer(async (req, res) => {
   try {
     // 0. Healthcheck e metadados da arquitetura Monolito Modular
     if (req.method === 'GET' && path === '/api/v1/health') {
-      return json(res, 200, {
+      exigirRateLimit(req, 'health', 120, 60_000);
+      return json(req, res, 200, {
         ok: true,
         arquitetura: 'monorepo-monolito-modular',
         municipio: 'Patos - PB',
         ibge: '2510808',
-        modulos: ['catalogo', 'unidades', 'alertas', 'protocolos', 'secretaria'],
+        modulos: ['auth', 'catalogo', 'unidades', 'alertas', 'protocolos', 'secretaria'],
         sseClientes: totalClientesSSE(),
         agora: Date.now(),
       });
     }
 
-    // 1. Stream Server-Sent Events (Tempo Real unificado)
+    // 0.1. Módulo de Autenticação e Sessão de Gestão (SEDUC / Unidades Escolares)
+    if (req.method === 'POST' && path === '/api/v1/auth/login') {
+      exigirRateLimit(req, 'auth-login', 12, 60_000);
+      const body = await lerJsonSeguro<Partial<LoginGestaoRequestDTO>>(req);
+      const sessao = autenticarCredenciaisGestao(body);
+      return json(req, res, 200, { ok: true, sessao });
+    }
+
+    if (req.method === 'GET' && path === '/api/v1/auth/me') {
+      exigirRateLimit(req, 'auth-me', 60, 60_000);
+      const sessao = exigirSessaoGestao(req, url);
+      return json(req, res, 200, { ok: true, sessao });
+    }
+
+    if (req.method === 'POST' && path === '/api/v1/auth/logout') {
+      return json(req, res, 200, { ok: true });
+    }
+
+    // 1. Stream Server-Sent Events (Tempo Real unificado com isolamento público vs. gestão)
     if (req.method === 'GET' && path === '/api/v1/stream') {
-      registrarClienteSSE(res);
+      exigirRateLimit(req, 'sse', 30, 60_000);
+      const sessao = extrairSessaoRequisicao(req, url);
+      registrarClienteSSE(req, res, sessao);
       return;
     }
 
     // 2. Módulo Catálogo Municipal (Patos-PB: bairros, centro e documentos)
     if (req.method === 'GET' && path === '/api/v1/catalogo') {
-      return json(res, 200, obterCatalogoMunicipio());
+      exigirRateLimit(req, 'leitura', 120, 60_000);
+      return json(req, res, 200, obterCatalogoMunicipio());
     }
 
     // 2.1. Síntese de Voz Neural em Português Brasileiro (acessibilidade cidadã)
     if (req.method === 'GET' && path === '/api/v1/tts') {
+      exigirRateLimit(req, 'tts', 30, 60_000);
       const q = (url.searchParams.get('q') ?? '').trim();
-      if (!q) return json(res, 400, { erro: 'Informe o parâmetro q.' });
+      if (!q) return json(req, res, 400, { erro: 'Informe o parâmetro q.' });
+      if (q.length > 900) {
+        return json(req, res, 400, { erro: 'Texto excede o limite para síntese de voz.' });
+      }
       try {
         const mp3 = await sintetizarVozNeuralPtBr(q);
-        cors(res);
+        aplicarHeadersSeguranca(req, res);
         res.writeHead(200, {
           'Content-Type': 'audio/mpeg',
           'Content-Length': String(mp3.length),
@@ -192,173 +222,195 @@ const server = createServer(async (req, res) => {
         res.end(mp3);
         return;
       } catch {
-        return json(res, 503, { erro: 'Serviço de voz neural temporariamente indisponível.' });
+        return json(req, res, 503, { erro: 'Serviço de voz neural temporariamente indisponível.' });
       }
     }
 
-    // 3. Módulo Unidades Escolares e Vagas
+    // 3. Módulo Unidades Escolares e Vagas (Snapshot Público + Hidratação autenticada de Gestão)
     if (req.method === 'GET' && path === '/api/v1/escolas') {
-      return json(res, 200, {
+      exigirRateLimit(req, 'leitura', 120, 60_000);
+      const sessao = extrairSessaoRequisicao(req, url);
+      return json(req, res, 200, {
         catalogo: obterCatalogoMunicipio(),
         escolas: listarEscolas(),
         historico: listarHistorico(40),
-        protocolos: listarProtocolos(),
-        secretaria: obterPainelSecretariaPatos(),
+        ...(sessao
+          ? {
+              protocolos: listarProtocolos(),
+              secretaria: obterPainelSecretariaPatos(),
+            }
+          : {}),
       });
     }
 
     const matchOferta = path.match(/^\/api\/v1\/gestao\/escolas\/([^/]+)\/ofertas$/);
     if (req.method === 'PATCH' && matchOferta) {
-      const escolaId = decodeURIComponent(matchOferta[1]);
-      const body = await lerJson<{
-        etapa: EtapaId;
-        periodo: Periodo;
-        vagas?: number;
-        fila?: number;
-        origem?: EventoVaga['origem'];
-      }>(req);
-
-      if (!body.etapa || !body.periodo) {
-        return json(res, 400, { erro: 'Informe etapa e periodo.' });
-      }
+      exigirRateLimit(req, 'gestao-mutacao', 60, 60_000);
+      const escolaId = decodeURIComponent(matchOferta[1]).trim();
+      const sessao = exigirSessaoGestao(req, url, { escolaId });
+      const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
+      const payload = validarPayloadOferta(bodyRaw);
 
       const { escola, evento } = atualizarOfertaUnidade({
         escolaId,
-        etapa: body.etapa,
-        periodo: body.periodo,
-        vagas: body.vagas,
-        fila: body.fila,
-        origem: body.origem ?? 'escola',
+        etapa: payload.etapa,
+        periodo: payload.periodo,
+        vagas: payload.vagas,
+        fila: payload.fila,
+        origem: sessao.perfil === 'secretaria' ? 'secretaria' : payload.origem,
       });
 
-      if (!escola) return json(res, 404, { erro: 'Unidade ou oferta não encontrada em Patos-PB.' });
+      if (!escola) return json(req, res, 404, { erro: 'Unidade ou oferta não encontrada em Patos-PB.' });
 
       transmitirAtualizacaoSSE(evento ?? undefined);
-      return json(res, 200, { ok: true, escola, evento });
+      return json(req, res, 200, { ok: true, escola, evento });
     }
 
     const matchConfirmar = path.match(/^\/api\/v1\/gestao\/escolas\/([^/]+)\/confirmar$/);
     if (req.method === 'POST' && matchConfirmar) {
-      const escolaId = decodeURIComponent(matchConfirmar[1]);
+      exigirRateLimit(req, 'gestao-mutacao', 30, 60_000);
+      const escolaId = decodeURIComponent(matchConfirmar[1]).trim();
+      exigirSessaoGestao(req, url, { escolaId });
       const ok = confirmarUnidade(escolaId);
-      if (!ok) return json(res, 404, { erro: 'Unidade não encontrada.' });
+      if (!ok) return json(req, res, 404, { erro: 'Unidade não encontrada.' });
       transmitirAtualizacaoSSE();
-      return json(res, 200, { ok: true });
+      return json(req, res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && path === '/api/v1/gestao/reset') {
+      exigirRateLimit(req, 'gestao-reset', 5, 60_000);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
       inicializarBancoPatos(true);
       transmitirAtualizacaoSSE();
-      return json(res, 200, { ok: true, escolas: listarEscolas() });
+      return json(req, res, 200, { ok: true, escolas: listarEscolas() });
     }
 
     // 4. Módulo Alertas (LGPD)
     if (req.method === 'GET' && path === '/api/v1/alertas') {
-      return json(res, 200, { alertas: listarAlertas() });
+      exigirRateLimit(req, 'leitura', 60, 60_000);
+      exigirSessaoGestao(req, url);
+      return json(req, res, 200, { alertas: listarAlertas() });
     }
 
     if (req.method === 'POST' && path === '/api/v1/alertas') {
-      const body = await lerJson<{
-        canal: Canal;
-        telefone?: string;
-        etapa: EtapaId;
-        periodo: Periodo | 'tanto-faz';
-        local: { lat: number; lng: number; rotulo: string };
-        raioKm: number;
-        escolaId?: string;
-        escolaNome?: string;
-      }>(req);
-
-      if (!body.canal || !body.etapa || !body.local) {
-        return json(res, 400, { erro: 'Dados incompletos para criar alerta.' });
-      }
-
-      const alerta = criarAlerta(body);
+      exigirRateLimit(req, 'criar-alerta', 15, 60_000);
+      const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
+      const payload = validarPayloadAlerta(bodyRaw);
+      const alerta = criarAlerta(payload);
       transmitirAtualizacaoSSE();
-      return json(res, 201, { ok: true, alerta });
+      return json(req, res, 201, { ok: true, alerta });
     }
 
     const matchDelAlerta = path.match(/^\/api\/v1\/alertas\/([^/]+)$/);
     if (req.method === 'DELETE' && matchDelAlerta) {
-      const id = decodeURIComponent(matchDelAlerta[1]);
+      exigirRateLimit(req, 'del-alerta', 20, 60_000);
+      const id = decodeURIComponent(matchDelAlerta[1]).trim();
+      const tokenHeader =
+        typeof req.headers['x-alert-token'] === 'string'
+          ? req.headers['x-alert-token']
+          : url.searchParams.get('token');
+
+      const autorizadoPorToken = verificarTokenCancelamentoAlerta(id, tokenHeader);
+      const sessaoGestao = extrairSessaoRequisicao(req, url);
+
+      if (!autorizadoPorToken && !sessaoGestao) {
+        return json(req, res, 403, {
+          erro: 'Token de cancelamento inválido ou ausente para este alerta.',
+        });
+      }
+
       removerAlerta(id);
       transmitirAtualizacaoSSE();
-      return json(res, 200, { ok: true });
+      return json(req, res, 200, { ok: true });
     }
 
     // 5. Módulo Protocolos de Pré-Agendamento / Atendimento Presencial (QR Code)
+    const matchGetProtocoloCodigo = path.match(/^\/api\/v1\/protocolos\/([^/]+)$/);
+    if (req.method === 'GET' && matchGetProtocoloCodigo) {
+      exigirRateLimit(req, 'consulta-protocolo', 60, 60_000);
+      const codigo = decodeURIComponent(matchGetProtocoloCodigo[1]).trim();
+      const protocolo = obterProtocoloPorCodigo(codigo);
+      if (!protocolo) {
+        return json(req, res, 404, { erro: 'Protocolo não encontrado na base de Patos - PB.' });
+      }
+      return json(req, res, 200, { ok: true, protocolo });
+    }
+
     if (req.method === 'GET' && path === '/api/v1/protocolos') {
+      exigirRateLimit(req, 'leitura', 60, 60_000);
+      exigirSessaoGestao(req, url);
       const escolaId = url.searchParams.get('escolaId') ?? undefined;
-      return json(res, 200, { protocolos: listarProtocolos(escolaId) });
+      return json(req, res, 200, { protocolos: listarProtocolos(escolaId) });
     }
 
     if (req.method === 'POST' && path === '/api/v1/protocolos') {
-      const body = await lerJson<{
-        escolaId: string;
-        etapa: EtapaId;
-        turma: string;
-        periodo: Periodo;
-        responsavel: string;
-        telefone?: string;
-        nascimento?: string;
-        turnoVisita: TurnoVisita;
-        dataVisita: string;
-        documentosMarcados: string[];
-        totalObrigatorios: number;
-      }>(req);
+      exigirRateLimit(req, 'criar-protocolo', 15, 60_000);
+      const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
+      const payload = validarPayloadProtocolo(bodyRaw);
+      const protocolo = criarProtocoloVisita(payload);
 
-      if (!body.escolaId || !body.etapa || !body.responsavel) {
-        return json(res, 400, { erro: 'Informe a escola, a etapa e o nome do responsável.' });
-      }
-
-      const protocolo = criarProtocoloVisita({
-        escolaId: body.escolaId,
-        etapa: body.etapa,
-        turma: body.turma || body.etapa,
-        periodo: body.periodo || 'integral',
-        responsavel: body.responsavel,
-        telefone: body.telefone,
-        nascimento: body.nascimento,
-        turnoVisita: body.turnoVisita || 'manha',
-        dataVisita: body.dataVisita || new Date().toISOString().slice(0, 10),
-        documentosMarcados: Array.isArray(body.documentosMarcados) ? body.documentosMarcados : [],
-        totalObrigatorios: Number(body.totalObrigatorios) || 6,
-      });
-
-      if (!protocolo) return json(res, 404, { erro: 'Unidade escolar não encontrada.' });
+      if (!protocolo) return json(req, res, 404, { erro: 'Unidade escolar não encontrada.' });
 
       transmitirAtualizacaoSSE();
-      return json(res, 201, { ok: true, protocolo });
+      return json(req, res, 201, { ok: true, protocolo });
     }
 
     const matchStatusProt = path.match(/^\/api\/v1\/gestao\/protocolos\/([^/]+)\/status$/);
     if (req.method === 'PATCH' && matchStatusProt) {
-      const codigo = decodeURIComponent(matchStatusProt[1]);
-      const body = await lerJson<{ status: StatusProtocolo }>(req);
-      if (!body.status || !['aguardando', 'atendido', 'cancelado'].includes(body.status)) {
-        return json(res, 400, { erro: 'Status inválido.' });
+      exigirRateLimit(req, 'gestao-mutacao', 40, 60_000);
+      const codigo = decodeURIComponent(matchStatusProt[1]).trim();
+      const sessao = exigirSessaoGestao(req, url);
+
+      const existente = obterProtocoloPorCodigo(codigo);
+      if (!existente) return json(req, res, 404, { erro: 'Protocolo não encontrado.' });
+
+      // Garante que gestor de unidade só dê baixa em protocolos da própria escola (SEDUC pode em todas)
+      if (sessao.perfil === 'unidade' && sessao.escolaId && sessao.escolaId !== existente.escolaId) {
+        return json(req, res, 403, {
+          erro: `Este protocolo pertence à unidade "${existente.escolaNome}". Acesse com o perfil da respectiva unidade ou da Secretaria de Educação.`,
+        });
       }
+
+      const body = await lerJsonSeguro<{ status?: unknown }>(req);
+      if (!ehStatusProtocoloValido(body.status)) {
+        return json(req, res, 400, { erro: 'Status de protocolo inválido.' });
+      }
+
       const { protocolo, evento } = atualizarStatusProtocolo(codigo, body.status);
-      if (!protocolo) return json(res, 404, { erro: 'Protocolo não encontrado.' });
+      if (!protocolo) return json(req, res, 404, { erro: 'Protocolo não encontrado.' });
 
       transmitirAtualizacaoSSE(evento ?? undefined);
-      return json(res, 200, { ok: true, protocolo, evento });
+      return json(req, res, 200, { ok: true, protocolo, evento });
     }
 
     // 6. Módulo Painel Macro da Secretaria Municipal de Educação de Patos-PB
     if (req.method === 'GET' && path === '/api/v1/secretaria/painel') {
-      return json(res, 200, obterPainelSecretariaPatos());
+      exigirRateLimit(req, 'leitura', 60, 60_000);
+      exigirSessaoGestao(req, url);
+      return json(req, res, 200, obterPainelSecretariaPatos());
     }
 
-    return json(res, 404, { erro: 'Rota não encontrada na API.' });
+    return json(req, res, 404, { erro: 'Rota não encontrada na API.' });
   } catch (err) {
+    if (err instanceof HttpError) {
+      return json(req, res, err.status, { erro: err.message });
+    }
     console.error('[API Error]', err);
-    return json(res, 500, { erro: 'Erro interno no servidor.' });
+    return json(req, res, 500, { erro: 'Erro interno no servidor.' });
   }
 });
 
 server.listen(PORT, () => {
   console.log(
-    `[Matrícula Aberta · Patos-PB] Monolito Modular ativo em http://localhost:${PORT} (SQLite WAL + SSE)`,
+    `[Matrícula Aberta · Patos-PB] Monolito Modular ativo em http://localhost:${PORT} (SQLite WAL + SSE + Auth RBAC)`,
   );
 });
+
+function encerrarServidor(): void {
+  server.close(() => {
+    process.exit(0);
+  });
+}
+
+process.on('SIGINT', encerrarServidor);
+process.on('SIGTERM', encerrarServidor);

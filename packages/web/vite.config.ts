@@ -9,6 +9,23 @@ export default defineConfig({
       '@matricula-aberta/shared': resolve(__dirname, '../shared/src/index.ts'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+          if (id.includes('/src/stickers/')) {
+            return 'stickers';
+          }
+          if (id.includes('/src/screens/Gestao') || id.includes('/src/components/LeitorQrModal')) {
+            return 'gestao';
+          }
+        },
+      },
+    },
+  },
   server: {
     port: 5173,
     host: true,

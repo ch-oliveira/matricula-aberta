@@ -3,7 +3,7 @@ import { Icone, IconeEtapa } from '../components/Icone';
 import { DicaAjudante, StatusPill, TituloEtapa } from '../components/ui';
 import { pulsoDaCidade } from '../domain/busca';
 import { calcularEtapa, ETAPAS, ORDEM_ETAPAS, statusDaOferta } from '../domain/etapas';
-import type { Busca, EtapaId } from '../domain/types';
+import { dataLocalISO, type Busca, type EtapaId } from '../domain/types';
 import { useEscolas } from '../services/vagasStore';
 import { calendar } from '../stickers/icons';
 
@@ -27,7 +27,7 @@ export function StepQuem({ busca, setBusca, ajudante, erro }: Props) {
   const pulso = useMemo(() => pulsoDaCidade(escolas), [escolas]);
   const idData = useId();
   const idErro = useId();
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = dataLocalISO();
 
   const calculo = busca.nascimento ? calcularEtapa(busca.nascimento) : null;
 
