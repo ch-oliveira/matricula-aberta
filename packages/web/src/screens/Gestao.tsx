@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Icone, IconeEtapa } from '../components/Icone';
+import { LeitorQrModal } from '../components/LeitorQrModal';
 import { toast } from '../components/Toasts';
 import { Ocupacao, StatusPill } from '../components/ui';
 import { ETAPAS, statusDaOferta } from '../domain/etapas';
@@ -19,8 +20,10 @@ import { Sticker } from '../stickers/Sticker';
 
 export function Gestao() {
   const escolas = useEscolas();
+  const protocolos = useProtocolos();
   const painelSecretaria = usePainelSecretaria();
   const rota = useHashRoute();
+  const [leitorQrAberto, setLeitorQrAberto] = useState(false);
   const [aba, setAba] = useState<'secretaria' | 'unidade'>(() =>
     window.location.hash.includes('unidade') ? 'unidade' : 'secretaria',
   );
@@ -186,6 +189,7 @@ export function Gestao() {
                     setAba('unidade');
                     window.history.replaceState(null, '', '#/gestao/unidade');
                   }}
+                  onAbrirLeitor={() => setLeitorQrAberto(true)}
                   onSair={() => {
                     setAuthSecretaria(false);
                     toast('Sessão da Secretaria encerrada com sucesso.', { emoji: 'info', tom: 'info' });
@@ -207,6 +211,7 @@ export function Gestao() {
               escola={escola}
               escolas={escolas}
               onTrocarEscola={(id) => setAuthUnidade(id)}
+              onAbrirLeitor={() => setLeitorQrAberto(true)}
               onSair={() => {
                 setAuthUnidade(null);
                 toast('Sessão da Unidade encerrada.', { emoji: 'info', tom: 'info' });
@@ -223,6 +228,21 @@ export function Gestao() {
             />
           )}
         </main>
+
+        <LeitorQrModal
+          aberto={leitorQrAberto}
+          onFechar={() => setLeitorQrAberto(false)}
+          escolaAtual={aba === 'unidade' && escola ? escola : undefined}
+          todasEscolas={escolas}
+          protocolos={protocolos}
+          onConfirmarMatricula={async (codigo) => {
+            await vagasStore.atualizarStatusProtocolo(codigo, 'atendido');
+            toast(`Matrícula do protocolo ${codigo} confirmada! 1 vaga ocupada.`, {
+              emoji: 'check-circle',
+              tom: 'ok',
+            });
+          }}
+        />
       </div>
     </div>
   );
@@ -231,10 +251,12 @@ export function Gestao() {
 function PainelMacroSecretaria({
   painel,
   onAbrirUnidade,
+  onAbrirLeitor,
   onSair,
 }: {
   painel: PainelSecretariaDTO;
   onAbrirUnidade: (id: string) => void;
+  onAbrirLeitor?: () => void;
   onSair: () => void;
 }) {
   const agora = useAgora(15_000);
@@ -252,6 +274,16 @@ function PainelMacroSecretaria({
           </p>
         </div>
         <div className="secretaria-acoes-topo">
+          {onAbrirLeitor && (
+            <button
+              type="button"
+              className="btn btn-primario btn-pequeno btn-escanear-qr"
+              onClick={onAbrirLeitor}
+              title="Abrir câmera para escanear QR Code do comprovante presencial"
+            >
+              <Icone nome="qr-code" tamanho={15} /> Escanear / Localizar Protocolo
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-fantasma btn-pequeno"
@@ -473,11 +505,13 @@ function PainelUnidade({
   escola,
   escolas,
   onTrocarEscola,
+  onAbrirLeitor,
   onSair,
 }: {
   escola: Escola;
   escolas: Escola[];
   onTrocarEscola: (id: string) => void;
+  onAbrirLeitor?: () => void;
   onSair: () => void;
 }) {
   const agora = useAgora(15_000);
@@ -554,6 +588,17 @@ function PainelUnidade({
               turma correspondente.
             </p>
           </div>
+          {onAbrirLeitor && (
+            <button
+              type="button"
+              className="btn btn-primario btn-pequeno btn-escanear-qr"
+              onClick={onAbrirLeitor}
+              title="Abrir câmera para escanear QR Code do voucher presencial"
+            >
+              <Icone nome="qr-code" tamanho={16} />
+              <span>Escanear QR Code</span>
+            </button>
+          )}
         </div>
 
         {protocolos.length === 0 ? (

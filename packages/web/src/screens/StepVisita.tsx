@@ -6,7 +6,8 @@ import { buscar } from '../domain/busca';
 import { documentosPara } from '../domain/documentos';
 import { ETAPAS, STATUS_INFO } from '../domain/etapas';
 import { formatarDistancia, minutosAPe, tempoRelativo } from '../domain/geo';
-import { gerarMatrizQrCode, type Busca, type ProtocoloVisita, type TurnoVisita } from '../domain/types';
+import { gerarMatrizQrCodeReal } from '../domain/qr';
+import { type Busca, type ProtocoloVisita, type TurnoVisita } from '../domain/types';
 import { useAgora, usePersistido } from '../hooks';
 import { mascararTelefone } from '../services/alertas';
 import { useCatalogo, useEscolas, useProtocolos, vagasStore } from '../services/vagasStore';
@@ -150,7 +151,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
   }
 
   const matrizQr = useMemo(
-    () => (protocoloAtivo ? gerarMatrizQrCode(`${protocoloAtivo.codigo}|${protocoloAtivo.escolaId}`) : []),
+    () => (protocoloAtivo ? gerarMatrizQrCodeReal(protocoloAtivo.codigo) : []),
     [protocoloAtivo],
   );
 
@@ -215,11 +216,12 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
       ctx.font = '900 44px monospace, system-ui';
       ctx.fillText(protocoloAtivo.codigo, 74, 442);
 
-      // Desenhar o QR Code (23 x 23 células)
+      // Desenhar o QR Code padrão ISO
       const qrTamanho = 320;
       const qrX = (900 - qrTamanho) / 2;
       const qrY = 490;
-      const celula = qrTamanho / 23;
+      const numCelulas = matrizQr.length || 21;
+      const celula = qrTamanho / numCelulas;
 
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(qrX - 16, qrY - 16, qrTamanho + 32, qrTamanho + 32);
@@ -419,11 +421,11 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
             <div className="protocolo-qr-bloco">
               <svg
                 className="protocolo-qr-svg"
-                viewBox="0 0 23 23"
+                viewBox={`0 0 ${matrizQr.length + 2} ${matrizQr.length + 2}`}
                 role="img"
                 aria-label={`QR Code do protocolo ${protocoloAtivo.codigo}`}
               >
-                <rect x="0" y="0" width="23" height="23" fill="#FFFFFF" />
+                <rect x="0" y="0" width={matrizQr.length + 2} height={matrizQr.length + 2} fill="#FFFFFF" />
                 {matrizQr.map((linha, rIdx) =>
                   linha.map((preenchido, cIdx) =>
                     preenchido ? (
