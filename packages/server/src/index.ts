@@ -6,6 +6,7 @@ import {
   extrairSessaoRequisicao,
   verificarTokenCancelamentoAlerta,
 } from './infra/auth.ts';
+import { db } from './infra/db.ts';
 import {
   aplicarHeadersSeguranca,
   exigirRateLimit,
@@ -47,15 +48,16 @@ import {
 
 const PORT = Number(process.env.PORT ?? 3333);
 
-// Inicializa o banco SQLite de Patos - PB com todos os módulos do Monolito Modular
-function inicializarBancoPatos(forcarReset = false): void {
-  garantirSeedCatalogoPatos();
-  popularUnidadesPatos(forcarReset);
-  garantirSeedAlertasPatos(forcarReset);
-  garantirSeedProtocolosPatos(forcarReset);
+// Inicializa o banco (PostgreSQL ou SQLite WAL) de Patos - PB com todos os módulos do Monolito Modular
+async function inicializarBancoPatos(forcarReset = false): Promise<void> {
+  await db.inicializarSchema();
+  await garantirSeedCatalogoPatos();
+  await popularUnidadesPatos(forcarReset);
+  await garantirSeedAlertasPatos(forcarReset);
+  await garantirSeedProtocolosPatos(forcarReset);
 }
 
-inicializarBancoPatos(false);
+await inicializarBancoPatos(false);
 
 function json(req: IncomingMessage, res: ServerResponse, status: number, body: unknown): void {
   aplicarHeadersSeguranca(req, res);
@@ -165,6 +167,7 @@ const server = createServer(async (req, res) => {
         arquitetura: 'monorepo-monolito-modular',
         municipio: 'Patos - PB',
         ibge: '2510808',
+        banco: db.tipoBanco,
         modulos: ['auth', 'catalogo', 'unidades', 'alertas', 'protocolos', 'secretaria'],
         sseClientes: totalClientesSSE(),
         agora: Date.now(),
@@ -175,7 +178,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'POST' && path === '/api/v1/auth/login') {
       exigirRateLimit(req, 'auth-login', 12, 60_000);
       const body = await lerJsonSeguro<Partial<LoginGestaoRequestDTO>>(req);
-      const sessao = autenticarCredenciaisGestao(body);
+      const sessao = await autenticarCredenciaisGestao(body);
       return json(req, res, 200, { ok: true, sessao });
     }
 
@@ -193,14 +196,15 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/api/v1/stream') {
       exigirRateLimit(req, 'sse', 30, 60_000);
       const sessao = extrairSessaoRequisicao(req, url);
-      registrarClienteSSE(req, res, sessao);
+      await registrarClienteSSE(req, res, sessao);
       return;
     }
 
     // 2. Módulo Catálogo Municipal (Patos-PB: bairros, centro e documentos)
     if (req.method === 'GET' && path === '/api/v1/catalogo') {
       exigirRateLimit(req, 'leitura', 120, 60_000);
-      return json(req, res, 200, obterCatalogoMunicipio());
+      const cat = await obterCatalogoMunicipio();
+      return json(req, res, 200, cat);
     }
 
     // 2.1. Síntese de Voz Neural em Português Brasileiro (acessibilidade cidadã)
@@ -230,16 +234,20 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/api/v1/escolas') {
       exigirRateLimit(req, 'leitura', 120, 60_000);
       const sessao = extrairSessaoRequisicao(req, url);
+      const [catalogo, escolas, historico, protocolos, secretaria] = await Promise.all([
+        obterCatalogoMunicipio(),
+        listarEscolas(),
+        listarHistorico(40),
+        sessao ? listarProtocolos() : Promise.resolve(undefined),
+        sessao ? obterPainelSecretariaPatos() : Promise.resolve(undefined),
+      ]);
+
       return json(req, res, 200, {
-        catalogo: obterCatalogoMunicipio(),
-        escolas: listarEscolas(),
-        historico: listarHistorico(40),
-        ...(sessao
-          ? {
-              protocolos: listarProtocolos(),
-              secretaria: obterPainelSecretariaPatos(),
-            }
-          : {}),
+        catalogo,
+        escolas,
+        historico,
+        ...(protocolos ? { protocolos } : {}),
+        ...(secretaria ? { secretaria } : {}),
       });
     }
 
@@ -251,7 +259,7 @@ const server = createServer(async (req, res) => {
       const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
       const payload = validarPayloadOferta(bodyRaw);
 
-      const { escola, evento } = atualizarOfertaUnidade({
+      const { escola, evento } = await atualizarOfertaUnidade({
         escolaId,
         etapa: payload.etapa,
         periodo: payload.periodo,
@@ -262,7 +270,7 @@ const server = createServer(async (req, res) => {
 
       if (!escola) return json(req, res, 404, { erro: 'Unidade ou oferta não encontrada em Patos-PB.' });
 
-      transmitirAtualizacaoSSE(evento ?? undefined);
+      await transmitirAtualizacaoSSE(evento ?? undefined);
       return json(req, res, 200, { ok: true, escola, evento });
     }
 
@@ -271,33 +279,33 @@ const server = createServer(async (req, res) => {
       exigirRateLimit(req, 'gestao-mutacao', 30, 60_000);
       const escolaId = decodeURIComponent(matchConfirmar[1]).trim();
       exigirSessaoGestao(req, url, { escolaId });
-      const ok = confirmarUnidade(escolaId);
+      const ok = await confirmarUnidade(escolaId);
       if (!ok) return json(req, res, 404, { erro: 'Unidade não encontrada.' });
-      transmitirAtualizacaoSSE();
+      await transmitirAtualizacaoSSE();
       return json(req, res, 200, { ok: true });
     }
 
     if (req.method === 'POST' && path === '/api/v1/gestao/reset') {
       exigirRateLimit(req, 'gestao-reset', 5, 60_000);
       exigirSessaoGestao(req, url, { perfil: 'secretaria' });
-      inicializarBancoPatos(true);
-      transmitirAtualizacaoSSE();
-      return json(req, res, 200, { ok: true, escolas: listarEscolas() });
+      await inicializarBancoPatos(true);
+      await transmitirAtualizacaoSSE();
+      return json(req, res, 200, { ok: true, escolas: await listarEscolas() });
     }
 
     // 4. Módulo Alertas (LGPD)
     if (req.method === 'GET' && path === '/api/v1/alertas') {
       exigirRateLimit(req, 'leitura', 60, 60_000);
       exigirSessaoGestao(req, url);
-      return json(req, res, 200, { alertas: listarAlertas() });
+      return json(req, res, 200, { alertas: await listarAlertas() });
     }
 
     if (req.method === 'POST' && path === '/api/v1/alertas') {
       exigirRateLimit(req, 'criar-alerta', 15, 60_000);
       const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
       const payload = validarPayloadAlerta(bodyRaw);
-      const alerta = criarAlerta(payload);
-      transmitirAtualizacaoSSE();
+      const alerta = await criarAlerta(payload);
+      await transmitirAtualizacaoSSE();
       return json(req, res, 201, { ok: true, alerta });
     }
 
@@ -319,8 +327,8 @@ const server = createServer(async (req, res) => {
         });
       }
 
-      removerAlerta(id);
-      transmitirAtualizacaoSSE();
+      await removerAlerta(id);
+      await transmitirAtualizacaoSSE();
       return json(req, res, 200, { ok: true });
     }
 
@@ -329,7 +337,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && matchGetProtocoloCodigo) {
       exigirRateLimit(req, 'consulta-protocolo', 60, 60_000);
       const codigo = decodeURIComponent(matchGetProtocoloCodigo[1]).trim();
-      const protocolo = obterProtocoloPorCodigo(codigo);
+      const protocolo = await obterProtocoloPorCodigo(codigo);
       if (!protocolo) {
         return json(req, res, 404, { erro: 'Protocolo não encontrado na base de Patos - PB.' });
       }
@@ -340,18 +348,18 @@ const server = createServer(async (req, res) => {
       exigirRateLimit(req, 'leitura', 60, 60_000);
       exigirSessaoGestao(req, url);
       const escolaId = url.searchParams.get('escolaId') ?? undefined;
-      return json(req, res, 200, { protocolos: listarProtocolos(escolaId) });
+      return json(req, res, 200, { protocolos: await listarProtocolos(escolaId) });
     }
 
     if (req.method === 'POST' && path === '/api/v1/protocolos') {
       exigirRateLimit(req, 'criar-protocolo', 15, 60_000);
       const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
       const payload = validarPayloadProtocolo(bodyRaw);
-      const protocolo = criarProtocoloVisita(payload);
+      const protocolo = await criarProtocoloVisita(payload);
 
       if (!protocolo) return json(req, res, 404, { erro: 'Unidade escolar não encontrada.' });
 
-      transmitirAtualizacaoSSE();
+      await transmitirAtualizacaoSSE();
       return json(req, res, 201, { ok: true, protocolo });
     }
 
@@ -361,7 +369,7 @@ const server = createServer(async (req, res) => {
       const codigo = decodeURIComponent(matchStatusProt[1]).trim();
       const sessao = exigirSessaoGestao(req, url);
 
-      const existente = obterProtocoloPorCodigo(codigo);
+      const existente = await obterProtocoloPorCodigo(codigo);
       if (!existente) return json(req, res, 404, { erro: 'Protocolo não encontrado.' });
 
       // Garante que gestor de unidade só dê baixa em protocolos da própria escola (SEDUC pode em todas)
@@ -376,10 +384,10 @@ const server = createServer(async (req, res) => {
         return json(req, res, 400, { erro: 'Status de protocolo inválido.' });
       }
 
-      const { protocolo, evento } = atualizarStatusProtocolo(codigo, body.status);
+      const { protocolo, evento } = await atualizarStatusProtocolo(codigo, body.status);
       if (!protocolo) return json(req, res, 404, { erro: 'Protocolo não encontrado.' });
 
-      transmitirAtualizacaoSSE(evento ?? undefined);
+      await transmitirAtualizacaoSSE(evento ?? undefined);
       return json(req, res, 200, { ok: true, protocolo, evento });
     }
 
@@ -387,7 +395,7 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/api/v1/secretaria/painel') {
       exigirRateLimit(req, 'leitura', 60, 60_000);
       exigirSessaoGestao(req, url);
-      return json(req, res, 200, obterPainelSecretariaPatos());
+      return json(req, res, 200, await obterPainelSecretariaPatos());
     }
 
     return json(req, res, 404, { erro: 'Rota não encontrada na API.' });
@@ -402,12 +410,13 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(
-    `[Matrícula Aberta · Patos-PB] Monolito Modular ativo em http://localhost:${PORT} (SQLite WAL + SSE + Auth RBAC)`,
+    `[Matrícula Aberta · Patos-PB] Monolito Modular ativo em http://localhost:${PORT} (${db.tipoBanco.toUpperCase()} + SSE + Auth RBAC)`,
   );
 });
 
-function encerrarServidor(): void {
-  server.close(() => {
+async function encerrarServidor(): Promise<void> {
+  server.close(async () => {
+    await db.fecharBanco();
     process.exit(0);
   });
 }

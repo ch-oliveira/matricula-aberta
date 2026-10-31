@@ -1,0 +1,7 @@
+# Robots.txt Oficial · Matrícula Aberta (Rede Municipal de Ensino de Patos - PB)
+User-agent: *
+Allow: /
+Disallow: /api/v1/auth/
+Disallow: /api/v1/gestao/
+
+Sitemap: https://matricula-patos.pb.gov.br/sitemap.xml

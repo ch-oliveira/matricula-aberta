@@ -17,12 +17,13 @@ export function mascararTelefoneLGPD(tel?: string): { mascarado: string | null; 
   return { mascarado, hash };
 }
 
-export function garantirSeedAlertasPatos(forcarReset = false): void {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM alertas').get() as { c: number }).c;
+export async function garantirSeedAlertasPatos(forcarReset = false): Promise<void> {
+  const rowCount = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM alertas');
+  const count = Number(rowCount?.c ?? 0);
   if (count > 0 && !forcarReset) return;
 
   if (forcarReset) {
-    db.exec('DELETE FROM alertas;');
+    await db.execute('DELETE FROM alertas');
   }
 
   const agora = Date.now();
@@ -121,39 +122,39 @@ export function garantirSeedAlertasPatos(forcarReset = false): void {
     },
   ];
 
-  const ins = db.prepare(`
-    INSERT INTO alertas (
-      id, canal, telefone_mascarado, telefone_hash, etapa, periodo,
-      local_lat, local_lng, local_rotulo, raio_km, escola_id, escola_nome, criado_em, expira_em
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
   for (const s of seed) {
     const { mascarado, hash } = mascararTelefoneLGPD(s.tel);
-    ins.run(
-      randomUUID(),
-      s.canal,
-      mascarado,
-      hash,
-      s.etapa,
-      s.periodo,
-      s.lat,
-      s.lng,
-      s.rotulo,
-      s.raio,
-      s.escolaId,
-      s.escolaNome,
-      agora - s.offsetMin * 60_000,
-      expira,
+    await db.execute(
+      `INSERT INTO alertas (
+        id, canal, telefone_mascarado, telefone_hash, etapa, periodo,
+        local_lat, local_lng, local_rotulo, raio_km, escola_id, escola_nome, criado_em, expira_em
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+      ON CONFLICT (id) DO NOTHING`,
+      [
+        randomUUID(),
+        s.canal,
+        mascarado,
+        hash,
+        s.etapa,
+        s.periodo,
+        s.lat,
+        s.lng,
+        s.rotulo,
+        s.raio,
+        s.escolaId,
+        s.escolaNome,
+        agora - s.offsetMin * 60_000,
+        expira,
+      ],
     );
   }
 }
 
-export function listarAlertas(): Alerta[] {
+export async function listarAlertas(): Promise<Alerta[]> {
   const agora = Date.now();
-  db.prepare('DELETE FROM alertas WHERE expira_em < ?').run(agora);
+  await db.execute('DELETE FROM alertas WHERE expira_em < $1', [agora]);
 
-  const rows = db.prepare('SELECT * FROM alertas ORDER BY criado_em DESC LIMIT 200').all() as Array<{
+  const rows = await db.query<{
     id: string;
     canal: Canal;
     telefone_mascarado: string | null;
@@ -166,7 +167,7 @@ export function listarAlertas(): Alerta[] {
     escola_id: string | null;
     escola_nome: string | null;
     criado_em: number;
-  }>;
+  }>('SELECT * FROM alertas ORDER BY criado_em DESC LIMIT 200');
 
   return rows.map((r) => ({
     id: r.id,
@@ -174,15 +175,15 @@ export function listarAlertas(): Alerta[] {
     telefone: r.telefone_mascarado ?? undefined,
     etapa: r.etapa,
     periodo: r.periodo,
-    local: { lat: r.local_lat, lng: r.local_lng, rotulo: r.local_rotulo },
-    raioKm: r.raio_km,
+    local: { lat: Number(r.local_lat), lng: Number(r.local_lng), rotulo: r.local_rotulo },
+    raioKm: Number(r.raio_km),
     escolaId: r.escola_id ?? undefined,
     escolaNome: r.escola_nome ?? undefined,
-    criadoEm: r.criado_em,
+    criadoEm: Number(r.criado_em),
   }));
 }
 
-export function criarAlerta(dados: {
+export async function criarAlerta(dados: {
   canal: Canal;
   telefone?: string;
   etapa: EtapaId;
@@ -191,32 +192,33 @@ export function criarAlerta(dados: {
   raioKm: number;
   escolaId?: string;
   escolaNome?: string;
-}): Alerta {
+}): Promise<Alerta> {
   const id = randomUUID();
   const criadoEm = Date.now();
   const expiraEm = criadoEm + NOVENTA_DIAS_MS;
   const { mascarado, hash } = mascararTelefoneLGPD(dados.telefone);
 
-  db.prepare(
+  await db.execute(
     `INSERT INTO alertas (
       id, canal, telefone_mascarado, telefone_hash, etapa, periodo,
       local_lat, local_lng, local_rotulo, raio_km, escola_id, escola_nome, criado_em, expira_em
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    dados.canal,
-    mascarado,
-    hash,
-    dados.etapa,
-    dados.periodo,
-    dados.local.lat,
-    dados.local.lng,
-    dados.local.rotulo,
-    dados.raioKm,
-    dados.escolaId ?? null,
-    dados.escolaNome ?? null,
-    criadoEm,
-    expiraEm,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [
+      id,
+      dados.canal,
+      mascarado,
+      hash,
+      dados.etapa,
+      dados.periodo,
+      dados.local.lat,
+      dados.local.lng,
+      dados.local.rotulo,
+      dados.raioKm,
+      dados.escolaId ?? null,
+      dados.escolaNome ?? null,
+      criadoEm,
+      expiraEm,
+    ],
   );
 
   return {
@@ -234,7 +236,7 @@ export function criarAlerta(dados: {
   };
 }
 
-export function removerAlerta(id: string): boolean {
-  const res = db.prepare('DELETE FROM alertas WHERE id = ?').run(id);
+export async function removerAlerta(id: string): Promise<boolean> {
+  const res = await db.execute('DELETE FROM alertas WHERE id = $1', [id]);
   return res.changes > 0;
 }

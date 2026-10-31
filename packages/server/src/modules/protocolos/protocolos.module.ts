@@ -64,24 +64,25 @@ function mapearLinhaProtocolo(r: LinhaProtocoloDB): ProtocoloVisita {
   };
 }
 
-function gerarCodigoProtocolo(): string {
+async function gerarCodigoProtocolo(): Promise<string> {
   const agora = new Date();
   const ano = agora.getMonth() >= 7 ? agora.getFullYear() + 1 : agora.getFullYear();
   for (let tent = 0; tent < 30; tent++) {
     const num = randomInt(1000, 10000);
     const codigo = `PATOS-${ano}-${num}`;
-    const existe = db.prepare('SELECT 1 FROM protocolos_visita WHERE codigo = ?').get(codigo);
+    const existe = await db.queryOne('SELECT 1 FROM protocolos_visita WHERE codigo = $1', [codigo]);
     if (!existe) return codigo;
   }
   return `PATOS-${ano}-${randomInt(10000, 99999)}`;
 }
 
-export function garantirSeedProtocolosPatos(forcarReset = false): void {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM protocolos_visita').get() as { c: number }).c;
+export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<void> {
+  const rowCount = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM protocolos_visita');
+  const count = Number(rowCount?.c ?? 0);
   if (count > 0 && !forcarReset) return;
 
   if (forcarReset) {
-    db.exec('DELETE FROM protocolos_visita;');
+    await db.execute('DELETE FROM protocolos_visita');
   }
 
   const agora = Date.now();
@@ -168,63 +169,64 @@ export function garantirSeedProtocolosPatos(forcarReset = false): void {
     },
   ];
 
-  const ins = db.prepare(`
-    INSERT INTO protocolos_visita (
-      codigo, escola_id, escola_nome, escola_endereco, escola_bairro,
-      etapa, turma, periodo, responsavel, telefone_mascarado, nascimento,
-      turno_visita, data_visita, documentos_json, total_obrigatorios,
-      status, criado_em, atendido_em
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
   for (const p of iniciais) {
-    ins.run(
-      p.codigo,
-      p.escolaId,
-      p.escolaNome,
-      p.escolaEndereco,
-      p.escolaBairro,
-      p.etapa,
-      p.turma,
-      p.periodo,
-      p.responsavel,
-      p.telefone ?? null,
-      p.nascimento ?? null,
-      p.turnoVisita,
-      p.dataVisita,
-      JSON.stringify(p.documentosMarcados),
-      p.totalObrigatorios,
-      p.status,
-      p.criadoEm,
-      p.atendidoEm ?? null,
+    await db.execute(
+      `INSERT INTO protocolos_visita (
+        codigo, escola_id, escola_nome, escola_endereco, escola_bairro,
+        etapa, turma, periodo, responsavel, telefone_mascarado, nascimento,
+        turno_visita, data_visita, documentos_json, total_obrigatorios,
+        status, criado_em, atendido_em
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+      ON CONFLICT (codigo) DO NOTHING`,
+      [
+        p.codigo,
+        p.escolaId,
+        p.escolaNome,
+        p.escolaEndereco,
+        p.escolaBairro,
+        p.etapa,
+        p.turma,
+        p.periodo,
+        p.responsavel,
+        p.telefone ?? null,
+        p.nascimento ?? null,
+        p.turnoVisita,
+        p.dataVisita,
+        JSON.stringify(p.documentosMarcados),
+        p.totalObrigatorios,
+        p.status,
+        p.criadoEm,
+        p.atendidoEm ?? null,
+      ],
     );
   }
 }
 
-export function obterProtocoloPorCodigo(codigo: string): ProtocoloVisita | null {
+export async function obterProtocoloPorCodigo(codigo: string): Promise<ProtocoloVisita | null> {
   const limpo = codigo.trim().toUpperCase();
   if (!limpo) return null;
 
-  const row = db
-    .prepare('SELECT * FROM protocolos_visita WHERE UPPER(codigo) = ? LIMIT 1')
-    .get(limpo) as LinhaProtocoloDB | undefined;
+  const row = await db.queryOne<LinhaProtocoloDB>(
+    'SELECT * FROM protocolos_visita WHERE UPPER(codigo) = $1 LIMIT 1',
+    [limpo],
+  );
 
   return row ? mapearLinhaProtocolo(row) : null;
 }
 
-export function listarProtocolos(escolaId?: string): ProtocoloVisita[] {
+export async function listarProtocolos(escolaId?: string): Promise<ProtocoloVisita[]> {
   const sql = escolaId
-    ? 'SELECT * FROM protocolos_visita WHERE escola_id = ? ORDER BY criado_em DESC LIMIT 80'
+    ? 'SELECT * FROM protocolos_visita WHERE escola_id = $1 ORDER BY criado_em DESC LIMIT 80'
     : 'SELECT * FROM protocolos_visita ORDER BY criado_em DESC LIMIT 100';
 
-  const rows = (
-    escolaId ? db.prepare(sql).all(escolaId) : db.prepare(sql).all()
-  ) as unknown as LinhaProtocoloDB[];
+  const rows = await (escolaId
+    ? db.query<LinhaProtocoloDB>(sql, [escolaId])
+    : db.query<LinhaProtocoloDB>(sql));
 
   return rows.map(mapearLinhaProtocolo);
 }
 
-export function criarProtocoloVisita(dados: {
+export async function criarProtocoloVisita(dados: {
   escolaId: string;
   etapa: EtapaId;
   turma: string;
@@ -236,59 +238,60 @@ export function criarProtocoloVisita(dados: {
   dataVisita: string;
   documentosMarcados: string[];
   totalObrigatorios: number;
-}): ProtocoloVisita | null {
-  const esc = db
-    .prepare('SELECT id, nome, endereco, bairro FROM escolas WHERE id = ?')
-    .get(dados.escolaId) as { id: string; nome: string; endereco: string; bairro: string } | undefined;
+}): Promise<ProtocoloVisita | null> {
+  const esc = await db.queryOne<{ id: string; nome: string; endereco: string; bairro: string }>(
+    'SELECT id, nome, endereco, bairro FROM escolas WHERE id = $1',
+    [dados.escolaId],
+  );
 
   if (!esc) return null;
 
-  const codigo = gerarCodigoProtocolo();
+  const codigo = await gerarCodigoProtocolo();
   const criadoEm = Date.now();
   const { mascarado } = mascararTelefoneLGPD(dados.telefone);
   const responsavelLimpo = dados.responsavel.trim().slice(0, 80) || 'Responsável Familiar';
 
-  db.prepare(
+  await db.execute(
     `INSERT INTO protocolos_visita (
       codigo, escola_id, escola_nome, escola_endereco, escola_bairro,
       etapa, turma, periodo, responsavel, telefone_mascarado, nascimento,
       turno_visita, data_visita, documentos_json, total_obrigatorios,
       status, criado_em, atendido_em
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'aguardando', ?, NULL)`,
-  ).run(
-    codigo,
-    esc.id,
-    esc.nome,
-    esc.endereco,
-    esc.bairro,
-    dados.etapa,
-    dados.turma,
-    dados.periodo,
-    responsavelLimpo,
-    mascarado,
-    dados.nascimento ?? null,
-    dados.turnoVisita,
-    dados.dataVisita,
-    JSON.stringify(dados.documentosMarcados),
-    dados.totalObrigatorios,
-    criadoEm,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'aguardando', $16, NULL)`,
+    [
+      codigo,
+      esc.id,
+      esc.nome,
+      esc.endereco,
+      esc.bairro,
+      dados.etapa,
+      dados.turma,
+      dados.periodo,
+      responsavelLimpo,
+      mascarado,
+      dados.nascimento ?? null,
+      dados.turnoVisita,
+      dados.dataVisita,
+      JSON.stringify(dados.documentosMarcados),
+      dados.totalObrigatorios,
+      criadoEm,
+    ],
   );
 
   return obterProtocoloPorCodigo(codigo);
 }
 
-export function atualizarStatusProtocolo(
+export async function atualizarStatusProtocolo(
   codigo: string,
   novoStatus: StatusProtocolo,
-): { protocolo: ProtocoloVisita | null; evento: EventoVaga | null } {
-  const atual = obterProtocoloPorCodigo(codigo);
+): Promise<{ protocolo: ProtocoloVisita | null; evento: EventoVaga | null }> {
+  const atual = await obterProtocoloPorCodigo(codigo);
   if (!atual) return { protocolo: null, evento: null };
 
   const agora = Date.now();
-  db.prepare('UPDATE protocolos_visita SET status = ?, atendido_em = ? WHERE codigo = ?').run(
-    novoStatus,
-    novoStatus === 'atendido' ? agora : null,
-    atual.codigo,
+  await db.execute(
+    'UPDATE protocolos_visita SET status = $1, atendido_em = $2 WHERE codigo = $3',
+    [novoStatus, novoStatus === 'atendido' ? agora : null, atual.codigo],
   );
 
   let evento: EventoVaga | null = null;
@@ -296,32 +299,35 @@ export function atualizarStatusProtocolo(
   // Ao confirmar o atendimento presencial na secretaria da escola, se ainda não estava atendido,
   // ocupa automaticamente 1 vaga na oferta correspondente (ou reduz 1 da fila).
   if (novoStatus === 'atendido' && atual.status !== 'atendido') {
-    const of = db
-      .prepare('SELECT vagas, fila FROM ofertas WHERE escola_id = ? AND etapa = ? AND periodo = ?')
-      .get(atual.escolaId, atual.etapa, atual.periodo) as { vagas: number; fila: number } | undefined;
+    const of = await db.queryOne<{ vagas: number; fila: number }>(
+      'SELECT vagas, fila FROM ofertas WHERE escola_id = $1 AND etapa = $2 AND periodo = $3',
+      [atual.escolaId, atual.etapa, atual.periodo],
+    );
 
     if (of) {
-      if (of.vagas > 0) {
-        const res = atualizarOfertaUnidade({
+      const vagasNum = Number(of.vagas);
+      const filaNum = Number(of.fila);
+      if (vagasNum > 0) {
+        const res = await atualizarOfertaUnidade({
           escolaId: atual.escolaId,
           etapa: atual.etapa,
           periodo: atual.periodo,
-          vagas: of.vagas - 1,
+          vagas: vagasNum - 1,
           origem: 'protocolo',
         });
         evento = res.evento;
-      } else if (of.fila > 0) {
-        atualizarOfertaUnidade({
+      } else if (filaNum > 0) {
+        await atualizarOfertaUnidade({
           escolaId: atual.escolaId,
           etapa: atual.etapa,
           periodo: atual.periodo,
-          fila: of.fila - 1,
+          fila: filaNum - 1,
           origem: 'protocolo',
         });
       }
     }
   }
 
-  const protocolo = obterProtocoloPorCodigo(atual.codigo);
+  const protocolo = await obterProtocoloPorCodigo(atual.codigo);
   return { protocolo, evento };
 }

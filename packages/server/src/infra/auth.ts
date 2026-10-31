@@ -179,7 +179,7 @@ export function exigirSessaoGestao(
   return sessao;
 }
 
-export function autenticarCredenciaisGestao(body: Partial<LoginGestaoRequestDTO>): SessaoGestaoDTO {
+export async function autenticarCredenciaisGestao(body: Partial<LoginGestaoRequestDTO>): Promise<SessaoGestaoDTO> {
   const perfil = body.perfil;
   const usuario = typeof body.usuario === 'string' ? body.usuario.trim().slice(0, 120) : '';
   const senha = typeof body.senha === 'string' ? body.senha.trim().slice(0, 120) : '';
@@ -226,9 +226,10 @@ export function autenticarCredenciaisGestao(body: Partial<LoginGestaoRequestDTO>
     throw new HttpError(400, 'Selecione a unidade escolar de Patos - PB.');
   }
 
-  const esc = db
-    .prepare('SELECT id, nome FROM escolas WHERE id = ?')
-    .get(escolaId) as { id: string; nome: string } | undefined;
+  const esc = await db.queryOne<{ id: string; nome: string }>(
+    'SELECT id, nome FROM escolas WHERE id = $1',
+    [escolaId],
+  );
 
   if (!esc) {
     throw new HttpError(404, 'Unidade escolar não encontrada na rede municipal de Patos - PB.');

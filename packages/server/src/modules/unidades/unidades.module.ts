@@ -247,92 +247,103 @@ export function construirUnidadesPatosInicial(): Escola[] {
   ];
 }
 
-export function popularUnidadesPatos(forcarReset = false) {
-  const count = (db.prepare('SELECT COUNT(*) as c FROM escolas').get() as { c: number }).c;
+export async function popularUnidadesPatos(forcarReset = false): Promise<void> {
+  const rowCount = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM escolas');
+  const count = Number(rowCount?.c ?? 0);
   if (count > 0 && !forcarReset) return;
 
-  const insertEscola = db.prepare(`
-    INSERT INTO escolas (id, nome, tipo, bairro, endereco, telefone, lat, lng, acessivel, destaques_json, atendimento, atualizado_em)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-  const insertOferta = db.prepare(`
-    INSERT INTO ofertas (escola_id, etapa, periodo, vagas, capacidade, fila)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
-
-  db.exec('BEGIN');
-  try {
+  await db.transaction(async (tx) => {
     if (forcarReset) {
-      db.exec('DELETE FROM ofertas; DELETE FROM escolas; DELETE FROM historico_vagas;');
+      await tx.execute('DELETE FROM ofertas');
+      await tx.execute('DELETE FROM escolas');
+      await tx.execute('DELETE FROM historico_vagas');
     }
     for (const esc of construirUnidadesPatosInicial()) {
-      insertEscola.run(
-        esc.id,
-        esc.nome,
-        esc.tipo,
-        esc.bairro,
-        esc.endereco,
-        esc.telefone,
-        esc.lat,
-        esc.lng,
-        esc.acessivel ? 1 : 0,
-        JSON.stringify(esc.destaques),
-        esc.atendimento,
-        esc.atualizadoEm,
+      await tx.execute(
+        `INSERT INTO escolas (id, nome, tipo, bairro, endereco, telefone, lat, lng, acessivel, destaques_json, atendimento, atualizado_em)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (id) DO UPDATE SET
+           nome = EXCLUDED.nome,
+           tipo = EXCLUDED.tipo,
+           bairro = EXCLUDED.bairro,
+           endereco = EXCLUDED.endereco,
+           telefone = EXCLUDED.telefone,
+           lat = EXCLUDED.lat,
+           lng = EXCLUDED.lng,
+           acessivel = EXCLUDED.acessivel,
+           destaques_json = EXCLUDED.destaques_json,
+           atendimento = EXCLUDED.atendimento,
+           atualizado_em = EXCLUDED.atualizado_em`,
+        [
+          esc.id,
+          esc.nome,
+          esc.tipo,
+          esc.bairro,
+          esc.endereco,
+          esc.telefone,
+          esc.lat,
+          esc.lng,
+          esc.acessivel ? 1 : 0,
+          JSON.stringify(esc.destaques),
+          esc.atendimento,
+          esc.atualizadoEm,
+        ],
       );
+
       for (const of of esc.ofertas) {
-        insertOferta.run(esc.id, of.etapa, of.periodo, of.vagas, of.capacidade, of.fila);
+        await tx.execute(
+          `INSERT INTO ofertas (escola_id, etapa, periodo, vagas, capacidade, fila)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (escola_id, etapa, periodo) DO UPDATE SET
+             vagas = EXCLUDED.vagas,
+             capacidade = EXCLUDED.capacidade,
+             fila = EXCLUDED.fila`,
+          [esc.id, of.etapa, of.periodo, of.vagas, of.capacidade, of.fila],
+        );
       }
     }
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
+  });
 }
 
-export function listarEscolas(): Escola[] {
-  const rowsEscolas = db.prepare('SELECT * FROM escolas ORDER BY nome ASC').all() as Array<{
-    id: string;
-    nome: string;
-    tipo: TipoUnidade;
-    bairro: string;
-    endereco: string;
-    telefone: string;
-    lat: number;
-    lng: number;
-    acessivel: number;
-    destaques_json: string;
-    atendimento: string;
-    atualizado_em: number;
-  }>;
-
-  const rowsOfertas = db.prepare('SELECT * FROM ofertas').all() as Array<{
-    escola_id: string;
-    etapa: EtapaId;
-    periodo: Periodo;
-    vagas: number;
-    capacidade: number;
-    fila: number;
-  }>;
-
-  const rowsAlertas = db
-    .prepare('SELECT etapa, periodo, local_lat, local_lng, raio_km, escola_id FROM alertas WHERE expira_em > ?')
-    .all(Date.now()) as Array<{
-    etapa: EtapaId;
-    periodo: string;
-    local_lat: number;
-    local_lng: number;
-    raio_km: number;
-    escola_id: string | null;
-  }>;
-
-  const rowsProtPendentes = db
-    .prepare("SELECT escola_id, COUNT(*) as c FROM protocolos_visita WHERE status = 'aguardando' GROUP BY escola_id")
-    .all() as Array<{ escola_id: string; c: number }>;
+export async function listarEscolas(): Promise<Escola[]> {
+  const [rowsEscolas, rowsOfertas, rowsAlertas, rowsProtPendentes] = await Promise.all([
+    db.query<{
+      id: string;
+      nome: string;
+      tipo: TipoUnidade;
+      bairro: string;
+      endereco: string;
+      telefone: string;
+      lat: number;
+      lng: number;
+      acessivel: number;
+      destaques_json: string;
+      atendimento: string;
+      atualizado_em: number;
+    }>('SELECT * FROM escolas ORDER BY nome ASC'),
+    db.query<{
+      escola_id: string;
+      etapa: EtapaId;
+      periodo: Periodo;
+      vagas: number;
+      capacidade: number;
+      fila: number;
+    }>('SELECT * FROM ofertas'),
+    db.query<{
+      etapa: EtapaId;
+      periodo: string;
+      local_lat: number;
+      local_lng: number;
+      raio_km: number;
+      escola_id: string | null;
+    }>('SELECT etapa, periodo, local_lat, local_lng, raio_km, escola_id FROM alertas WHERE expira_em > $1', [Date.now()]),
+    db.query<{ escola_id: string; c: number }>(
+      "SELECT escola_id, COUNT(*) as c FROM protocolos_visita WHERE status = 'aguardando' GROUP BY escola_id",
+    ),
+  ]);
 
   const protPorEscola = new Map<string, number>();
-  for (const r of rowsProtPendentes) protPorEscola.set(r.escola_id, r.c);
+  for (const r of rowsProtPendentes) protPorEscola.set(r.escola_id, Number(r.c));
 
   const porEscola = new Map<string, Oferta[]>();
   for (const r of rowsOfertas) {
@@ -340,9 +351,9 @@ export function listarEscolas(): Escola[] {
     lista.push({
       etapa: r.etapa,
       periodo: r.periodo,
-      vagas: r.vagas,
-      capacidade: r.capacidade,
-      fila: r.fila,
+      vagas: Number(r.vagas),
+      capacidade: Number(r.capacidade),
+      fila: Number(r.fila),
     });
     porEscola.set(r.escola_id, lista);
   }
@@ -358,8 +369,8 @@ export function listarEscolas(): Escola[] {
       if (a.escola_id) {
         if (a.escola_id === e.id) alertasCompativeis++;
       } else {
-        const d = distanciaKm({ lat: a.local_lat, lng: a.local_lng }, { lat: e.lat, lng: e.lng });
-        if (d <= a.raio_km) alertasCompativeis++;
+        const d = distanciaKm({ lat: Number(a.local_lat), lng: Number(a.local_lng) }, { lat: Number(e.lat), lng: Number(e.lng) });
+        if (d <= Number(a.raio_km)) alertasCompativeis++;
       }
     }
 
@@ -370,12 +381,12 @@ export function listarEscolas(): Escola[] {
       bairro: e.bairro,
       endereco: e.endereco,
       telefone: e.telefone,
-      lat: e.lat,
-      lng: e.lng,
+      lat: Number(e.lat),
+      lng: Number(e.lng),
       acessivel: Boolean(e.acessivel),
       destaques: JSON.parse(e.destaques_json) as string[],
       atendimento: e.atendimento,
-      atualizadoEm: e.atualizado_em,
+      atualizadoEm: Number(e.atualizado_em),
       ofertas,
       alertasAtivos: alertasCompativeis,
       protocolosPendentes: protPorEscola.get(e.id) ?? 0,
@@ -383,8 +394,8 @@ export function listarEscolas(): Escola[] {
   });
 }
 
-export function listarHistorico(limite = 40): EventoVaga[] {
-  const rows = db.prepare('SELECT * FROM historico_vagas ORDER BY em DESC LIMIT ?').all(limite) as Array<{
+export async function listarHistorico(limite = 40): Promise<EventoVaga[]> {
+  const rows = await db.query<{
     id: string;
     escola_id: string;
     escola_nome: string;
@@ -394,7 +405,7 @@ export function listarHistorico(limite = 40): EventoVaga[] {
     para: number;
     em: number;
     origem: EventoVaga['origem'];
-  }>;
+  }>('SELECT * FROM historico_vagas ORDER BY em DESC LIMIT $1', [limite]);
 
   return rows.map((r) => ({
     id: r.id,
@@ -402,90 +413,85 @@ export function listarHistorico(limite = 40): EventoVaga[] {
     escolaNome: r.escola_nome,
     etapa: r.etapa,
     periodo: r.periodo,
-    de: r.de,
-    para: r.para,
-    em: r.em,
+    de: Number(r.de),
+    para: Number(r.para),
+    em: Number(r.em),
     origem: r.origem,
   }));
 }
 
-export function atualizarOfertaUnidade(params: {
+export async function atualizarOfertaUnidade(params: {
   escolaId: string;
   etapa: EtapaId;
   periodo: Periodo;
   vagas?: number;
   fila?: number;
   origem?: EventoVaga['origem'];
-}): { escola: Escola | null; evento: EventoVaga | null } {
-  const atual = db
-    .prepare(
-      `SELECT o.vagas, o.capacidade, o.fila, e.nome as escola_nome
-       FROM ofertas o
-       JOIN escolas e ON e.id = o.escola_id
-       WHERE o.escola_id = ? AND o.etapa = ? AND o.periodo = ?`,
-    )
-    .get(params.escolaId, params.etapa, params.periodo) as
-    | { vagas: number; capacidade: number; fila: number; escola_nome: string }
-    | undefined;
+}): Promise<{ escola: Escola | null; evento: EventoVaga | null }> {
+  const atual = await db.queryOne<{ vagas: number; capacidade: number; fila: number; escola_nome: string }>(
+    `SELECT o.vagas, o.capacidade, o.fila, e.nome as escola_nome
+     FROM ofertas o
+     JOIN escolas e ON e.id = o.escola_id
+     WHERE o.escola_id = $1 AND o.etapa = $2 AND o.periodo = $3`,
+    [params.escolaId, params.etapa, params.periodo],
+  );
 
   if (!atual) return { escola: null, evento: null };
 
+  const vagasAtual = Number(atual.vagas);
+  const capacidadeAtual = Number(atual.capacidade);
+  const filaAtual = Number(atual.fila);
+
   const novasVagas =
-    params.vagas !== undefined ? Math.max(0, Math.min(atual.capacidade, Math.round(params.vagas))) : atual.vagas;
-  const novaFila = params.fila !== undefined ? Math.max(0, Math.round(params.fila)) : atual.fila;
+    params.vagas !== undefined ? Math.max(0, Math.min(capacidadeAtual, Math.round(params.vagas))) : vagasAtual;
+  const novaFila = params.fila !== undefined ? Math.max(0, Math.round(params.fila)) : filaAtual;
   const agora = Date.now();
   let evento: EventoVaga | null = null;
 
-  db.exec('BEGIN');
-  try {
-    db.prepare('UPDATE ofertas SET vagas = ?, fila = ? WHERE escola_id = ? AND etapa = ? AND periodo = ?').run(
-      novasVagas,
-      novaFila,
-      params.escolaId,
-      params.etapa,
-      params.periodo,
+  await db.transaction(async (tx) => {
+    await tx.execute(
+      'UPDATE ofertas SET vagas = $1, fila = $2 WHERE escola_id = $3 AND etapa = $4 AND periodo = $5',
+      [novasVagas, novaFila, params.escolaId, params.etapa, params.periodo],
     );
-    db.prepare('UPDATE escolas SET atualizado_em = ? WHERE id = ?').run(agora, params.escolaId);
+    await tx.execute('UPDATE escolas SET atualizado_em = $1 WHERE id = $2', [agora, params.escolaId]);
 
-    if (novasVagas !== atual.vagas) {
+    if (novasVagas !== vagasAtual) {
       evento = {
         id: randomUUID(),
         escolaId: params.escolaId,
         escolaNome: atual.escola_nome,
         etapa: params.etapa,
         periodo: params.periodo,
-        de: atual.vagas,
+        de: vagasAtual,
         para: novasVagas,
         em: agora,
         origem: params.origem ?? 'escola',
       };
-      db.prepare(
+      await tx.execute(
         `INSERT INTO historico_vagas (id, escola_id, escola_nome, etapa, periodo, de, para, em, origem)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(
-        evento.id,
-        evento.escolaId,
-        evento.escolaNome,
-        evento.etapa,
-        evento.periodo,
-        evento.de,
-        evento.para,
-        evento.em,
-        evento.origem,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          evento.id,
+          evento.escolaId,
+          evento.escolaNome,
+          evento.etapa,
+          evento.periodo,
+          evento.de,
+          evento.para,
+          evento.em,
+          evento.origem,
+        ],
       );
     }
-    db.exec('COMMIT');
-  } catch (err) {
-    db.exec('ROLLBACK');
-    throw err;
-  }
+  });
 
-  const escola = listarEscolas().find((e) => e.id === params.escolaId) ?? null;
+  const todas = await listarEscolas();
+  const escola = todas.find((e) => e.id === params.escolaId) ?? null;
   return { escola, evento };
 }
 
-export function confirmarUnidade(escolaId: string): boolean {
-  const res = db.prepare('UPDATE escolas SET atualizado_em = ? WHERE id = ?').run(Date.now(), escolaId);
+export async function confirmarUnidade(escolaId: string): Promise<boolean> {
+  const res = await db.execute('UPDATE escolas SET atualizado_em = $1 WHERE id = $2', [Date.now(), escolaId]);
   return res.changes > 0;
 }
 

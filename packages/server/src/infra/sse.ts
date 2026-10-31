@@ -14,12 +14,12 @@ interface ClienteSSE {
 const clientesSSE = new Set<ClienteSSE>();
 const MAX_CLIENTES_SSE = 250;
 
-export function construirSnapshotSincronizacao(opcoes: {
+export async function construirSnapshotSincronizacao(opcoes: {
   incluirCatalogo?: boolean;
   incluirDadosGestao?: boolean;
   escolaIdFiltro?: string;
   evento?: EventoVaga;
-}): SyncFrameDTO {
+}): Promise<SyncFrameDTO> {
   const {
     incluirCatalogo = false,
     incluirDadosGestao = false,
@@ -27,26 +27,30 @@ export function construirSnapshotSincronizacao(opcoes: {
     evento,
   } = opcoes;
 
+  const [catalogo, escolas, historico, protocolos, secretaria] = await Promise.all([
+    incluirCatalogo ? obterCatalogoMunicipio() : Promise.resolve(undefined),
+    listarEscolas(),
+    listarHistorico(40),
+    incluirDadosGestao ? listarProtocolos(escolaIdFiltro) : Promise.resolve(undefined),
+    incluirDadosGestao ? obterPainelSecretariaPatos() : Promise.resolve(undefined),
+  ]);
+
   return {
     tipo: 'sync',
-    ...(incluirCatalogo ? { catalogo: obterCatalogoMunicipio() } : {}),
-    escolas: listarEscolas(),
-    historico: listarHistorico(40),
-    ...(incluirDadosGestao
-      ? {
-          protocolos: listarProtocolos(escolaIdFiltro),
-          secretaria: obterPainelSecretariaPatos(),
-        }
-      : {}),
+    ...(catalogo ? { catalogo } : {}),
+    escolas,
+    historico,
+    ...(protocolos ? { protocolos } : {}),
+    ...(secretaria ? { secretaria } : {}),
     ...(evento ? { evento } : {}),
   };
 }
 
-export function registrarClienteSSE(
+export async function registrarClienteSSE(
   req: IncomingMessage,
   res: ServerResponse,
   sessao: SessaoGestaoDTO | null,
-): void {
+): Promise<void> {
   if (clientesSSE.size >= MAX_CLIENTES_SSE) {
     // Desconecta o cliente mais antigo caso atinja o teto de segurança
     const maisAntigo = clientesSSE.values().next().value;
@@ -68,13 +72,11 @@ export function registrarClienteSSE(
     'Access-Control-Allow-Origin': resolverOrigemCors(req),
   });
 
-  const inicial = JSON.stringify(
-    construirSnapshotSincronizacao({
-      incluirCatalogo: true,
-      incluirDadosGestao: Boolean(sessao),
-    }),
-  );
-  res.write(`data: ${inicial}\n\n`);
+  const frameInicial = await construirSnapshotSincronizacao({
+    incluirCatalogo: true,
+    incluirDadosGestao: Boolean(sessao),
+  });
+  res.write(`data: ${JSON.stringify(frameInicial)}\n\n`);
 
   const cliente: ClienteSSE = { res, sessao };
   clientesSSE.add(cliente);
@@ -94,7 +96,7 @@ export function registrarClienteSSE(
   });
 }
 
-export function transmitirAtualizacaoSSE(evento?: EventoVaga): void {
+export async function transmitirAtualizacaoSSE(evento?: EventoVaga): Promise<void> {
   if (clientesSSE.size === 0) return;
 
   let payloadPublico: string | null = null;
@@ -104,24 +106,22 @@ export function transmitirAtualizacaoSSE(evento?: EventoVaga): void {
     try {
       if (cliente.sessao) {
         if (!payloadGestao) {
-          payloadGestao = JSON.stringify(
-            construirSnapshotSincronizacao({
-              incluirCatalogo: false,
-              incluirDadosGestao: true,
-              evento,
-            }),
-          );
+          const snapshot = await construirSnapshotSincronizacao({
+            incluirCatalogo: false,
+            incluirDadosGestao: true,
+            evento,
+          });
+          payloadGestao = JSON.stringify(snapshot);
         }
         cliente.res.write(`data: ${payloadGestao}\n\n`);
       } else {
         if (!payloadPublico) {
-          payloadPublico = JSON.stringify(
-            construirSnapshotSincronizacao({
-              incluirCatalogo: false,
-              incluirDadosGestao: false,
-              evento,
-            }),
-          );
+          const snapshot = await construirSnapshotSincronizacao({
+            incluirCatalogo: false,
+            incluirDadosGestao: false,
+            evento,
+          });
+          payloadPublico = JSON.stringify(snapshot);
         }
         cliente.res.write(`data: ${payloadPublico}\n\n`);
       }

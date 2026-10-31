@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <!-- Fundo com cantos arredondados Neo-brutalista -->
+  <rect width="512" height="512" rx="112" fill="#5B3FD9" />
+  <rect x="24" y="24" width="464" height="464" rx="92" stroke="#181528" stroke-width="16" fill="#FFF8EE" />
+  
+  <!-- Sombra 3D Brutalista do Card Central -->
+  <rect x="108" y="108" width="312" height="312" rx="44" fill="#181528" />
+  <rect x="96" y="96" width="312" height="312" rx="44" fill="#FFD24C" stroke="#181528" stroke-width="16" />
+  
+  <!-- Alça da Mochila / Portal Escolar -->
+  <path d="M196 96V72C196 52 216 36 256 36C296 36 316 52 316 72V96" stroke="#181528" stroke-width="16" stroke-linecap="round" fill="none" />
+  
+  <!-- Bolso Frontal Roxo Índigo -->
+  <rect x="136" y="236" width="232" height="136" rx="28" fill="#5B3FD9" stroke="#181528" stroke-width="16" />
+  
+  <!-- Fecho / Fivela Dourada -->
+  <rect x="226" y="220" width="60" height="48" rx="12" fill="#00D2B4" stroke="#181528" stroke-width="12" />
+  
+  <!-- Detalhe da Correia Central -->
+  <path d="M256 140V220" stroke="#181528" stroke-width="16" stroke-linecap="round" />
+  
+  <!-- Emblema / Estrela da Educação -->
+  <circle cx="340" cy="156" r="22" fill="#FF6B4A" stroke="#181528" stroke-width="10" />
+</svg>

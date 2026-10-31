@@ -1,0 +1,54 @@
+name: CI · Matrícula Aberta (Patos - PB)
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualidade-e-testes:
+    name: Typecheck, Build & Testes de Segurança
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 23
+        uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: 'npm'
+
+      - name: Instalar Dependências do Monorepo
+        run: npm install
+
+      - name: Verificação Estrita de Tipos (TypeScript Monorepo)
+        run: npm run typecheck
+
+      - name: Build de Produção (Vite + Assets PWA)
+        run: npm run build
+
+      - name: Validar Assets PWA, Ícones e SEO Municipal
+        run: |
+          test -f dist/index.html
+          test -f dist/manifest.webmanifest
+          test -f dist/sw.js
+          test -f dist/icon-192.png
+          test -f dist/icon-512.png
+          test -f dist/apple-touch-icon.png
+          test -f dist/favicon.ico
+          test -f dist/robots.txt
+          test -f dist/sitemap.xml
+          echo "Todos os 9 assets PWA e de SEO foram gerados e verificados com sucesso no dist!"
+
+      - name: Executar Testes de Integração & Segurança (Backend RBAC / LGPD / PostgreSQL-Ready)
+        run: npm test

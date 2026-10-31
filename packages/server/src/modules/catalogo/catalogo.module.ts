@@ -45,71 +45,75 @@ const DOCUMENTOS_INICIAL: Documento[] = [
   { id: 'laudo', nome: 'Laudo médico ou parecer multiprofissional (AEE)', dica: 'Para estudantes com deficiência, TEA ou altas habilidades.', emoji: 'stethoscope', obrigatorio: false },
 ];
 
-export function garantirSeedCatalogoPatos() {
-  const qtdBairros = (db.prepare('SELECT COUNT(*) as c FROM bairros_patos').get() as { c: number }).c;
+export async function garantirSeedCatalogoPatos(): Promise<void> {
+  const rowBairros = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM bairros_patos');
+  const qtdBairros = Number(rowBairros?.c ?? 0);
   if (qtdBairros === 0) {
-    const insBairro = db.prepare(`
-      INSERT INTO bairros_patos (id, rotulo, zona, lat, lng, ordem)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-    BAIRROS_PATOS_INICIAL.forEach((b, idx) => {
-      insBairro.run(b.id, b.rotulo, b.zona, b.lat, b.lng, idx + 1);
-    });
+    for (let idx = 0; idx < BAIRROS_PATOS_INICIAL.length; idx++) {
+      const b = BAIRROS_PATOS_INICIAL[idx];
+      await db.execute(
+        `INSERT INTO bairros_patos (id, rotulo, zona, lat, lng, ordem)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (id) DO NOTHING`,
+        [b.id, b.rotulo, b.zona, b.lat, b.lng, idx + 1],
+      );
+    }
   }
 
-  const qtdDocs = (db.prepare('SELECT COUNT(*) as c FROM documentos_catalogo').get() as { c: number }).c;
+  const rowDocs = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM documentos_catalogo');
+  const qtdDocs = Number(rowDocs?.c ?? 0);
   if (qtdDocs === 0) {
-    const insDoc = db.prepare(`
-      INSERT INTO documentos_catalogo (id, nome, dica, emoji, obrigatorio, etapas_json, ordem)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    DOCUMENTOS_INICIAL.forEach((d, idx) => {
-      insDoc.run(
-        d.id,
-        d.nome,
-        d.dica,
-        d.emoji,
-        d.obrigatorio ? 1 : 0,
-        d.etapas ? JSON.stringify(d.etapas) : null,
-        idx + 1,
+    for (let idx = 0; idx < DOCUMENTOS_INICIAL.length; idx++) {
+      const d = DOCUMENTOS_INICIAL[idx];
+      await db.execute(
+        `INSERT INTO documentos_catalogo (id, nome, dica, emoji, obrigatorio, etapas_json, ordem)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          d.id,
+          d.nome,
+          d.dica,
+          d.emoji,
+          d.obrigatorio ? 1 : 0,
+          d.etapas ? JSON.stringify(d.etapas) : null,
+          idx + 1,
+        ],
       );
-    });
+    }
   } else {
-    const updDoc = db.prepare('UPDATE documentos_catalogo SET emoji = ? WHERE id = ?');
-    DOCUMENTOS_INICIAL.forEach((d) => {
-      updDoc.run(d.emoji, d.id);
-    });
+    for (const d of DOCUMENTOS_INICIAL) {
+      await db.execute('UPDATE documentos_catalogo SET emoji = $1 WHERE id = $2', [d.emoji, d.id]);
+    }
   }
 }
 
-export function listarBairrosPatos(): Local[] {
-  const rows = db.prepare('SELECT id, rotulo, zona, lat, lng FROM bairros_patos ORDER BY ordem ASC').all() as Array<{
+export async function listarBairrosPatos(): Promise<Local[]> {
+  const rows = await db.query<{
     id: string;
     rotulo: string;
     zona: string;
     lat: number;
     lng: number;
-  }>;
+  }>('SELECT id, rotulo, zona, lat, lng FROM bairros_patos ORDER BY ordem ASC');
   return rows.map((r) => ({
     id: r.id,
     rotulo: r.rotulo,
     zona: r.zona,
-    lat: r.lat,
-    lng: r.lng,
+    lat: Number(r.lat),
+    lng: Number(r.lng),
   }));
 }
 
-export function listarDocumentosCatalogo(): Documento[] {
-  const rows = db
-    .prepare('SELECT id, nome, dica, emoji, obrigatorio, etapas_json FROM documentos_catalogo ORDER BY ordem ASC')
-    .all() as Array<{
+export async function listarDocumentosCatalogo(): Promise<Documento[]> {
+  const rows = await db.query<{
     id: string;
     nome: string;
     dica: string;
     emoji: string;
     obrigatorio: number;
     etapas_json: string | null;
-  }>;
+  }>('SELECT id, nome, dica, emoji, obrigatorio, etapas_json FROM documentos_catalogo ORDER BY ordem ASC');
+
   return rows.map((r) => ({
     id: r.id,
     nome: r.nome,
@@ -120,11 +124,15 @@ export function listarDocumentosCatalogo(): Documento[] {
   }));
 }
 
-export function obterCatalogoMunicipio(): CatalogoMunicipioDTO {
+export async function obterCatalogoMunicipio(): Promise<CatalogoMunicipioDTO> {
+  const [bairros, documentos] = await Promise.all([
+    listarBairrosPatos(),
+    listarDocumentosCatalogo(),
+  ]);
+
   return {
     ...MUNICIPIO_PATOS_META,
-    bairros: listarBairrosPatos(),
-    documentos: listarDocumentosCatalogo(),
+    bairros,
+    documentos,
   };
 }
-

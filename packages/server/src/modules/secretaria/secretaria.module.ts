@@ -12,12 +12,14 @@ import { listarEscolas } from '../unidades/unidades.module.ts';
 
 const LIMITE_DESATUALIZADA_MS = 48 * 3600 * 1000;
 
-export function obterPainelSecretariaPatos(): PainelSecretariaDTO {
+export async function obterPainelSecretariaPatos(): Promise<PainelSecretariaDTO> {
   const agora = Date.now();
-  const escolas = listarEscolas();
-  const bairros = listarBairrosPatos();
-  const alertas = listarAlertas();
-  const protocolos = listarProtocolos();
+  const [escolas, bairros, alertas, protocolos] = await Promise.all([
+    listarEscolas(),
+    listarBairrosPatos(),
+    listarAlertas(),
+    listarProtocolos(),
+  ]);
 
   let capacidadeRede = 0;
   let vagasLivres = 0;
