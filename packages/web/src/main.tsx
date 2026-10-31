@@ -10,7 +10,7 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Registro do Service Worker PWA para suporte offline em Patos - PB
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
@@ -27,7 +27,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         });
       })
       .catch((err) => {
-        console.warn('[PWA] Falha ao registrar Service Worker:', err);
+        console.warn('[PWA] Service Worker não inicializado (requer HTTPS ou localhost):', err);
       });
   });
 }

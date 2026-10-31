@@ -1,3 +1,4 @@
+import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { Toasts } from './components/Toasts';
 import { useHashRoute } from './hooks';
 import { CidadaoApp } from './screens/CidadaoApp';
@@ -8,6 +9,7 @@ export default function App() {
   return (
     <>
       {rota.startsWith('#/gestao') ? <Gestao /> : <CidadaoApp />}
+      <PwaInstallBanner />
       <Toasts />
     </>
   );
