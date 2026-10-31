@@ -52,3 +52,4 @@ jobs:
 
       - name: Executar Testes de Integração & Segurança (Backend RBAC / LGPD / PostgreSQL-Ready)
         run: npm test
+
