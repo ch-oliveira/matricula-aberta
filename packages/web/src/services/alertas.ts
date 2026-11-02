@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { Alerta, Canal } from '../domain/types';
+import { API_BASE } from './vagasStore';
 
 export type { Alerta, Canal };
 
@@ -9,7 +10,6 @@ export type { Alerta, Canal };
  * e expiração automática em 90 dias (LGPD).
  */
 const KEY = 'ma:alertas:cidadao:v2';
-const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
 
 function validarAlertaLocal(item: unknown): item is Alerta {
   if (!item || typeof item !== 'object') return false;

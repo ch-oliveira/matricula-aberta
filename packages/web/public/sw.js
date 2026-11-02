@@ -1,7 +1,7 @@
 // Service Worker Oficial · Matrícula Aberta (Rede Municipal de Patos - PB)
-// Versão do Cache: v2.0.0
+// Versão do Cache: v2.0.1
 
-const CACHE_NAME = 'matricula-patos-v2.0.0';
+const CACHE_NAME = 'matricula-patos-v2.0.1';
 
 const RECURSOS_APP_SHELL = [
   '/',
@@ -45,8 +45,17 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Não interceptar requisições que não sejam GET (mutação de dados, SSE, auth)
-  if (request.method !== 'GET') {
+  // Não interceptar requisições cross-origin (ex.: API hospedada no Render, Google Fonts, etc.)
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Não interceptar requisições que não sejam GET ou streams de SSE (EventSource)
+  if (
+    request.method !== 'GET' ||
+    request.headers.get('accept')?.includes('text/event-stream') ||
+    url.pathname.includes('/stream')
+  ) {
     return;
   }
 

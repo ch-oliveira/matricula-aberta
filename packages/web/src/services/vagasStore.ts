@@ -29,7 +29,25 @@ export type { EventoVaga };
 const KEY_CACHE = 'ma:patos:snapshot:v4';
 const KEY_SESSAO_SEC = 'ma:gestao:sessao:secretaria:v2';
 const KEY_SESSAO_UNI = 'ma:gestao:sessao:unidade:v2';
-export const API_BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
+
+export function obterApiBase(): string {
+  const envUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/$/, '');
+  }
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // Em desenvolvimento local ou testes em rede local, usa rota relativa com proxy do Vite (porta 3333)
+    if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) {
+      return '';
+    }
+    // Em produção na nuvem (Vercel, domínios públicos), conecta diretamente à API hospedada no Render
+    return 'https://matricula-aberta-api.onrender.com';
+  }
+  return 'https://matricula-aberta-api.onrender.com';
+}
+
+export const API_BASE = obterApiBase();
 
 const min = (m: number) => Date.now() - m * 60_000;
 const hora = (h: number) => Date.now() - h * 3_600_000;

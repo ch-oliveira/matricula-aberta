@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { API_BASE } from '../services/vagasStore';
 
 /** Estado persistido em localStorage (funciona offline). */
 export function usePersistido<T>(chave: string, inicial: T) {
@@ -226,8 +227,7 @@ export function useFala() {
 
       // Se estiver online, prioriza o motor de Voz Neural pt-BR da aplicação
       if (typeof Audio !== 'undefined' && navigator.onLine !== false) {
-        const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '');
-        const url = `${apiBase}/api/v1/tts?q=${encodeURIComponent(textoHumanizado)}`;
+        const url = `${API_BASE}/api/v1/tts?q=${encodeURIComponent(textoHumanizado)}`;
         const audio = new Audio(url);
         audio.preload = 'auto';
         audio.playbackRate = 1.04;
