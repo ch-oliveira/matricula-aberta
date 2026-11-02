@@ -1,3 +1,4 @@
+import { Analytics } from '@vercel/analytics/react';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { Toasts } from './components/Toasts';
 import { useHashRoute } from './hooks';
@@ -11,6 +12,7 @@ export default function App() {
       {rota.startsWith('#/gestao') ? <Gestao /> : <CidadaoApp />}
       <PwaInstallBanner />
       <Toasts />
+      <Analytics />
     </>
   );
 }
