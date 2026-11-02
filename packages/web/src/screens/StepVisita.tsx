@@ -292,7 +292,13 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
 
       ctx.font = 'bold 16px system-ui, -apple-system, sans-serif';
       ctx.fillStyle = '#227B4E';
-      ctx.fillText('✓ PROTOCOLO OFICIAL DA REDE MUNICIPAL DE ENSINO DE PATOS - PB', 74, 1095);
+      ctx.fillText(
+        protocoloAtivo.reservaVaga
+          ? `✓ VAGA PRÉ-RESERVADA · COMPARECER ATÉ ${formatarDataBR(protocoloAtivo.dataVisita)} (${protocoloAtivo.turnoVisita === 'manha' ? '12:30' : '18:00'})`
+          : '✓ PROTOCOLO DE FILA DE ESPERA OFICIAL DE PATOS - PB',
+        74,
+        1095,
+      );
 
       // Rodapé Offline
       ctx.fillStyle = '#676479';
@@ -471,12 +477,63 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 </div>
               </dl>
 
+              {protocoloAtivo.reservaVaga && protocoloAtivo.status === 'aguardando' && (
+                <div
+                  className="aviso-reserva-garantida"
+                  style={{
+                    background: '#E8F5E9',
+                    border: '2px solid #2E7D32',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    margin: '12px 0',
+                    color: '#1B5E20',
+                    fontSize: '0.92rem',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong>🔒 Vaga Pré-Reservada e Garantida:</strong>
+                  <div>
+                    1 vaga foi debitada do quadro escolar e está reservada para você até{' '}
+                    <strong>{formatarDataBR(protocoloAtivo.dataVisita)}</strong> às{' '}
+                    <strong>{protocoloAtivo.turnoVisita === 'manha' ? '12h30' : '18h00'}</strong> (fim do turno).
+                    Após este horário, se não houver comparecimento, o agendamento expira e a vaga retorna para a rede.
+                  </div>
+                </div>
+              )}
+
+              {protocoloAtivo.status === 'cancelado' && (
+                <div
+                  style={{
+                    background: '#FFEBEE',
+                    border: '2px solid #C62828',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    margin: '12px 0',
+                    color: '#B71C1C',
+                    fontSize: '0.92rem',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong>⚠️ Protocolo Cancelado / Expirado:</strong>
+                  <div>
+                    {protocoloAtivo.motivoCancelamento === 'expirado_sem_comparecimento'
+                      ? 'O prazo limite de comparecimento encerrou. A vaga pré-reservada foi devolvida para a rede escolar.'
+                      : 'Este agendamento foi cancelado. A vaga reservada retornou para o quadro de vagas.'}
+                  </div>
+                </div>
+              )}
+
               <p className="protocolo-aviso">
                 {protocoloAtivo.status === 'atendido' ? (
                   <>
                     <Icone nome="sparkles" tamanho={16} />{' '}
-                    <strong>Atendimento confirmado pela secretaria da unidade!</strong> A vaga foi vinculada ao seu
-                    protocolo.
+                    <strong>Atendimento confirmado pela secretaria da unidade!</strong> A vaga foi efetivada e
+                    vinculada à criança.
+                  </>
+                ) : protocoloAtivo.status === 'cancelado' ? (
+                  <>
+                    <Icone nome="alert-triangle" tamanho={16} />{' '}
+                    Para obter uma nova vaga, faça uma nova busca e emita um novo protocolo.
                   </>
                 ) : (
                   <>
@@ -517,6 +574,24 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
           </div>
         ) : (
           <form className="protocolo-form" onSubmit={gerarProtocolo} noValidate>
+            <div
+              style={{
+                background: '#FFF9C4',
+                border: '2px solid #F57F17',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                marginBottom: '16px',
+                color: '#5D4037',
+                fontSize: '0.92rem',
+                lineHeight: '1.4',
+              }}
+            >
+              <strong>⚡ Pré-Reserva com Vaga Garantida (Patos - PB):</strong>
+              <div>
+                Ao emitir seu protocolo, 1 vaga é imediatamente debitada do quadro escolar e reservada para você até o dia e turno escolhidos.
+                Se você informar seu WhatsApp abaixo, enviaremos avisos no dia e 1 hora antes para lembrá-lo da documentação e do prazo.
+              </div>
+            </div>
             <p className="legenda">
               Gere gratuitamente sua senha digital. A secretaria da unidade em Patos - PB visualiza sua chegada e o
               status dos seus documentos antes mesmo de você sair de casa.

@@ -133,6 +133,14 @@ export interface ProtocoloVisita {
   status: StatusProtocolo;
   criadoEm: number;
   atendidoEm?: number;
+  /** Se true, uma vaga física da turma foi debitada e pré-reservada no momento da emissão */
+  reservaVaga?: boolean;
+  /** Motivo em caso de cancelamento ('expirado_sem_comparecimento', 'cancelado_gestor', etc.) */
+  motivoCancelamento?: string;
+  /** Timestamp de envio do lembrete matinal no dia da visita */
+  notificadoDiaEm?: number;
+  /** Timestamp de envio do lembrete de 1 hora antes do início do turno */
+  notificado1hEm?: number;
 }
 
 export interface DemandaBairroDTO {
@@ -267,6 +275,11 @@ export function distanciaKm(a: { lat: number; lng: number }, b: { lat: number; l
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+/** Ano letivo para o qual a matrícula está aberta (a partir de agosto, ano seguinte). */
+export function anoLetivo(hoje = new Date()): number {
+  return hoje.getMonth() >= 7 ? hoje.getFullYear() + 1 : hoje.getFullYear();
+}
+
 /** Formata data no fuso horário local (YYYY-MM-DD), evitando desvio UTC à noite no Brasil (UTC-3). */
 export function dataLocalISO(d = new Date()): string {
   const ano = d.getFullYear();
@@ -337,3 +350,167 @@ export function gerarMatrizQrCode(texto: string): boolean[][] {
 
   return mat;
 }
+
+/** Idade completa em uma data de referência. */
+export function idadeEm(nascimento: Date, ref: Date): { anos: number; meses: number } {
+  let meses = (ref.getFullYear() - nascimento.getFullYear()) * 12 + (ref.getMonth() - nascimento.getMonth());
+  if (ref.getDate() < nascimento.getDate()) meses -= 1;
+  return { anos: Math.floor(meses / 12), meses };
+}
+
+export type ResultadoEtapa =
+  | { ok: true; etapa: EtapaId; turma: string; idadeCorte: number; ano: number }
+  | { ok: false; motivo: string };
+
+/**
+ * Calcula a etapa de ensino pela data de corte de 31 de março do ano letivo
+ * (regra nacional – Resolução CNE/CEB nº 2/2018).
+ */
+export function calcularEtapa(nascimentoISO: string, hoje = new Date()): ResultadoEtapa {
+  const nasc = new Date(nascimentoISO + 'T12:00:00');
+  if (Number.isNaN(nasc.getTime())) return { ok: false, motivo: 'Data inválida.' };
+  if (nasc > hoje) return { ok: false, motivo: 'Essa data ainda não chegou. Confira o ano.' };
+
+  const ano = anoLetivo(hoje);
+  const corte = new Date(ano, 2, 31, 12);
+  const { anos, meses } = idadeEm(nasc, corte);
+
+  if (meses < 4) {
+    return {
+      ok: false,
+      motivo: 'As creches atendem bebês a partir de 4 meses até 31 de março.',
+    };
+  }
+  if (anos <= 1) return { ok: true, etapa: 'bercario', turma: anos === 0 ? 'Berçário I' : 'Berçário II', idadeCorte: anos, ano };
+  if (anos <= 3) return { ok: true, etapa: 'maternal', turma: anos === 2 ? 'Maternal I' : 'Maternal II', idadeCorte: anos, ano };
+  if (anos <= 5) return { ok: true, etapa: 'pre', turma: anos === 4 ? 'Pré I' : 'Pré II', idadeCorte: anos, ano };
+  if (anos <= 10) return { ok: true, etapa: 'fund1', turma: `${anos - 5}º ano`, idadeCorte: anos, ano };
+  if (anos <= 14) return { ok: true, etapa: 'fund2', turma: `${anos - 5}º ano`, idadeCorte: anos, ano };
+
+  return {
+    ok: false,
+    motivo: 'Para 15 anos ou mais, procure o Ensino Médio (rede estadual) ou a EJA.',
+  };
+}
+
+/** Retorna 1 resultado por escola (a melhor oferta compatível), dentro do raio. */
+export function buscar(
+  escolas: Escola[],
+  b: Pick<Busca, 'etapa' | 'local' | 'raioKm' | 'periodo' | 'soAcessivel'>,
+): Resultado[] {
+  if (!b.etapa || !b.local) return [];
+  const out: Resultado[] = [];
+  for (const escola of escolas) {
+    if (b.soAcessivel && !escola.acessivel) continue;
+    const ofertas = escola.ofertas.filter(
+      (o) => o.etapa === b.etapa && (b.periodo === 'tanto-faz' || o.periodo === b.periodo),
+    );
+    if (!ofertas.length) continue;
+    const distancia = distanciaKm(b.local, escola);
+    if (distancia > b.raioKm) continue;
+    const oferta = ofertas.reduce((a, c) => (c.vagas > a.vagas || (c.vagas === a.vagas && c.fila < a.fila) ? c : a));
+    out.push({ escola, oferta, distanciaKm: distancia, status: statusDaOferta(oferta) });
+  }
+  return out;
+}
+
+export function resumo(rs: Resultado[]) {
+  const cont: Record<StatusVaga, number> = { aberta: 0, ultimas: 0, espera: 0 };
+  let vagas = 0;
+  for (const r of rs) {
+    cont[r.status]++;
+    vagas += r.oferta.vagas;
+  }
+  return { ...cont, vagas, total: rs.length, comVaga: cont.aberta + cont.ultimas };
+}
+
+/** Vagas totais por etapa na cidade inteira — o "pulso" da rede. */
+export function pulsoDaCidade(escolas: Escola[]) {
+  const m: Record<EtapaId, { vagas: number; capacidade: number; escolasComVaga: number }> = {
+    bercario: { vagas: 0, capacidade: 0, escolasComVaga: 0 },
+    maternal: { vagas: 0, capacidade: 0, escolasComVaga: 0 },
+    pre: { vagas: 0, capacidade: 0, escolasComVaga: 0 },
+    fund1: { vagas: 0, capacidade: 0, escolasComVaga: 0 },
+    fund2: { vagas: 0, capacidade: 0, escolasComVaga: 0 },
+  };
+  for (const e of escolas) {
+    const vistos = new Set<EtapaId>();
+    for (const o of e.ofertas) {
+      m[o.etapa].vagas += o.vagas;
+      m[o.etapa].capacidade += o.capacidade;
+      if (o.vagas > 0 && !vistos.has(o.etapa)) {
+        m[o.etapa].escolasComVaga++;
+        vistos.add(o.etapa);
+      }
+    }
+  }
+  return m;
+}
+
+export function documentosPara(catalogoDocs: Documento[], etapa: EtapaId | null): Documento[] {
+  return catalogoDocs.filter((d) => (d.etapas ?? ORDEM_ETAPAS).includes(etapa ?? 'pre'));
+}
+
+/**
+ * Retorna os horários oficiais de funcionamento de cada turno na Rede Municipal de Patos-PB:
+ * - Manhã: 07h30 às 11h30 (com tolerância até 12h30 para encerramento do turno)
+ * - Tarde: 13h30 às 17h00 (com tolerância até 18h00 para encerramento do turno)
+ */
+export function horarioTurnoVisita(turno: TurnoVisita): {
+  inicio: string;
+  fim: string;
+  toleranciaExpira: string;
+  horaInicio: number;
+  minutoInicio: number;
+  horaLimite: number;
+  minutoLimite: number;
+} {
+  if (turno === 'manha') {
+    return {
+      inicio: '07:30',
+      fim: '11:30',
+      toleranciaExpira: '12:30',
+      horaInicio: 7,
+      minutoInicio: 30,
+      horaLimite: 12,
+      minutoLimite: 30,
+    };
+  }
+  return {
+    inicio: '13:30',
+    fim: '17:00',
+    toleranciaExpira: '18:00',
+    horaInicio: 13,
+    minutoInicio: 30,
+    horaLimite: 18,
+    minutoLimite: 0,
+  };
+}
+
+/**
+ * Avalia se um protocolo com status 'aguardando' já excedeu o prazo de comparecimento
+ * presencial e deve ter sua vaga devolvida para a rede escolar.
+ */
+export function verificarProtocoloExpirado(
+  protocolo: Pick<ProtocoloVisita, 'dataVisita' | 'turnoVisita' | 'status'>,
+  agora = new Date(),
+): boolean {
+  if (protocolo.status !== 'aguardando') return false;
+
+  const hojeISO = dataLocalISO(agora);
+  // Se a data de visita já passou (dias anteriores)
+  if (protocolo.dataVisita < hojeISO) return true;
+  // Se a data de visita ainda é no futuro (dias seguintes)
+  if (protocolo.dataVisita > hojeISO) return false;
+
+  // Se a data é hoje, verifica o horário limite com tolerância do turno
+  const { horaLimite, minutoLimite } = horarioTurnoVisita(protocolo.turnoVisita);
+  const horaAtual = agora.getHours();
+  const minAtual = agora.getMinutes();
+
+  if (horaAtual > horaLimite) return true;
+  if (horaAtual === horaLimite && minAtual >= minutoLimite) return true;
+
+  return false;
+}
+

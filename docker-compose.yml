@@ -1,0 +1,48 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: matricula-aberta-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3333}:3333"
+    environment:
+      - PORT=3333
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:patos2026@postgres:5432/patos_matricula}
+      - AUTH_SECRET=${AUTH_SECRET:-patos-secreta-chave-producao-2026-seduc}
+      - LGPD_HASH_SALT=${LGPD_HASH_SALT:-salt-lgpd-patos-pb-2026-seguranca}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - WHATSAPP_API_URL=${WHATSAPP_API_URL:-}
+      - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN:-}
+      - SEDUC_ADMIN_PASSWORDS=${SEDUC_ADMIN_PASSWORDS:-patos2026,seduc2026}
+      - UNIDADE_PINS=${UNIDADE_PINS:-2026,patos2026}
+    volumes:
+      - app_data:/app/packages/server/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: matricula-aberta-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-patos2026}
+      POSTGRES_DB: patos_matricula
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d patos_matricula"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  app_data:
+  postgres_data:
+

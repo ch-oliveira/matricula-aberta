@@ -17,22 +17,25 @@ const MAX_CLIENTES_SSE = 250;
 export async function construirSnapshotSincronizacao(opcoes: {
   incluirCatalogo?: boolean;
   incluirDadosGestao?: boolean;
-  escolaIdFiltro?: string;
+  sessao?: SessaoGestaoDTO | null;
   evento?: EventoVaga;
 }): Promise<SyncFrameDTO> {
   const {
     incluirCatalogo = false,
     incluirDadosGestao = false,
-    escolaIdFiltro,
+    sessao,
     evento,
   } = opcoes;
+
+  const escolaIdFiltro = sessao?.perfil === 'unidade' ? sessao.escolaId : undefined;
+  const podeVerSecretaria = sessao?.perfil === 'secretaria';
 
   const [catalogo, escolas, historico, protocolos, secretaria] = await Promise.all([
     incluirCatalogo ? obterCatalogoMunicipio() : Promise.resolve(undefined),
     listarEscolas(),
     listarHistorico(40),
     incluirDadosGestao ? listarProtocolos(escolaIdFiltro) : Promise.resolve(undefined),
-    incluirDadosGestao ? obterPainelSecretariaPatos() : Promise.resolve(undefined),
+    incluirDadosGestao && podeVerSecretaria ? obterPainelSecretariaPatos() : Promise.resolve(undefined),
   ]);
 
   return {
@@ -75,6 +78,7 @@ export async function registrarClienteSSE(
   const frameInicial = await construirSnapshotSincronizacao({
     incluirCatalogo: true,
     incluirDadosGestao: Boolean(sessao),
+    sessao,
   });
   res.write(`data: ${JSON.stringify(frameInicial)}\n\n`);
 
@@ -100,20 +104,36 @@ export async function transmitirAtualizacaoSSE(evento?: EventoVaga): Promise<voi
   if (clientesSSE.size === 0) return;
 
   let payloadPublico: string | null = null;
-  let payloadGestao: string | null = null;
+  let payloadSecretaria: string | null = null;
+  const cachePayloadUnidade = new Map<string, string>();
 
   for (const cliente of clientesSSE) {
     try {
-      if (cliente.sessao) {
-        if (!payloadGestao) {
+      if (cliente.sessao?.perfil === 'secretaria') {
+        if (!payloadSecretaria) {
           const snapshot = await construirSnapshotSincronizacao({
             incluirCatalogo: false,
             incluirDadosGestao: true,
+            sessao: cliente.sessao,
             evento,
           });
-          payloadGestao = JSON.stringify(snapshot);
+          payloadSecretaria = JSON.stringify(snapshot);
         }
-        cliente.res.write(`data: ${payloadGestao}\n\n`);
+        cliente.res.write(`data: ${payloadSecretaria}\n\n`);
+      } else if (cliente.sessao?.perfil === 'unidade') {
+        const escolaId = cliente.sessao.escolaId ?? 'padrao';
+        let payloadUni = cachePayloadUnidade.get(escolaId);
+        if (!payloadUni) {
+          const snapshot = await construirSnapshotSincronizacao({
+            incluirCatalogo: false,
+            incluirDadosGestao: true,
+            sessao: cliente.sessao,
+            evento,
+          });
+          payloadUni = JSON.stringify(snapshot);
+          cachePayloadUnidade.set(escolaId, payloadUni);
+        }
+        cliente.res.write(`data: ${payloadUni}\n\n`);
       } else {
         if (!payloadPublico) {
           const snapshot = await construirSnapshotSincronizacao({

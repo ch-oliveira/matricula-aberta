@@ -4,11 +4,13 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm install
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
       - key: NODE_VERSION
         value: 23.11.0
+      - key: NODE_ENV
+        value: production
       - key: PORT
         value: 10000
       - key: DATABASE_URL
@@ -19,3 +21,7 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         value: "*"
+      - key: WHATSAPP_API_URL
+        sync: false
+      - key: WHATSAPP_API_TOKEN
+        sync: false

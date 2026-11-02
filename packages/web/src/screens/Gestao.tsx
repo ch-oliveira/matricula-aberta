@@ -226,7 +226,7 @@ export function Gestao() {
           onConfirmarMatricula={async (codigo) => {
             try {
               await vagasStore.atualizarStatusProtocolo(codigo, 'atendido');
-              toast(`Matrícula do protocolo ${codigo} confirmada! 1 vaga ocupada.`, {
+              toast(`Matrícula do protocolo ${codigo} confirmada com sucesso!`, {
                 emoji: 'check-circle',
                 tom: 'ok',
               });
@@ -619,6 +619,36 @@ function PainelUnidade({
                 <div className="card-prot-principal">
                   <div className="card-prot-topo">
                     <strong className="prot-badge-codigo">{p.codigo}</strong>
+                    {p.reservaVaga && p.status === 'aguardando' && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          background: '#E8F5E9',
+                          color: '#1B5E20',
+                          border: '1px solid #81C784',
+                        }}
+                      >
+                        🔒 Vaga Pré-Reservada
+                      </span>
+                    )}
+                    {p.motivoCancelamento === 'expirado_sem_comparecimento' && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          background: '#FFEBEE',
+                          color: '#C62828',
+                          border: '1px solid #E57373',
+                        }}
+                      >
+                        ⌛ Expirado (Vaga Devolvida)
+                      </span>
+                    )}
                     <span className={`selo-protocolo selo-prot-${p.status}`}>
                       {p.status === 'atendido' ? (
                         <>
@@ -663,7 +693,7 @@ function PainelUnidade({
                       onClick={async () => {
                         try {
                           await vagasStore.atualizarStatusProtocolo(p.codigo, 'atendido');
-                          toast(`Matrícula do protocolo ${p.codigo} confirmada! 1 vaga ocupada.`, {
+                          toast(`Matrícula do protocolo ${p.codigo} confirmada com sucesso!`, {
                             emoji: 'check-circle',
                             tom: 'ok',
                           });
@@ -683,7 +713,10 @@ function PainelUnidade({
                       onClick={async () => {
                         try {
                           await vagasStore.atualizarStatusProtocolo(p.codigo, 'cancelado');
-                          toast(`Protocolo ${p.codigo} cancelado.`, { emoji: 'info', tom: 'aviso' });
+                          toast(
+                            `Protocolo ${p.codigo} cancelado. Se havia vaga pré-reservada, ela retornou para a escola.`,
+                            { emoji: 'info', tom: 'aviso' },
+                          );
                         } catch (err) {
                           toast(err instanceof Error ? err.message : 'Falha ao cancelar protocolo.', {
                             emoji: 'alert-triangle',

@@ -2,7 +2,7 @@ import { useId, useMemo } from 'react';
 import { Icone, IconeEtapa } from '../components/Icone';
 import { DicaAjudante, StatusPill, TituloEtapa } from '../components/ui';
 import { pulsoDaCidade } from '../domain/busca';
-import { calcularEtapa, ETAPAS, ORDEM_ETAPAS, statusDaOferta } from '../domain/etapas';
+import { anoLetivo, calcularEtapa, ETAPAS, ORDEM_ETAPAS, statusDaOferta } from '../domain/etapas';
 import { dataLocalISO, type Busca, type EtapaId } from '../domain/types';
 import { useEscolas } from '../services/vagasStore';
 import { calendar } from '../stickers/icons';
@@ -41,8 +41,8 @@ export function StepQuem({ busca, setBusca, ajudante, erro }: Props) {
   }
 
   function escolherPorIdade(item: typeof ATALHOS_IDADE[number]) {
-    const anoAtual = new Date().getFullYear();
-    const anoNasc = anoAtual - item.anosRef;
+    const anoRef = anoLetivo();
+    const anoNasc = anoRef - item.anosRef;
     const dataEstimada = `${anoNasc}-02-15`;
     const r = calcularEtapa(dataEstimada);
     setBusca((b) => ({

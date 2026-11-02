@@ -298,12 +298,17 @@ export async function inicializarSchema(): Promise<void> {
       periodo TEXT NOT NULL,
       responsavel TEXT NOT NULL,
       telefone_mascarado TEXT,
+      telefone_contato TEXT,
       nascimento TEXT,
       turno_visita TEXT NOT NULL CHECK (turno_visita IN ('manha', 'tarde')),
       data_visita TEXT NOT NULL,
       documentos_json TEXT NOT NULL DEFAULT '[]',
       total_obrigatorios INTEGER NOT NULL DEFAULT 6,
       status TEXT NOT NULL CHECK (status IN ('aguardando', 'atendido', 'cancelado')),
+      reserva_vaga INTEGER NOT NULL DEFAULT 1,
+      motivo_cancelamento TEXT,
+      notificado_dia_em BIGINT,
+      notificado_1h_em BIGINT,
       criado_em BIGINT NOT NULL,
       atendido_em BIGINT
     );
@@ -316,12 +321,30 @@ export async function inicializarSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_ofertas_escola ON ofertas(escola_id);
   `;
 
+  async function aplicarMigracoesIncremental(): Promise<void> {
+    const colunas = [
+      'ALTER TABLE protocolos_visita ADD COLUMN reserva_vaga INTEGER NOT NULL DEFAULT 1',
+      'ALTER TABLE protocolos_visita ADD COLUMN telefone_contato TEXT',
+      'ALTER TABLE protocolos_visita ADD COLUMN motivo_cancelamento TEXT',
+      'ALTER TABLE protocolos_visita ADD COLUMN notificado_dia_em BIGINT',
+      'ALTER TABLE protocolos_visita ADD COLUMN notificado_1h_em BIGINT',
+    ];
+    for (const sql of colunas) {
+      try {
+        await execute(sql);
+      } catch {
+        // Coluna já existe
+      }
+    }
+  }
+
   if (ehPostgres) {
     try {
       const pool = obterPgPool();
       const client = await pool.connect();
       client.release();
       await execScript(schemaSql);
+      await aplicarMigracoesIncremental();
       return;
     } catch (err: any) {
       console.error(
@@ -337,6 +360,7 @@ export async function inicializarSchema(): Promise<void> {
   }
 
   await execScript(schemaSql);
+  await aplicarMigracoesIncremental();
 }
 
 export async function fecharBanco(): Promise<void> {

@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { dirname, extname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { LoginGestaoRequestDTO } from '../../shared/src/index.ts';
 import {
   autenticarCredenciaisGestao,
@@ -32,11 +35,15 @@ import {
   obterCatalogoMunicipio,
 } from './modules/catalogo/catalogo.module.ts';
 import {
+  processarNotificacoesWhatsApp,
+} from './modules/notificacoes/notificacoes.module.ts';
+import {
   atualizarStatusProtocolo,
   criarProtocoloVisita,
   garantirSeedProtocolosPatos,
   listarProtocolos,
   obterProtocoloPorCodigo,
+  processarExpiracaoProtocolosVencidos,
 } from './modules/protocolos/protocolos.module.ts';
 import { obterPainelSecretariaPatos } from './modules/secretaria/secretaria.module.ts';
 import {
@@ -160,6 +167,88 @@ async function sintetizarVozNeuralPtBr(texto: string): Promise<Buffer> {
   return audioFinal;
 }
 
+const MIME_TYPES: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.webp': 'image/webp',
+  '.mp3': 'audio/mpeg',
+  '.txt': 'text/plain; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+};
+
+const __dirnameLocal = dirname(fileURLToPath(import.meta.url));
+
+function obterDiretorioDist(): string | null {
+  const caminhos = [
+    resolve(__dirnameLocal, '../../../dist'),
+    resolve(__dirnameLocal, '../../web/dist'),
+    resolve(process.cwd(), 'dist'),
+    resolve(process.cwd(), 'packages/web/dist'),
+  ];
+  for (const c of caminhos) {
+    if (existsSync(c) && existsSync(join(c, 'index.html'))) {
+      return c;
+    }
+  }
+  return null;
+}
+
+function tentarServirEstatico(req: IncomingMessage, res: ServerResponse, pathname: string): boolean {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return false;
+  if (pathname.startsWith('/api/')) return false;
+
+  const distDir = obterDiretorioDist();
+  if (!distDir) return false;
+
+  const caminhoRelativo = pathname.replace(/^\/+/, '');
+  let arquivoAlvo = join(distDir, caminhoRelativo);
+  let ehSpaFallback = false;
+
+  if (!caminhoRelativo || !existsSync(arquivoAlvo) || !statSync(arquivoAlvo).isFile()) {
+    arquivoAlvo = join(distDir, 'index.html');
+    ehSpaFallback = true;
+  }
+
+  if (!existsSync(arquivoAlvo)) return false;
+
+  const ext = extname(arquivoAlvo).toLowerCase();
+  const mime = MIME_TYPES[ext] ?? 'application/octet-stream';
+
+  aplicarHeadersSeguranca(req, res);
+
+  let cacheControl = 'public, max-age=3600';
+  if (pathname.startsWith('/assets/')) {
+    cacheControl = 'public, max-age=31536000, immutable';
+  } else if (pathname === '/sw.js' || pathname === '/manifest.webmanifest') {
+    cacheControl = 'public, max-age=0, must-revalidate';
+  } else if (ehSpaFallback || ext === '.html') {
+    cacheControl = 'no-cache';
+  }
+
+  const stat = statSync(arquivoAlvo);
+  res.writeHead(200, {
+    'Content-Type': mime,
+    'Content-Length': stat.size,
+    'Cache-Control': cacheControl,
+  });
+
+  if (req.method === 'HEAD') {
+    res.end();
+    return true;
+  }
+
+  createReadStream(arquivoAlvo).pipe(res);
+  return true;
+}
+
 const server = createServer(async (req, res) => {
   aplicarHeadersSeguranca(req, res);
 
@@ -171,6 +260,11 @@ const server = createServer(async (req, res) => {
 
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
   const path = url.pathname;
+
+  // Em produção, se o bundle dist/ existir, serve os arquivos estáticos e rotas SPA do frontend
+  if (tentarServirEstatico(req, res, path)) {
+    return;
+  }
 
   try {
     // 0. Healthcheck e metadados da arquitetura Monolito Modular
@@ -300,13 +394,13 @@ const server = createServer(async (req, res) => {
         return;
       }
 
-      // Usuário autenticado da Gestão (SEDUC / Unidade): hidratação completa
+      // Usuário autenticado da Gestão (SEDUC / Unidade): hidratação completa com isolamento de escopo
       const [catalogo, escolas, historico, protocolos, secretaria] = await Promise.all([
         obterCatalogoMunicipio(),
         listarEscolas(),
         listarHistorico(40),
-        listarProtocolos(),
-        obterPainelSecretariaPatos(),
+        listarProtocolos(sessao.perfil === 'unidade' ? sessao.escolaId : undefined),
+        sessao.perfil === 'secretaria' ? obterPainelSecretariaPatos() : Promise.resolve(undefined),
       ]);
 
       return json(req, res, 200, {
@@ -314,7 +408,7 @@ const server = createServer(async (req, res) => {
         escolas,
         historico,
         protocolos,
-        secretaria,
+        ...(secretaria ? { secretaria } : {}),
       });
     }
 
@@ -363,10 +457,10 @@ const server = createServer(async (req, res) => {
       return json(req, res, 200, { ok: true, escolas: await listarEscolas() });
     }
 
-    // 4. Módulo Alertas (LGPD)
+    // 4. Módulo Alertas (LGPD - Restrito à Secretaria de Educação)
     if (req.method === 'GET' && path === '/api/v1/alertas') {
       exigirRateLimit(req, 'leitura', 60, 60_000);
-      exigirSessaoGestao(req, url);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
       return json(req, res, 200, { alertas: await listarAlertas() });
     }
 
@@ -418,8 +512,11 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && path === '/api/v1/protocolos') {
       exigirRateLimit(req, 'leitura', 60, 60_000);
-      exigirSessaoGestao(req, url);
-      const escolaId = url.searchParams.get('escolaId') ?? undefined;
+      const sessao = exigirSessaoGestao(req, url);
+      const escolaId =
+        sessao.perfil === 'unidade'
+          ? sessao.escolaId
+          : (url.searchParams.get('escolaId') ?? undefined);
       return json(req, res, 200, { protocolos: await listarProtocolos(escolaId) });
     }
 
@@ -427,13 +524,35 @@ const server = createServer(async (req, res) => {
       exigirRateLimit(req, 'criar-protocolo', 15, 60_000);
       const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
       const payload = validarPayloadProtocolo(bodyRaw);
-      const protocolo = await criarProtocoloVisita(payload);
+      const { protocolo, evento } = await criarProtocoloVisita(payload);
 
       if (!protocolo) return json(req, res, 404, { erro: 'Unidade escolar não encontrada.' });
 
       invalidarSnapshotPublico();
-      await transmitirAtualizacaoSSE();
-      return json(req, res, 201, { ok: true, protocolo });
+      await transmitirAtualizacaoSSE(evento ?? undefined);
+      return json(req, res, 201, { ok: true, protocolo, evento });
+    }
+
+    // Rotina de Expiração Automática de Protocolos Vencidos com Devolução de Vagas
+    if (req.method === 'POST' && path === '/api/v1/gestao/rotinas/expiracao') {
+      exigirRateLimit(req, 'gestao-mutacao', 30, 60_000);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const resultado = await processarExpiracaoProtocolosVencidos();
+      if (resultado.expirados.length > 0) {
+        invalidarSnapshotPublico();
+        for (const ev of resultado.eventos) {
+          await transmitirAtualizacaoSSE(ev);
+        }
+      }
+      return json(req, res, 200, { ok: true, ...resultado });
+    }
+
+    // Rotina de Processamento de Notificações via WhatsApp (lembretes no dia e 1h antes)
+    if (req.method === 'POST' && path === '/api/v1/gestao/rotinas/notificacoes') {
+      exigirRateLimit(req, 'gestao-mutacao', 30, 60_000);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const resultado = await processarNotificacoesWhatsApp();
+      return json(req, res, 200, { ok: true, ...resultado });
     }
 
     const matchStatusProt = path.match(/^\/api\/v1\/gestao\/protocolos\/([^/]+)\/status$/);
@@ -468,7 +587,7 @@ const server = createServer(async (req, res) => {
     // 6. Módulo Painel Macro da Secretaria Municipal de Educação de Patos-PB
     if (req.method === 'GET' && path === '/api/v1/secretaria/painel') {
       exigirRateLimit(req, 'leitura', 60, 60_000);
-      exigirSessaoGestao(req, url);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
       return json(req, res, 200, await obterPainelSecretariaPatos());
     }
 
@@ -488,7 +607,39 @@ server.listen(PORT, () => {
   );
 });
 
+// Worker periódico de segundo plano para expiração de protocolos e notificações WhatsApp
+let intervaloWorker: NodeJS.Timeout | null = null;
+
+export function iniciarWorkersSegundoPlano(intervaloMs = 60_000): void {
+  if (intervaloWorker) return;
+  intervaloWorker = setInterval(async () => {
+    try {
+      const exp = await processarExpiracaoProtocolosVencidos();
+      if (exp.expirados.length > 0) {
+        invalidarSnapshotPublico();
+        for (const ev of exp.eventos) {
+          await transmitirAtualizacaoSSE(ev);
+        }
+      }
+      await processarNotificacoesWhatsApp();
+    } catch (err) {
+      console.error('[Worker Erro]', err);
+    }
+  }, intervaloMs);
+  intervaloWorker.unref();
+}
+
+export function pararWorkersSegundoPlano(): void {
+  if (intervaloWorker) {
+    clearInterval(intervaloWorker);
+    intervaloWorker = null;
+  }
+}
+
+iniciarWorkersSegundoPlano(60_000);
+
 async function encerrarServidor(): Promise<void> {
+  pararWorkersSegundoPlano();
   server.close(async () => {
     await db.fecharBanco();
     process.exit(0);
