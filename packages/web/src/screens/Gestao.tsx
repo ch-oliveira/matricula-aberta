@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Icone, IconeEtapa } from '../components/Icone';
 import { LeitorQrModal } from '../components/LeitorQrModal';
 import { toast } from '../components/Toasts';
@@ -56,6 +56,23 @@ export function Gestao() {
     }
   }, []);
 
+  // Toast discreto em telas pequenas sugerindo a aba Unidade para leitura de QR Code
+  const avisoMobileExibidoRef = useRef(false);
+  useEffect(() => {
+    if (
+      aba === 'secretaria' &&
+      !avisoMobileExibidoRef.current &&
+      typeof window !== 'undefined' &&
+      window.innerWidth <= 768
+    ) {
+      avisoMobileExibidoRef.current = true;
+      toast('Dica: para bipar QR Code no celular ou tablet, use a aba Painel da Unidade.', {
+        emoji: 'info',
+        tom: 'info',
+      });
+    }
+  }, [aba]);
+
   const authSecretaria = Boolean(sessaoSecretaria);
   const idUnidadeAtiva =
     sessaoUnidade?.escolaId ?? (authSecretaria ? escolaInspecionadaSeduc : null);
@@ -79,40 +96,6 @@ export function Gestao() {
   return (
     <div className="gestao">
       <div className="gestao-shell">
-        {/* Aviso amigável em telas pequenas se estiver na visão analítica macro da SEDUC */}
-        {aba === 'secretaria' && (
-          <aside
-            className="aviso-seduc-mobile so-mobile"
-            style={{
-              margin: '12px 16px',
-              padding: '12px 14px',
-              background: '#FFF3E0',
-              border: '2px solid #E65100',
-              borderRadius: '8px',
-              fontSize: '0.88rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-            }}
-          >
-            <strong>📱 Triagem e Atendimento no Celular / Tablet:</strong>
-            <p style={{ margin: 0, color: '#444' }}>
-              O painel da Secretaria possui tabelas completas para computadores. Para bipar QR Codes na recepção ou portaria da escola, use o <strong>Painel da Unidade</strong>.
-            </p>
-            <button
-              type="button"
-              className="btn btn-primario btn-pequeno"
-              style={{ alignSelf: 'flex-start', marginTop: '4px' }}
-              onClick={() => {
-                setAba('unidade');
-                window.history.replaceState(null, '', '#/gestao/unidade');
-              }}
-            >
-              Ir para Painel da Unidade (Leitor QR) →
-            </button>
-          </aside>
-        )}
-
         <header className="gestao-topo">
           <div className="gestao-topo-interno">
             <a className="marca" href="#">
