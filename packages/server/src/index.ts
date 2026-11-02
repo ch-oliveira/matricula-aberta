@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { LoginGestaoRequestDTO } from '../../shared/src/index.ts';
 import {
@@ -66,6 +67,19 @@ function json(req: IncomingMessage, res: ServerResponse, status: number, body: u
     'Cache-Control': 'no-store',
   });
   res.end(JSON.stringify(body));
+}
+
+interface CacheSnapshotPublico {
+  jsonString: string;
+  etag: string;
+  expiraEm: number;
+}
+
+let cacheSnapshotPublico: CacheSnapshotPublico | null = null;
+const TTL_SNAPSHOT_PUBLICO_MS = 3_500;
+
+export function invalidarSnapshotPublico(): void {
+  cacheSnapshotPublico = null;
 }
 
 const cacheTts = new Map<string, Buffer>();
@@ -160,7 +174,7 @@ const server = createServer(async (req, res) => {
 
   try {
     // 0. Healthcheck e metadados da arquitetura Monolito Modular
-    if (req.method === 'GET' && path === '/api/v1/health') {
+    if (req.method === 'GET' && (path === '/api/v1/health' || path === '/health' || path === '/')) {
       exigirRateLimit(req, 'health', 120, 60_000);
       return json(req, res, 200, {
         ok: true,
@@ -234,20 +248,73 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && path === '/api/v1/escolas') {
       exigirRateLimit(req, 'leitura', 120, 60_000);
       const sessao = extrairSessaoRequisicao(req, url);
+
+      // Cidadão comum (sem autenticação de gestão): rota mais crítica de leitura sob alta concorrência
+      if (!sessao) {
+        const agora = Date.now();
+        if (cacheSnapshotPublico && cacheSnapshotPublico.expiraEm > agora) {
+          const etagCliente = req.headers['if-none-match'];
+          if (etagCliente && etagCliente === cacheSnapshotPublico.etag) {
+            aplicarHeadersSeguranca(req, res);
+            res.writeHead(304, {
+              ETag: cacheSnapshotPublico.etag,
+              'Cache-Control': 'public, max-age=3, stale-while-revalidate=10',
+            });
+            res.end();
+            return;
+          }
+
+          aplicarHeadersSeguranca(req, res);
+          res.writeHead(200, {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Cache-Control': 'public, max-age=3, stale-while-revalidate=10',
+            ETag: cacheSnapshotPublico.etag,
+          });
+          res.end(cacheSnapshotPublico.jsonString);
+          return;
+        }
+
+        const [catalogo, escolas, historico] = await Promise.all([
+          obterCatalogoMunicipio(),
+          listarEscolas(),
+          listarHistorico(40),
+        ]);
+
+        const bodyObj = { catalogo, escolas, historico };
+        const jsonString = JSON.stringify(bodyObj);
+        const etag = `"${createHash('md5').update(jsonString).digest('hex').slice(0, 16)}"`;
+
+        cacheSnapshotPublico = {
+          jsonString,
+          etag,
+          expiraEm: agora + TTL_SNAPSHOT_PUBLICO_MS,
+        };
+
+        aplicarHeadersSeguranca(req, res);
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=3, stale-while-revalidate=10',
+          ETag: etag,
+        });
+        res.end(jsonString);
+        return;
+      }
+
+      // Usuário autenticado da Gestão (SEDUC / Unidade): hidratação completa
       const [catalogo, escolas, historico, protocolos, secretaria] = await Promise.all([
         obterCatalogoMunicipio(),
         listarEscolas(),
         listarHistorico(40),
-        sessao ? listarProtocolos() : Promise.resolve(undefined),
-        sessao ? obterPainelSecretariaPatos() : Promise.resolve(undefined),
+        listarProtocolos(),
+        obterPainelSecretariaPatos(),
       ]);
 
       return json(req, res, 200, {
         catalogo,
         escolas,
         historico,
-        ...(protocolos ? { protocolos } : {}),
-        ...(secretaria ? { secretaria } : {}),
+        protocolos,
+        secretaria,
       });
     }
 
@@ -270,6 +337,7 @@ const server = createServer(async (req, res) => {
 
       if (!escola) return json(req, res, 404, { erro: 'Unidade ou oferta não encontrada em Patos-PB.' });
 
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE(evento ?? undefined);
       return json(req, res, 200, { ok: true, escola, evento });
     }
@@ -281,6 +349,7 @@ const server = createServer(async (req, res) => {
       exigirSessaoGestao(req, url, { escolaId });
       const ok = await confirmarUnidade(escolaId);
       if (!ok) return json(req, res, 404, { erro: 'Unidade não encontrada.' });
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE();
       return json(req, res, 200, { ok: true });
     }
@@ -289,6 +358,7 @@ const server = createServer(async (req, res) => {
       exigirRateLimit(req, 'gestao-reset', 5, 60_000);
       exigirSessaoGestao(req, url, { perfil: 'secretaria' });
       await inicializarBancoPatos(true);
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE();
       return json(req, res, 200, { ok: true, escolas: await listarEscolas() });
     }
@@ -305,6 +375,7 @@ const server = createServer(async (req, res) => {
       const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
       const payload = validarPayloadAlerta(bodyRaw);
       const alerta = await criarAlerta(payload);
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE();
       return json(req, res, 201, { ok: true, alerta });
     }
@@ -328,6 +399,7 @@ const server = createServer(async (req, res) => {
       }
 
       await removerAlerta(id);
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE();
       return json(req, res, 200, { ok: true });
     }
@@ -359,6 +431,7 @@ const server = createServer(async (req, res) => {
 
       if (!protocolo) return json(req, res, 404, { erro: 'Unidade escolar não encontrada.' });
 
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE();
       return json(req, res, 201, { ok: true, protocolo });
     }
@@ -387,6 +460,7 @@ const server = createServer(async (req, res) => {
       const { protocolo, evento } = await atualizarStatusProtocolo(codigo, body.status);
       if (!protocolo) return json(req, res, 404, { erro: 'Protocolo não encontrado.' });
 
+      invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE(evento ?? undefined);
       return json(req, res, 200, { ok: true, protocolo, evento });
     }

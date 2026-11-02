@@ -10,7 +10,7 @@ import {
 } from '../../../../shared/src/index.ts';
 import { db } from '../../infra/db.ts';
 import { mascararTelefoneLGPD } from '../alertas/alertas.module.ts';
-import { atualizarOfertaUnidade } from '../unidades/unidades.module.ts';
+import { atualizarOfertaUnidade, invalidarCacheEscolas } from '../unidades/unidades.module.ts';
 
 interface LinhaProtocoloDB {
   codigo: string;
@@ -278,6 +278,7 @@ export async function criarProtocoloVisita(dados: {
     ],
   );
 
+  invalidarCacheEscolas();
   return obterProtocoloPorCodigo(codigo);
 }
 
@@ -293,6 +294,7 @@ export async function atualizarStatusProtocolo(
     'UPDATE protocolos_visita SET status = $1, atendido_em = $2 WHERE codigo = $3',
     [novoStatus, novoStatus === 'atendido' ? agora : null, atual.codigo],
   );
+  invalidarCacheEscolas();
 
   let evento: EventoVaga | null = null;
 

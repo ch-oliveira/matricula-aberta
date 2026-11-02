@@ -46,6 +46,7 @@ const DOCUMENTOS_INICIAL: Documento[] = [
 ];
 
 export async function garantirSeedCatalogoPatos(): Promise<void> {
+  invalidarCacheCatalogo();
   const rowBairros = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM bairros_patos');
   const qtdBairros = Number(rowBairros?.c ?? 0);
   if (qtdBairros === 0) {
@@ -124,15 +125,27 @@ export async function listarDocumentosCatalogo(): Promise<Documento[]> {
   }));
 }
 
+let catalogoCache: CatalogoMunicipioDTO | null = null;
+
+export function invalidarCacheCatalogo(): void {
+  catalogoCache = null;
+}
+
 export async function obterCatalogoMunicipio(): Promise<CatalogoMunicipioDTO> {
+  if (catalogoCache) {
+    return catalogoCache;
+  }
+
   const [bairros, documentos] = await Promise.all([
     listarBairrosPatos(),
     listarDocumentosCatalogo(),
   ]);
 
-  return {
+  catalogoCache = {
     ...MUNICIPIO_PATOS_META,
     bairros,
     documentos,
   };
+
+  return catalogoCache;
 }

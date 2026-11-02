@@ -7,6 +7,7 @@
     "dev": "node --no-warnings --watch --experimental-strip-types --experimental-sqlite src/index.ts",
     "start": "node --no-warnings --experimental-strip-types --experimental-sqlite src/index.ts",
     "test": "node --no-warnings test/api.test.mjs",
+    "test:load": "node --no-warnings test/load-test.mjs",
     "typecheck": "../web/node_modules/.bin/tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

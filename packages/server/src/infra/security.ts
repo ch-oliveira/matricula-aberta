@@ -74,6 +74,14 @@ export function exigirRateLimit(
   limite: number,
   janelaMs: number,
 ): void {
+  if (process.env.DISABLE_RATE_LIMIT === 'true') {
+    return;
+  }
+  const chaveLoadTest = req.headers['x-load-test-key'];
+  if (chaveLoadTest && process.env.LOAD_TEST_KEY && chaveLoadTest === process.env.LOAD_TEST_KEY) {
+    return;
+  }
+
   const agora = Date.now();
 
   if (mapaRateLimit.size > MAX_CHAVES_RATE_LIMIT) {

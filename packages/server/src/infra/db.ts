@@ -59,6 +59,7 @@ function obterPgPool(): pg.Pool {
       max: Number(process.env.PG_MAX_POOL ?? 10),
       connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 30000,
+      statement_timeout: 5000,
       ssl: isLocalhost ? false : { rejectUnauthorized: false },
     });
 
@@ -309,7 +310,10 @@ export async function inicializarSchema(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_historico_em ON historico_vagas(em DESC);
     CREATE INDEX IF NOT EXISTS idx_alertas_etapa ON alertas(etapa);
+    CREATE INDEX IF NOT EXISTS idx_alertas_expira ON alertas(expira_em);
     CREATE INDEX IF NOT EXISTS idx_protocolos_escola ON protocolos_visita(escola_id, criado_em DESC);
+    CREATE INDEX IF NOT EXISTS idx_protocolos_status_escola ON protocolos_visita(status, escola_id);
+    CREATE INDEX IF NOT EXISTS idx_ofertas_escola ON ofertas(escola_id);
   `;
 
   await execScript(schemaSql);

@@ -247,7 +247,15 @@ export function construirUnidadesPatosInicial(): Escola[] {
   ];
 }
 
+let cacheEscolas: { escolas: Escola[]; expiraEm: number } | null = null;
+const TTL_CACHE_ESCOLAS_MS = 3_000;
+
+export function invalidarCacheEscolas(): void {
+  cacheEscolas = null;
+}
+
 export async function popularUnidadesPatos(forcarReset = false): Promise<void> {
+  invalidarCacheEscolas();
   const rowCount = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM escolas');
   const count = Number(rowCount?.c ?? 0);
   if (count > 0 && !forcarReset) return;
@@ -306,6 +314,11 @@ export async function popularUnidadesPatos(forcarReset = false): Promise<void> {
 }
 
 export async function listarEscolas(): Promise<Escola[]> {
+  const agora = Date.now();
+  if (cacheEscolas && cacheEscolas.expiraEm > agora) {
+    return cacheEscolas.escolas;
+  }
+
   const [rowsEscolas, rowsOfertas, rowsAlertas, rowsProtPendentes] = await Promise.all([
     db.query<{
       id: string;
@@ -358,7 +371,7 @@ export async function listarEscolas(): Promise<Escola[]> {
     porEscola.set(r.escola_id, lista);
   }
 
-  return rowsEscolas.map((e) => {
+  const resultado: Escola[] = rowsEscolas.map((e) => {
     const ofertas = porEscola.get(e.id) ?? [];
     const etapasDaEscola = new Set(ofertas.map((o) => o.etapa));
 
@@ -392,6 +405,13 @@ export async function listarEscolas(): Promise<Escola[]> {
       protocolosPendentes: protPorEscola.get(e.id) ?? 0,
     };
   });
+
+  cacheEscolas = {
+    escolas: resultado,
+    expiraEm: agora + TTL_CACHE_ESCOLAS_MS,
+  };
+
+  return resultado;
 }
 
 export async function listarHistorico(limite = 40): Promise<EventoVaga[]> {
@@ -485,12 +505,14 @@ export async function atualizarOfertaUnidade(params: {
     }
   });
 
+  invalidarCacheEscolas();
   const todas = await listarEscolas();
   const escola = todas.find((e) => e.id === params.escolaId) ?? null;
   return { escola, evento };
 }
 
 export async function confirmarUnidade(escolaId: string): Promise<boolean> {
+  invalidarCacheEscolas();
   const res = await db.execute('UPDATE escolas SET atualizado_em = $1 WHERE id = $2', [Date.now(), escolaId]);
   return res.changes > 0;
 }

@@ -13,6 +13,7 @@
     "typecheck": "npm --prefix packages/server run typecheck && packages/web/node_modules/.bin/tsc --project packages/web/tsconfig.json --noEmit",
     "build": "npm run typecheck && npm --prefix packages/web run build && rm -rf ./dist && cp -r packages/web/dist ./dist",
     "test": "npm --prefix packages/server test",
+    "test:load": "npm --prefix packages/server run test:load",
     "start": "npm --prefix packages/server run start"
   },
   "dependencies": {

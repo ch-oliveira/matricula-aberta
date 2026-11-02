@@ -2,6 +2,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 import type { Alerta, Canal, EtapaId, Periodo } from '../../../../shared/src/index.ts';
 import { gerarTokenCancelamentoAlerta } from '../../infra/auth.ts';
 import { db } from '../../infra/db.ts';
+import { invalidarCacheEscolas } from '../unidades/unidades.module.ts';
 
 const NOVENTA_DIAS_MS = 90 * 24 * 3600 * 1000;
 const LGPD_SALT = (process.env.LGPD_HASH_SALT ?? 'ma-lgpd-patos-pb-2510808').trim();
@@ -221,6 +222,8 @@ export async function criarAlerta(dados: {
     ],
   );
 
+  invalidarCacheEscolas();
+
   return {
     id,
     canal: dados.canal,
@@ -238,5 +241,9 @@ export async function criarAlerta(dados: {
 
 export async function removerAlerta(id: string): Promise<boolean> {
   const res = await db.execute('DELETE FROM alertas WHERE id = $1', [id]);
-  return res.changes > 0;
+  if (res.changes > 0) {
+    invalidarCacheEscolas();
+    return true;
+  }
+  return false;
 }
