@@ -28,8 +28,8 @@ const DATABASE_URL = (
   ''
 ).trim();
 
-export const ehPostgres = Boolean(DATABASE_URL);
-export const tipoBanco: TipoBanco = ehPostgres ? 'postgres' : 'sqlite';
+export let ehPostgres = Boolean(DATABASE_URL);
+export let tipoBanco: TipoBanco = ehPostgres ? 'postgres' : 'sqlite';
 
 let pgPool: pg.Pool | null = null;
 let sqliteDb: DatabaseSync | null = null;
@@ -316,12 +316,32 @@ export async function inicializarSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_ofertas_escola ON ofertas(escola_id);
   `;
 
+  if (ehPostgres) {
+    try {
+      const pool = obterPgPool();
+      const client = await pool.connect();
+      client.release();
+      await execScript(schemaSql);
+      return;
+    } catch (err: any) {
+      console.error(
+        `[PostgreSQL Fallback] Falha ao autenticar/conectar no PostgreSQL (${err?.message || err}). Ativando fallback automático para SQLite WAL!`,
+      );
+      if (pgPool) {
+        await pgPool.end().catch(() => {});
+        pgPool = null;
+      }
+      ehPostgres = false;
+      tipoBanco = 'sqlite';
+    }
+  }
+
   await execScript(schemaSql);
 }
 
 export async function fecharBanco(): Promise<void> {
   if (pgPool) {
-    await pgPool.end();
+    await pgPool.end().catch(() => {});
     pgPool = null;
   }
   if (sqliteDb) {
@@ -338,6 +358,10 @@ export const db = {
   transaction,
   fecharBanco,
   inicializarSchema,
-  tipoBanco,
-  ehPostgres,
+  get tipoBanco() {
+    return tipoBanco;
+  },
+  get ehPostgres() {
+    return ehPostgres;
+  },
 };
