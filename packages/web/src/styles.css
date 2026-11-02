@@ -1195,12 +1195,18 @@ h1:focus {
   grid-template-columns: minmax(0, 1fr) 330px;
   gap: 24px;
   align-items: start;
+  min-inline-size: 0;
+  width: 100%;
 }
 
 .consulta-principal {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-inline-size: 0;
+  min-width: 0;
+  max-inline-size: 100%;
+  width: 100%;
 }
 
 .palco-etapa {
@@ -1212,11 +1218,16 @@ h1:focus {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  min-inline-size: 0;
+  min-width: 0;
+  max-inline-size: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 940px) {
   .consulta-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
   .palco-etapa {
     padding: 20px 16px;
@@ -1524,6 +1535,25 @@ legend {
 .chips-iguais {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+}
+.chips-raio {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.chips-raio .chip span {
+  padding-inline: 4px;
+}
+.chips-periodo {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.chips-periodo .chip span {
+  padding-inline: 4px;
+  gap: 4px;
 }
 .chip {
   position: relative;
@@ -4471,17 +4501,50 @@ td.vis-desktop {
 @media (max-width: 720px) {
   .onde-filtros-duplos {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .mapa-patos-barra-topo {
+    gap: 6px;
+  }
+  .mapa-patos-legenda {
+    gap: 8px;
+    font-size: 0.74rem;
+  }
+  .btn-gps-compacto {
+    min-block-size: 32px;
+    padding-inline: 10px;
+    font-size: 0.78rem;
+    border-width: 1.5px;
   }
   .mapa-patos-palco {
-    aspect-ratio: 4 / 3.1;
+    aspect-ratio: 10 / 8;
+    min-block-size: 280px;
   }
   .pino-bairro {
-    min-block-size: 30px;
-    padding: 2px 7px;
+    min-block-size: 26px;
+    padding: 2px 6px;
     gap: 3px;
+    font-size: 0.7rem;
+    border-width: 1.5px;
+    box-shadow: 1.5px 1.5px 0 #181528;
+  }
+  .pino-icone {
+    font-size: 0.78rem;
   }
   .pino-nome {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
+    font-weight: 800;
+  }
+  .pino-ponto {
+    min-inline-size: 16px;
+    block-size: 16px;
+    padding-inline: 3px;
+    font-size: 0.62rem;
+  }
+  .pino-selecionado {
+    box-shadow: 0 0 0 2.5px #ffd24c, 2.5px 2.5px 0 #181528;
+    transform: translate(-50%, -50%) scale(1.08);
+    z-index: 10;
   }
 }
 
@@ -4862,31 +4925,53 @@ td.vis-desktop {
 
   /* --- Wizard de Consulta: Stepper & Palco --- */
   .stepper {
-    padding: 6px 6px;
+    padding: 6px 4px;
     border-radius: var(--r-sm);
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    width: 100%;
+    box-sizing: border-box;
   }
   .stepper ol {
     gap: 3px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-inline-size: 0;
+    width: 100%;
+  }
+  .passo {
+    min-inline-size: 0;
   }
   .passo button {
     flex-direction: column;
     text-align: center;
-    gap: 3px;
-    padding: 4px 2px;
+    gap: 2px;
+    padding: 4px 1px;
     border-radius: 8px;
-    min-block-size: 42px;
+    min-block-size: 38px;
     justify-content: center;
+    min-inline-size: 0;
+    width: 100%;
   }
   .passo-bolha {
-    inline-size: 26px;
-    block-size: 26px;
-    font-size: 0.74rem;
-    border-radius: 8px;
+    inline-size: 24px;
+    block-size: 24px;
+    font-size: 0.72rem;
+    border-radius: 7px;
     border-width: 1.5px;
   }
+  .passo-textos {
+    min-inline-size: 0;
+    width: 100%;
+    text-align: center;
+  }
   .passo-rotulo {
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    width: 100%;
   }
   .passo-desc {
     display: none;
@@ -4897,10 +4982,19 @@ td.vis-desktop {
     gap: 14px;
     border-radius: var(--r-sm);
     border-width: 2px;
-    box-shadow: var(--shadow);
+    box-shadow: 2.5px 2.5px 0 var(--shadow-ink);
+    min-inline-size: 0;
+    min-width: 0;
+    max-inline-size: 100%;
+    width: 100%;
+    box-sizing: border-box;
   }
   .etapa {
     gap: 14px;
+    min-inline-size: 0;
+    min-width: 0;
+    max-inline-size: 100%;
+    width: 100%;
   }
   .titulo-etapa {
     gap: 8px;
@@ -4923,9 +5017,10 @@ td.vis-desktop {
     line-height: 1.38;
   }
   .btn-ouvir {
-    min-block-size: 34px;
-    padding-inline: 10px;
-    font-size: 0.8rem;
+    min-block-size: 30px;
+    padding-inline: 9px;
+    font-size: 0.76rem;
+    box-shadow: 1px 1px 0 var(--line);
   }
 
   /* Etapa 1: Quem vai estudar? */
@@ -4937,48 +5032,69 @@ td.vis-desktop {
   }
   .campo input,
   .campo select {
-    min-block-size: 46px;
-    padding: 8px 12px;
-    font-size: 0.94rem;
+    min-block-size: 44px;
+    padding: 8px 10px;
+    font-size: 0.92rem;
     border-radius: var(--r-sm);
+    box-sizing: border-box;
+    width: 100%;
+    max-inline-size: 100%;
   }
   .atalhos-idade-container {
     gap: 6px;
+    min-inline-size: 0;
+    width: 100%;
   }
   .atalhos-idade-rotulo {
     font-size: 0.8rem;
   }
   .atalhos-idade-grade {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
+    min-inline-size: 0;
+    width: 100%;
   }
   .btn-atalho-idade {
+    min-inline-size: 0;
     width: 100%;
-    padding: 7px 8px;
+    padding: 6px 8px;
     font-size: 0.78rem;
     gap: 4px;
-    justify-content: space-between;
+    justify-content: flex-start;
     box-shadow: 1.5px 1.5px 0 var(--line);
     border-radius: 9px;
     min-block-size: 38px;
+    box-sizing: border-box;
   }
   .btn-atalho-idade:last-child:nth-child(odd) {
     grid-column: 1 / -1;
+    max-inline-size: 260px;
+    margin-inline: auto;
+    width: 100%;
+    justify-content: center;
   }
   .btn-atalho-idade strong {
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .btn-atalho-idade small {
     font-size: 0.68rem;
     padding: 1px 5px;
     white-space: nowrap;
+    flex-shrink: 0;
+    margin-inline-start: auto;
+  }
+  .btn-atalho-idade:last-child:nth-child(odd) small {
+    margin-inline-start: 0;
   }
 
   .grade-etapas {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
+    min-inline-size: 0;
   }
   .grade-etapas legend {
     font-size: 0.82rem;
@@ -4989,9 +5105,13 @@ td.vis-desktop {
     gap: 3px;
     border-radius: var(--r-sm);
     border-width: 1.5px;
+    min-inline-size: 0;
   }
   .chip-etapa:last-child:nth-child(odd) {
     grid-column: 1 / -1;
+    max-inline-size: 260px;
+    margin-inline: auto;
+    width: 100%;
   }
   .chip-etapa-emoji {
     font-size: 1.22rem;
@@ -5010,24 +5130,35 @@ td.vis-desktop {
     font-size: 0.7rem;
   }
 
-  /* Barra de Navegação Inferior (Thumb-first) */
+  /* Barra de Navegação Inferior Elegante (Lado a Lado no Mobile) */
   .barra-acao {
-    flex-direction: column-reverse;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
     padding-block-start: 12px;
     margin-block-start: 2px;
+    width: 100%;
+    min-inline-size: 0;
   }
   .barra-acao .btn {
-    width: 100%;
-    min-block-size: 46px;
+    min-block-size: 42px;
+    font-size: 0.88rem;
+    padding-inline: 12px;
     justify-content: center;
-    font-size: 0.94rem;
-    padding-inline: 14px;
+    white-space: nowrap;
+    box-sizing: border-box;
   }
   .barra-acao .btn-fantasma {
-    min-block-size: 38px;
-    font-size: 0.86rem;
-    box-shadow: none;
+    flex: 0 0 auto;
+    min-block-size: 42px;
+    font-size: 0.82rem;
+    padding-inline: 10px;
+    box-shadow: 1.5px 1.5px 0 var(--shadow-ink);
+  }
+  .barra-acao .btn-crescer {
+    flex: 1;
+    min-inline-size: 0;
   }
 
   /* Painéis Laterais Compactados no Mobile */
@@ -5093,10 +5224,35 @@ td.vis-desktop {
   .chips {
     gap: 6px;
   }
+  .chips-raio {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  .chips-raio .chip span {
+    min-block-size: 38px;
+    padding-inline: 2px;
+    font-size: 0.82rem;
+    justify-content: center;
+  }
+  .chips-periodo {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  .chips-periodo .chip span {
+    min-block-size: 38px;
+    padding-inline: 2px;
+    font-size: 0.78rem;
+    gap: 3px;
+    justify-content: center;
+  }
   .chip span {
-    min-block-size: 40px;
-    padding: 6px 12px;
-    font-size: 0.86rem;
+    min-block-size: 38px;
+    padding: 6px 10px;
+    font-size: 0.84rem;
   }
 
   /* Etapa 3: Vagas */

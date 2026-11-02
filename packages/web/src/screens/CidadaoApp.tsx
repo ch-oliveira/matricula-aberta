@@ -365,17 +365,27 @@ export function CidadaoApp() {
                         className="btn btn-fantasma"
                         onClick={() => transicionar(() => setModo('landing'))}
                       >
-                        <span aria-hidden="true">←</span> Visão geral
+                        <span aria-hidden="true">←</span> <span className="btn-texto-voltar">Início</span>
                       </button>
                     ) : (
                       <button type="button" className="btn btn-fantasma" onClick={() => ir(passo - 1)}>
-                        <span aria-hidden="true">←</span> Voltar
+                        <span aria-hidden="true">←</span> <span className="btn-texto-voltar">Voltar</span>
                       </button>
                     )}
 
                     {passo < 2 && (
                       <button type="button" className="btn btn-primario btn-crescer" onClick={avancar}>
-                        {passo === 0 ? 'Continuar para seu bairro em Patos' : 'Ver vagas disponíveis'}{' '}
+                        {passo === 0 ? (
+                          <>
+                            <span>Continuar</span>
+                            <span className="so-desktop"> para seu bairro</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Ver vagas</span>
+                            <span className="so-desktop"> disponíveis</span>
+                          </>
+                        )}{' '}
                         <span aria-hidden="true">→</span>
                       </button>
                     )}
@@ -391,7 +401,7 @@ export function CidadaoApp() {
                 {passo === 2 && comparar.length === 0 && (
                   <div className="barra-acao">
                     <button type="button" className="btn btn-fantasma" onClick={() => ir(1)}>
-                      <span aria-hidden="true">←</span> Alterar bairro
+                      <span aria-hidden="true">←</span> <span className="btn-texto-voltar">Bairros</span>
                     </button>
                     <button
                       type="button"

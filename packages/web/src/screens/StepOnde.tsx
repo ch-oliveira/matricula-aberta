@@ -100,7 +100,7 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
       <div className="onde-filtros-duplos">
         <fieldset className="grupo">
           <legend>Até que distância?</legend>
-          <div className="chips chips-iguais">
+          <div className="chips chips-iguais chips-raio">
             {RAIOS.map((r) => (
               <label key={r} className="chip">
                 <input
@@ -117,7 +117,7 @@ export function StepOnde({ busca, setBusca, ajudante, erro }: Props) {
 
         <fieldset className="grupo">
           <legend>Qual período?</legend>
-          <div className="chips chips-iguais">
+          <div className="chips chips-iguais chips-periodo">
             {(
               [
                 ['tanto-faz', 'clock', 'Tanto faz'],
