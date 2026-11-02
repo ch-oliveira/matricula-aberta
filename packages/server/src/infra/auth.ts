@@ -270,3 +270,22 @@ export function verificarTokenCancelamentoAlerta(
   return bufRec.length === bufEsp.length && timingSafeEqual(bufRec, bufEsp);
 }
 
+export function gerarTokenCancelamentoProtocolo(codigo: string): string {
+  return createHmac('sha256', AUTH_SECRET)
+    .update(`cancelar-protocolo:${codigo.trim().toUpperCase()}`)
+    .digest('base64url')
+    .slice(0, 28);
+}
+
+export function verificarTokenCancelamentoProtocolo(
+  codigo: string,
+  tokenRecebido?: string | null,
+): boolean {
+  if (!tokenRecebido || typeof tokenRecebido !== 'string') return false;
+  const esperado = gerarTokenCancelamentoProtocolo(codigo);
+  const bufRec = Buffer.from(tokenRecebido.trim());
+  const bufEsp = Buffer.from(esperado);
+  return bufRec.length === bufEsp.length && timingSafeEqual(bufRec, bufEsp);
+}
+
+

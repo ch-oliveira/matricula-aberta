@@ -33,17 +33,28 @@ export function StepVagas(p: Props) {
   const [ordem, setOrdem] = useState<Ordem>('distancia');
   const [soComVaga, setSoComVaga] = useState(false);
   const [vista, setVista] = useState<'lista' | 'mapa'>('lista');
+  const [termoBusca, setTermoBusca] = useState('');
 
   const todos = useMemo(() => buscar(escolas, busca), [escolas, busca]);
   const res = useMemo(() => resumo(todos), [todos]);
   const lista = useMemo(() => {
-    const l = soComVaga ? todos.filter((r) => r.status !== 'espera') : [...todos];
+    let l = soComVaga ? todos.filter((r) => r.status !== 'espera') : [...todos];
+    if (termoBusca.trim()) {
+      const q = termoBusca.trim().toLowerCase();
+      l = l.filter(
+        (r) =>
+          r.escola.nome.toLowerCase().includes(q) ||
+          r.escola.bairro.toLowerCase().includes(q) ||
+          r.escola.endereco.toLowerCase().includes(q) ||
+          r.escola.tipo.toLowerCase().includes(q),
+      );
+    }
     return l.sort((a: Resultado, b: Resultado) =>
       ordem === 'vagas'
         ? b.oferta.vagas - a.oferta.vagas || a.distanciaKm - b.distanciaKm
         : PESO[a.status] - PESO[b.status] || a.distanciaKm - b.distanciaKm,
     );
-  }, [todos, ordem, soComVaga]);
+  }, [todos, ordem, soComVaga, termoBusca]);
 
   const etapa = busca.etapa ? ETAPAS[busca.etapa] : null;
   const proximoRaio = [2, 3, 5, 8].find((r) => r > busca.raioKm);
@@ -109,6 +120,39 @@ export function StepVagas(p: Props) {
           <li className="s-ultimas"><IconeStatus status="ultimas" tamanho={16} /> <strong>{res.ultimas}</strong> últimas</li>
           <li className="s-espera"><IconeStatus status="espera" tamanho={16} /> <strong>{res.espera}</strong> em espera</li>
         </ul>
+      </div>
+
+      <div className="busca-escola-rapida" style={{ margin: '14px 0 10px 0' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <span style={{ position: 'absolute', left: '12px', color: 'var(--muted)', pointerEvents: 'none', display: 'flex' }}>
+            <Icone nome="search" tamanho={16} />
+          </span>
+          <input
+            type="search"
+            placeholder="Pesquisar por nome da escola, creche ou rua em Patos…"
+            value={termoBusca}
+            onChange={(e) => setTermoBusca(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px 10px 38px',
+              borderRadius: '8px',
+              border: '2px solid var(--line)',
+              background: 'var(--surface)',
+              fontSize: '0.92rem',
+              fontWeight: 500,
+            }}
+          />
+          {termoBusca && (
+            <button
+              type="button"
+              onClick={() => setTermoBusca('')}
+              style={{ position: 'absolute', right: '10px', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
+              aria-label="Limpar busca"
+            >
+              <Icone nome="x" tamanho={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="barra-ferramentas">

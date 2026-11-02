@@ -664,6 +664,7 @@ export const vagasStore = {
     dataVisita: string;
     documentosMarcados: string[];
     totalObrigatorios: number;
+    documentoEstudante?: string;
   }): Promise<ProtocoloVisita> {
     const res = await fetch(`${API_BASE}/api/v1/protocolos`, {
       method: 'POST',
@@ -672,6 +673,25 @@ export const vagasStore = {
     });
     if (!res.ok) {
       const msg = await extrairMensagemErro(res, 'Não foi possível emitir o protocolo.');
+      throw new Error(msg);
+    }
+    const json = (await res.json()) as { protocolo: ProtocoloVisita };
+    mesclarProtocolos([json.protocolo]);
+    emitir();
+    return json.protocolo;
+  },
+
+  async cancelarProtocoloPorCidadao(codigo: string, token: string): Promise<ProtocoloVisita> {
+    const res = await fetch(`${API_BASE}/api/v1/protocolos/${encodeURIComponent(codigo)}/cancelar`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-protocolo-token': token,
+      },
+      body: JSON.stringify({ token }),
+    });
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao cancelar o agendamento.');
       throw new Error(msg);
     }
     const json = (await res.json()) as { protocolo: ProtocoloVisita };

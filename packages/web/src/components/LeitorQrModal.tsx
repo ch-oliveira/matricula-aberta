@@ -261,6 +261,84 @@ export function LeitorQrModal({
     }
   }
 
+  function imprimirTermoEfetivacao() {
+    if (!protocoloEncontrado) return;
+    const p = protocoloEncontrado;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>Termo de Matrícula - ${p.codigo}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; padding: 40px; color: #171625; max-width: 760px; margin: 0 auto; line-height: 1.5; }
+          .header { text-align: center; border-bottom: 3px solid #171625; padding-bottom: 16px; margin-bottom: 24px; }
+          .header h1 { margin: 0; font-size: 20px; text-transform: uppercase; }
+          .header h2 { margin: 4px 0 0; font-size: 16px; font-weight: 600; }
+          .badge { display: inline-block; background: #E8F5E9; border: 2px solid #2E7D32; color: #1B5E20; padding: 6px 14px; border-radius: 6px; font-weight: bold; margin: 16px 0; font-size: 14px; }
+          .dados { border: 1.5px solid #171625; border-radius: 8px; padding: 18px; margin: 20px 0; }
+          .dados table { width: 100%; border-collapse: collapse; }
+          .dados td { padding: 8px 4px; vertical-align: top; }
+          .dados td.label { font-weight: bold; width: 35%; color: #444; }
+          .assinaturas { margin-top: 60px; display: flex; justify-content: space-between; }
+          .assinatura { width: 45%; text-align: center; border-top: 1.5px solid #171625; padding-top: 8px; font-size: 13px; }
+          .rodape { margin-top: 50px; text-align: center; font-size: 11px; color: #777; border-top: 1px dashed #ccc; padding-top: 12px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Prefeitura Municipal de Patos - PB</h1>
+          <h2>Secretaria Municipal de Educação (SEDUC)</h2>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #555;">Matrícula Aberta · Comprovante Oficial de Comparecimento e Efetivação</p>
+        </div>
+
+        <div style="text-align: center;">
+          <span class="badge">✓ MATRÍCULA EFETIVADA COM SUCESSO</span>
+          <p style="font-size: 22px; font-weight: 900; margin: 8px 0; font-family: monospace;">PROTOCOLO: ${p.codigo}</p>
+        </div>
+
+        <div class="dados">
+          <table>
+            <tr><td class="label">Unidade Escolar:</td><td><strong>${p.escolaNome}</strong></td></tr>
+            <tr><td class="label">Endereço da Unidade:</td><td>${p.escolaEndereco} (${p.escolaBairro})</td></tr>
+            <tr><td class="label">Responsável Legal:</td><td>${p.responsavel}</td></tr>
+            <tr><td class="label">Telefone / WhatsApp:</td><td>${p.telefone ?? 'Não informado'}</td></tr>
+            <tr><td class="label">Turma e Etapa:</td><td><strong>${p.turma}</strong> (${p.periodo === 'integral' ? 'Período Integral' : 'Meio Período'})</td></tr>
+            <tr><td class="label">Documentos Apresentados:</td><td>${p.documentosMarcados.length} de ${p.totalObrigatorios} exigidos na Rede de Patos - PB</td></tr>
+            <tr><td class="label">Data de Efetivação:</td><td>${new Date().toLocaleString('pt-BR')}</td></tr>
+          </table>
+        </div>
+
+        <p style="font-size: 13px; color: #444; line-height: 1.4;">
+          Atestamos que o(a) responsável acima identificado(a) compareceu presencialmente à unidade escolar munido(a) da documentação exigida, efetivando a vaga solicitada para o ano letivo correspondente.
+        </p>
+
+        <div class="assinaturas">
+          <div class="assinatura">
+            <strong>${p.responsavel}</strong><br />
+            Responsável Legal
+          </div>
+          <div class="assinatura">
+            <strong>Secretaria / Direção Escolar</strong><br />
+            ${p.escolaNome}
+          </div>
+        </div>
+
+        <div class="rodape">
+          Documento emitido eletronicamente via Sistema Matrícula Aberta (Patos - PB) em ${new Date().toLocaleString('pt-BR')}.
+        </div>
+        <script>
+          window.print();
+        </script>
+      </body>
+      </html>
+    `);
+    win.document.close();
+  }
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="t-leitor-qr">
       <div className="modal-conteudo leitor-qr-modal">
@@ -395,9 +473,20 @@ export function LeitorQrModal({
                 )}
 
                 {protocoloEncontrado.status === 'atendido' && (
-                  <div className="leitor-confirmado-msg">
-                    <Icone nome="check-circle" tamanho={20} />
-                    <span>Matrícula vinculada com sucesso! Vaga contabilizada no sistema.</span>
+                  <div className="leitor-confirmado-msg" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Icone nome="check-circle" tamanho={20} />
+                      <span>Matrícula vinculada com sucesso! Vaga contabilizada no sistema.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primario"
+                      onClick={imprimirTermoEfetivacao}
+                      style={{ alignSelf: 'flex-start' }}
+                    >
+                      <Icone nome="printer" tamanho={16} />
+                      <span>Imprimir Termo de Efetivação</span>
+                    </button>
                   </div>
                 )}
 

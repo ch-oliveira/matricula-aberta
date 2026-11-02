@@ -9,6 +9,7 @@ import {
   exigirSessaoGestao,
   extrairSessaoRequisicao,
   verificarTokenCancelamentoAlerta,
+  verificarTokenCancelamentoProtocolo,
 } from './infra/auth.ts';
 import { db } from './infra/db.ts';
 import {
@@ -39,6 +40,7 @@ import {
 } from './modules/notificacoes/notificacoes.module.ts';
 import {
   atualizarStatusProtocolo,
+  cancelarProtocoloPorCidadao,
   criarProtocoloVisita,
   garantirSeedProtocolosPatos,
   listarProtocolos,
@@ -531,6 +533,80 @@ const server = createServer(async (req, res) => {
       invalidarSnapshotPublico();
       await transmitirAtualizacaoSSE(evento ?? undefined);
       return json(req, res, 201, { ok: true, protocolo, evento });
+    }
+
+    // Cancelamento de protocolo pelo próprio cidadão com liberação imediata da vaga
+    const matchCancelProt =
+      path.match(/^\/api\/v1\/protocolos\/([^/]+)\/cancelar$/) ||
+      (req.method === 'DELETE' && path.match(/^\/api\/v1\/protocolos\/([^/]+)$/));
+    if (matchCancelProt && (req.method === 'POST' || req.method === 'DELETE')) {
+      exigirRateLimit(req, 'cancelar-protocolo', 20, 60_000);
+      const codigo = decodeURIComponent(matchCancelProt[1]).trim();
+      const tokenHeader =
+        typeof req.headers['x-protocolo-token'] === 'string'
+          ? req.headers['x-protocolo-token']
+          : url.searchParams.get('token');
+
+      const sessaoGestao = extrairSessaoRequisicao(req, url);
+      let resCancel: { protocolo: any; evento: any };
+
+      if (tokenHeader && verificarTokenCancelamentoProtocolo(codigo, tokenHeader)) {
+        resCancel = await cancelarProtocoloPorCidadao(codigo, tokenHeader);
+      } else if (sessaoGestao) {
+        resCancel = await atualizarStatusProtocolo(codigo, 'cancelado', 'cancelado_gestor');
+      } else {
+        return json(req, res, 403, {
+          erro: 'Token de cancelamento do protocolo inválido ou ausente.',
+        });
+      }
+
+      if (!resCancel.protocolo) {
+        return json(req, res, 404, { erro: 'Protocolo não encontrado.' });
+      }
+
+      invalidarSnapshotPublico();
+      if (resCancel.evento) {
+        await transmitirAtualizacaoSSE(resCancel.evento);
+      }
+      return json(req, res, 200, { ok: true, protocolo: resCancel.protocolo });
+    }
+
+    // Endpoint de Cron Unificado para Ambientes Serverless (Vercel Cron / Render / GitHub Actions)
+    if ((req.method === 'POST' || req.method === 'GET') && path === '/api/v1/cron/rotinas') {
+      exigirRateLimit(req, 'cron-rotinas', 30, 60_000);
+      const secretEnv = (process.env.CRON_SECRET ?? 'patos-cron-secret-2026').trim();
+      const authHeader = req.headers.authorization ?? '';
+      const secretHeader = req.headers['x-cron-secret'];
+      const secretQuery = url.searchParams.get('secret') ?? url.searchParams.get('key');
+
+      const matchSecret =
+        authHeader === `Bearer ${secretEnv}` ||
+        secretHeader === secretEnv ||
+        secretQuery === secretEnv;
+
+      if (!matchSecret) {
+        return json(req, res, 401, { erro: 'Chave de autorização de cron inválida.' });
+      }
+
+      const [exp, notif] = await Promise.all([
+        processarExpiracaoProtocolosVencidos(),
+        processarNotificacoesWhatsApp(),
+      ]);
+
+      if (exp.expirados.length > 0) {
+        invalidarSnapshotPublico();
+        for (const ev of exp.eventos) {
+          await transmitirAtualizacaoSSE(ev);
+        }
+      }
+
+      return json(req, res, 200, {
+        ok: true,
+        executadoEm: Date.now(),
+        expiracao: exp,
+        expirados: exp.expirados.length,
+        notificacoes: notif,
+      });
     }
 
     // Rotina de Expiração Automática de Protocolos Vencidos com Devolução de Vagas

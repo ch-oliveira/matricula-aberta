@@ -42,6 +42,14 @@ export async function obterPainelSecretariaPatos(): Promise<PainelSecretariaDTO>
 
   const protocolosAguardando = protocolos.filter((p) => p.status === 'aguardando').length;
   const protocolosAtendidos = protocolos.filter((p) => p.status === 'atendido').length;
+  const protocolosCancelados = protocolos.filter((p) => p.status === 'cancelado').length;
+  const protocolosExpirados = protocolos.filter(
+    (p) => p.status === 'cancelado' && p.motivoCancelamento === 'expirado_sem_comparecimento',
+  ).length;
+  const taxaAbsenteismo =
+    protocolosAtendidos + protocolosExpirados > 0
+      ? Math.round((protocolosExpirados / (protocolosAtendidos + protocolosExpirados)) * 1000) / 10
+      : 0;
 
   // Demanda reprimida e equilíbrio por bairro de Patos-PB
   const mapaBairro = new Map<string, DemandaBairroDTO>();
@@ -166,6 +174,9 @@ export async function obterPainelSecretariaPatos(): Promise<PainelSecretariaDTO>
       alertasAtivosTotal: alertas.length,
       protocolosAguardando,
       protocolosAtendidos,
+      protocolosCancelados,
+      protocolosExpirados,
+      taxaAbsenteismo,
       unidadesDesatualizadas,
     },
     demandaPorBairro,

@@ -109,6 +109,63 @@ export function formatarMensagemLembrete1h(p: {
   );
 }
 
+export function formatarMensagemConfirmacaoImediata(p: {
+  responsavel: string;
+  escolaNome: string;
+  turma: string;
+  turnoVisita: TurnoVisita;
+  dataVisita: string;
+  codigo: string;
+  reservaVaga?: boolean;
+}): string {
+  const h = horarioTurnoVisita(p.turnoVisita);
+  const turnoRotulo = p.turnoVisita === 'manha' ? 'Manhã' : 'Tarde';
+  const tipo = p.reservaVaga ? '🔒 *Vaga Pré-Reservada e Garantida*' : '📋 *Inscrição na Fila de Espera Oficial*';
+  return (
+    `✅ *Confirmação de Agendamento · Prefeitura Municipal de Patos - PB*\n\n` +
+    `Olá, ${p.responsavel}! Seu agendamento presencial foi registrado com sucesso:\n` +
+    `🏫 *Unidade:* ${p.escolaNome}\n` +
+    `🎒 *Turma:* ${p.turma}\n` +
+    `📅 *Data da Visita:* ${p.dataVisita}\n` +
+    `🕒 *Turno:* ${turnoRotulo} (${h.inicio} às ${h.fim})\n` +
+    `${tipo}\n\n` +
+    `🎫 *Código do Protocolo:* ${p.codigo}\n` +
+    `Apresente este código com os documentos exigidos na secretaria da escola.`
+  );
+}
+
+export async function enviarMensagemConfirmacaoImediata(p: {
+  responsavel: string;
+  escolaNome: string;
+  turma: string;
+  turnoVisita: TurnoVisita;
+  dataVisita: string;
+  codigo: string;
+  reservaVaga?: boolean;
+  telefone?: string;
+}): Promise<{ ok: boolean }> {
+  if (!p.telefone) return { ok: false };
+  const tel = p.telefone.replace(/\D/g, '');
+  if (!tel || tel.length < 10) return { ok: false };
+  const provedor = obterProvedorAtivo();
+  const texto = formatarMensagemConfirmacaoImediata(p);
+  const res = await provedor.enviarMensagem(tel, texto);
+  const agoraMs = Date.now();
+  historicoNotificacoes.push({
+    id: `${p.codigo}-confirmacao-${agoraMs}`,
+    telefone: tel,
+    codigoProtocolo: p.codigo,
+    tipo: 'lembrete_dia',
+    texto,
+    enviadoEm: agoraMs,
+    sucesso: res.ok,
+    provedor: provedor.nome,
+    resposta: res.resposta,
+  });
+  return { ok: res.ok };
+}
+
+
 export async function processarNotificacoesWhatsApp(agora = new Date()): Promise<{
   totalVerificados: number;
   lembretesDiaEnviados: number;

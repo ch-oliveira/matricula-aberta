@@ -9,6 +9,7 @@ import { formatarDistancia, minutosAPe, tempoRelativo } from '../domain/geo';
 import { gerarMatrizQrCodeReal } from '../domain/qr';
 import {
   dataLocalISO,
+  formatarCpfOuCertidao,
   proximoDiaUtilISO,
   type Busca,
   type ProtocoloVisita,
@@ -45,18 +46,24 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
   const docs = useMemo(() => documentosPara(catalogo.documentos, busca.etapa), [catalogo.documentos, busca.etapa]);
   const [marcados, setMarcados] = usePersistido<string[]>('ma:checklist:v1', []);
   const [meusCodigos, setMeusCodigos] = usePersistido<Record<string, string>>('ma:protocolos:por-escola:v1', {});
+  const [meusTokens, setMeusTokens] = usePersistido<Record<string, string>>('ma:protocolos:tokens:v1', {});
   const progressoId = useId();
   const respId = useId();
   const telId = useId();
   const dataId = useId();
+  const docEstudanteId = useId();
 
   const [responsavel, setResponsavel] = useState('');
+  const [documentoEstudante, setDocumentoEstudante] = useState('');
   const [telefone, setTelefone] = useState('');
   const [turnoVisita, setTurnoVisita] = useState<TurnoVisita>('manha');
   const [dataVisita, setDataVisita] = useState<string>(() => proximoDiaUtilISO(1));
   const [emitindo, setEmitindo] = useState(false);
   const [erroProt, setErroProt] = useState<string | null>(null);
   const [protocoloLocal, setProtocoloLocal] = useState<ProtocoloVisita | null>(null);
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+  const [fotosDocs, setFotosDocs] = usePersistido<Record<string, string>>('ma:docs:fotos:v1', {});
 
   // Sincroniza protocolo emitido para esta escola com o estado ao vivo do servidor
   const codigoSalvo = meusCodigos[escolaId];
@@ -139,17 +146,54 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         dataVisita,
         documentosMarcados: marcados,
         totalObrigatorios: obrig.length,
+        documentoEstudante: documentoEstudante.trim() || undefined,
       });
       setProtocoloLocal(novo);
       setMeusCodigos((ant) => ({ ...ant, [escola.id]: novo.codigo }));
+      if (novo.tokenCancelamento) {
+        setMeusTokens((ant) => ({ ...ant, [novo.codigo]: novo.tokenCancelamento! }));
+      }
       toast(`Protocolo ${novo.codigo} emitido e enviado para a secretaria da escola!`, {
         emoji: 'ticket',
         tom: 'ok',
       });
-    } catch {
-      setErroProt('Não foi possível conectar ao servidor para emitir o protocolo. Tente novamente.');
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message || 'Não foi possível emitir o protocolo. Tente novamente.';
+      setErroProt(msg);
     } finally {
       setEmitindo(false);
+    }
+  }
+
+  async function executarCancelamento() {
+    if (!protocoloAtivo) return;
+    const token = meusTokens[protocoloAtivo.codigo] || protocoloAtivo.tokenCancelamento;
+    if (!token) {
+      toast('Token de cancelamento não localizado neste aparelho. Procure a secretaria da escola.', {
+        emoji: 'alert-triangle',
+        tom: 'aviso',
+      });
+      return;
+    }
+    setCancelando(true);
+    try {
+      const cancelado = await vagasStore.cancelarProtocoloPorCidadao(protocoloAtivo.codigo, token);
+      setProtocoloLocal(cancelado);
+      setMeusCodigos((ant) => {
+        const copia = { ...ant };
+        delete copia[escola.id];
+        return copia;
+      });
+      toast('Agendamento cancelado com sucesso. A vaga foi devolvida para a rede escolar de Patos!', {
+        emoji: 'check-circle',
+        tom: 'ok',
+      });
+      setConfirmandoCancelamento(false);
+    } catch (err: unknown) {
+      const msg = (err as Error)?.message || 'Falha ao cancelar agendamento.';
+      toast(msg, { emoji: 'alert-triangle', tom: 'aviso' });
+    } finally {
+      setCancelando(false);
     }
   }
 
@@ -501,6 +545,29 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 </div>
               )}
 
+              {!protocoloAtivo.reservaVaga && protocoloAtivo.status === 'aguardando' && (
+                <div
+                  className="aviso-reserva-fila"
+                  style={{
+                    background: '#FFF3E0',
+                    border: '2px solid #E65100',
+                    borderRadius: '8px',
+                    padding: '12px 14px',
+                    margin: '12px 0',
+                    color: '#BF360C',
+                    fontSize: '0.92rem',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong>📋 Inscrição em Fila de Espera Oficial:</strong>
+                  <div>
+                    No momento todas as vagas estão preenchidas. Você é o{' '}
+                    <strong>{protocoloAtivo.posicaoFila ?? 1}º lugar</strong> na lista de espera oficial para{' '}
+                    {protocoloAtivo.turma} nesta unidade. A secretaria chamará conforme ordem cronológica.
+                  </div>
+                </div>
+              )}
+
               {protocoloAtivo.status === 'cancelado' && (
                 <div
                   style={{
@@ -518,7 +585,9 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                   <div>
                     {protocoloAtivo.motivoCancelamento === 'expirado_sem_comparecimento'
                       ? 'O prazo limite de comparecimento encerrou. A vaga pré-reservada foi devolvida para a rede escolar.'
-                      : 'Este agendamento foi cancelado. A vaga reservada retornou para o quadro de vagas.'}
+                      : protocoloAtivo.motivoCancelamento === 'cancelado_cidadao'
+                        ? 'Este agendamento foi cancelado por você. A vaga foi liberada imediatamente para outra família.'
+                        : 'Este agendamento foi cancelado. A vaga reservada retornou para o quadro de vagas.'}
                   </div>
                 </div>
               )}
@@ -543,6 +612,44 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 )}
               </p>
 
+              {confirmandoCancelamento && protocoloAtivo.status === 'aguardando' && (
+                <div
+                  style={{
+                    background: '#FFF3E0',
+                    border: '2px solid #E65100',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    margin: '12px 0',
+                    color: '#171625',
+                  }}
+                >
+                  <p style={{ margin: '0 0 10px 0', fontWeight: 'bold' }}>
+                    Tem certeza que deseja cancelar seu agendamento?
+                  </p>
+                  <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#555' }}>
+                    Sua vaga pré-reservada será <strong>devolvida imediatamente</strong> para o quadro da escola e ficará disponível para outros pais.
+                  </p>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-perigo btn-pequeno"
+                      disabled={cancelando}
+                      onClick={executarCancelamento}
+                    >
+                      {cancelando ? 'Cancelando…' : 'Sim, cancelar e liberar vaga'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-fantasma btn-pequeno"
+                      disabled={cancelando}
+                      onClick={() => setConfirmandoCancelamento(false)}
+                    >
+                      Voltar (manter minha vaga)
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="protocolo-acoes">
                 <button
                   type="button"
@@ -552,9 +659,27 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 >
                   <Icone nome="file-text" tamanho={15} /> Baixar Cartão no Celular (PNG)
                 </button>
+                <button
+                  type="button"
+                  className="btn btn-secundario btn-pequeno"
+                  onClick={() => window.print()}
+                  title="Imprimir ou salvar em PDF"
+                >
+                  <Icone nome="printer" tamanho={15} /> Imprimir Comprovante
+                </button>
                 <a className="btn btn-whats btn-pequeno" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener noreferrer">
                   <Icone nome="message" tamanho={15} /> Salvar no WhatsApp
                 </a>
+                {protocoloAtivo.status === 'aguardando' && !confirmandoCancelamento && (
+                  <button
+                    type="button"
+                    className="btn btn-fantasma btn-pequeno"
+                    style={{ color: '#C62828' }}
+                    onClick={() => setConfirmandoCancelamento(true)}
+                  >
+                    <Icone nome="x" tamanho={15} /> Cancelar Agendamento
+                  </button>
+                )}
                 <button
                   type="button"
                   className="link-sutil"
@@ -609,6 +734,23 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                     setErroProt(null);
                   }}
                 />
+              </div>
+
+              <div className="campo">
+                <label htmlFor={docEstudanteId}>CPF ou Certidão de Nascimento da criança</label>
+                <input
+                  id={docEstudanteId}
+                  type="text"
+                  placeholder="Ex.: 000.000.000-00 ou nº da certidão"
+                  value={documentoEstudante}
+                  onChange={(e) => {
+                    setDocumentoEstudante(formatarCpfOuCertidao(e.target.value));
+                    setErroProt(null);
+                  }}
+                />
+                <small style={{ fontSize: '0.78rem', color: '#676479', marginTop: '4px', display: 'block' }}>
+                  Garante a vaga única da criança na rede municipal (evita duplicidades).
+                </small>
               </div>
 
               <div className="campo">
@@ -712,6 +854,59 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
             </li>
           ))}
         </ul>
+
+        <div style={{ marginTop: '16px', padding: '14px', background: 'var(--surface, #FFF)', border: '2px dashed var(--line, #171625)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <Icone nome="camera" tamanho={18} />
+            <strong style={{ fontSize: '0.92rem' }}>Fotografar documentos para levar no celular (Opcional)</strong>
+          </div>
+          <p style={{ margin: '0 0 10px 0', fontSize: '0.82rem', color: '#676479' }}>
+            Você pode fotografar os documentos agora. As fotos ficam salvas no seu aparelho para agilizar a conferência na escola.
+          </p>
+          <label className="btn btn-secundario btn-pequeno" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+            <Icone nome="camera" tamanho={15} />
+            <span>Tirar foto ou anexar imagem</span>
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  const url = ev.target?.result as string;
+                  setFotosDocs((ant) => ({ ...ant, [Date.now()]: url }));
+                  toast('Foto do documento salva no seu celular!', { emoji: 'check-circle', tom: 'ok' });
+                };
+                reader.readAsDataURL(file);
+              }}
+            />
+          </label>
+          {Object.keys(fotosDocs).length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px' }}>
+              {Object.entries(fotosDocs).map(([k, foto]) => (
+                <div key={k} style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '6px', overflow: 'hidden', border: '2px solid var(--line, #171625)' }}>
+                  <img src={foto} alt="Documento anexado" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button
+                    type="button"
+                    style={{ position: 'absolute', top: 0, right: 0, background: '#D32F2F', color: '#fff', border: 'none', width: '20px', height: '20px', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => {
+                      setFotosDocs((ant) => {
+                        const cp = { ...ant };
+                        delete cp[k];
+                        return cp;
+                      });
+                    }}
+                    title="Remover foto"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ================= GUIA LOCAL: ONDE EMITIR EM PATOS - PB ================= */}

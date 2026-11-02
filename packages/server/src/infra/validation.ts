@@ -167,6 +167,7 @@ export function validarPayloadProtocolo(body: Record<string, unknown>): {
   dataVisita: string;
   documentosMarcados: string[];
   totalObrigatorios: number;
+  documentoEstudante?: string;
 } {
   const escolaId = limparTexto(body.escolaId, 80);
   if (!escolaId) {
@@ -193,6 +194,7 @@ export function validarPayloadProtocolo(body: Record<string, unknown>): {
   const nascimento = REGEX_DATA_ISO.test(nascRaw) ? nascRaw : undefined;
 
   const telefone = limparTexto(body.telefone, 30) || undefined;
+  const documentoEstudante = limparTexto(body.documentoEstudante, 50) || undefined;
 
   const documentosMarcados = Array.isArray(body.documentosMarcados)
     ? body.documentosMarcados
@@ -219,6 +221,7 @@ export function validarPayloadProtocolo(body: Record<string, unknown>): {
     dataVisita,
     documentosMarcados,
     totalObrigatorios,
+    documentoEstudante,
   };
 }
 

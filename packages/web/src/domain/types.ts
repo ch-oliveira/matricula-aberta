@@ -47,4 +47,7 @@ export {
   statusDaOferta,
   TIPOS_UNIDADE_VALIDOS,
   TURNOS_VISITA_VALIDOS,
+  formatarCpfOuCertidao,
+  mascararDocumentoEstudante,
+  gerarCsv,
 } from '@matricula-aberta/shared';

@@ -307,6 +307,10 @@ export async function inicializarSchema(): Promise<void> {
       status TEXT NOT NULL CHECK (status IN ('aguardando', 'atendido', 'cancelado')),
       reserva_vaga INTEGER NOT NULL DEFAULT 1,
       motivo_cancelamento TEXT,
+      posicao_fila INTEGER,
+      documento_estudante TEXT,
+      documento_estudante_hash TEXT,
+      token_cancelamento TEXT,
       notificado_dia_em BIGINT,
       notificado_1h_em BIGINT,
       criado_em BIGINT NOT NULL,
@@ -326,6 +330,10 @@ export async function inicializarSchema(): Promise<void> {
       'ALTER TABLE protocolos_visita ADD COLUMN reserva_vaga INTEGER NOT NULL DEFAULT 1',
       'ALTER TABLE protocolos_visita ADD COLUMN telefone_contato TEXT',
       'ALTER TABLE protocolos_visita ADD COLUMN motivo_cancelamento TEXT',
+      'ALTER TABLE protocolos_visita ADD COLUMN posicao_fila INTEGER',
+      'ALTER TABLE protocolos_visita ADD COLUMN documento_estudante TEXT',
+      'ALTER TABLE protocolos_visita ADD COLUMN documento_estudante_hash TEXT',
+      'ALTER TABLE protocolos_visita ADD COLUMN token_cancelamento TEXT',
       'ALTER TABLE protocolos_visita ADD COLUMN notificado_dia_em BIGINT',
       'ALTER TABLE protocolos_visita ADD COLUMN notificado_1h_em BIGINT',
     ];
@@ -335,6 +343,11 @@ export async function inicializarSchema(): Promise<void> {
       } catch {
         // Coluna já existe
       }
+    }
+    try {
+      await execute('CREATE INDEX IF NOT EXISTS idx_protocolos_doc_ativo ON protocolos_visita(documento_estudante_hash, status)');
+    } catch {
+      // ignore
     }
   }
 

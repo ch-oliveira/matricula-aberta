@@ -15,9 +15,10 @@ interface Props {
   onVerEscola: (escolaId: string, etapa: EtapaId) => void;
   protocoloAtivo?: { escolaId: string; codigo: string; escolaNome: string } | null;
   onAbrirProtocolo?: (escolaId: string) => void;
+  onConsultarProtocolo?: () => void;
 }
 
-export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) {
+export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo, onConsultarProtocolo }: Props) {
   const escolas = useEscolas();
   const { suportado, falando, falar, parar } = useFala();
 
@@ -84,15 +85,26 @@ export function Landing({ onComecar, protocoloAtivo, onAbrirProtocolo }: Props) 
                 <span>Consultar vagas em Patos</span>
                 <span aria-hidden="true">→</span>
               </button>
+              {onConsultarProtocolo && (
+                <button
+                  type="button"
+                  className="btn btn-secundario"
+                  onClick={onConsultarProtocolo}
+                  title="Recuperar comprovante ou QR Code digitando o código do protocolo"
+                >
+                  <Icone nome="ticket" tamanho={16} />
+                  <span>Já tenho protocolo</span>
+                </button>
+              )}
               {suportado && (
                 <button
                   type="button"
-                  className={`btn btn-secundario ${falando ? 'falando' : ''}`}
+                  className={`btn btn-fantasma ${falando ? 'falando' : ''}`}
                   onClick={() => (falando ? parar() : falar(textoAudio))}
                   aria-pressed={falando}
                 >
                   <Icone nome={falando ? 'stop' : 'volume'} tamanho={16} />
-                  <span>{falando ? 'Parar áudio' : 'Ouvir explicação'}</span>
+                  <span>{falando ? 'Parar áudio' : 'Ouvir'}</span>
                 </button>
               )}
             </div>

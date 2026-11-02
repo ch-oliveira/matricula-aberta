@@ -135,8 +135,14 @@ export interface ProtocoloVisita {
   atendidoEm?: number;
   /** Se true, uma vaga física da turma foi debitada e pré-reservada no momento da emissão */
   reservaVaga?: boolean;
-  /** Motivo em caso de cancelamento ('expirado_sem_comparecimento', 'cancelado_gestor', etc.) */
+  /** Motivo em caso de cancelamento ('expirado_sem_comparecimento', 'cancelado_gestor', 'cancelado_cidadao', etc.) */
   motivoCancelamento?: string;
+  /** Posição ordinal na fila de espera caso não haja vaga livre no momento */
+  posicaoFila?: number;
+  /** Documento do estudante (CPF ou Certidão) para controle de reserva única */
+  documentoEstudante?: string;
+  /** Token de cancelamento individual para que o titular cancele seu próprio agendamento */
+  tokenCancelamento?: string;
   /** Timestamp de envio do lembrete matinal no dia da visita */
   notificadoDiaEm?: number;
   /** Timestamp de envio do lembrete de 1 hora antes do início do turno */
@@ -184,6 +190,9 @@ export interface PainelSecretariaDTO {
     alertasAtivosTotal: number;
     protocolosAguardando: number;
     protocolosAtendidos: number;
+    protocolosCancelados: number;
+    protocolosExpirados: number;
+    taxaAbsenteismo: number;
     unidadesDesatualizadas: number;
   };
   demandaPorBairro: DemandaBairroDTO[];
@@ -513,4 +522,45 @@ export function verificarProtocoloExpirado(
 
   return false;
 }
+
+/** Formata CPF ou número de certidão de nascimento */
+export function formatarCpfOuCertidao(valor: string): string {
+  const d = valor.replace(/\D/g, '');
+  if (d.length <= 11) {
+    // Formato CPF: 000.000.000-00
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+    if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+    return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9, 11)}`;
+  }
+  // Certidão de nascimento nova (32 dígitos) ou termo
+  if (d.length > 32) return d.slice(0, 32);
+  return d;
+}
+
+/** Mascara CPF ou certidão para exibição segura (LGPD) */
+export function mascararDocumentoEstudante(valor?: string | null): string {
+  if (!valor) return '';
+  const limpo = valor.trim();
+  const d = limpo.replace(/\D/g, '');
+  if (d.length === 11) {
+    return `${d.slice(0, 3)}.•••.•••-${d.slice(9)}`;
+  }
+  if (d.length > 8) {
+    return `${d.slice(0, 4)}••••••••${d.slice(-4)}`;
+  }
+  return limpo.length > 4 ? `${limpo.slice(0, 2)}••••${limpo.slice(-2)}` : '••••';
+}
+
+/** Converte matriz de dados em string CSV com escape de caracteres */
+export function gerarCsv(cabecalhos: string[], linhas: Array<Array<string | number>>): string {
+  const escapar = (val: string | number) => {
+    const s = String(val ?? '').replace(/"/g, '""');
+    return `"${s}"`;
+  };
+  const cabecalhoLinha = cabecalhos.map(escapar).join(';');
+  const corpo = linhas.map((l) => l.map(escapar).join(';')).join('\r\n');
+  return `\uFEFF${cabecalhoLinha}\r\n${corpo}`;
+}
+
 

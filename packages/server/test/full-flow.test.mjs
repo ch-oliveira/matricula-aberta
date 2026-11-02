@@ -301,6 +301,100 @@ try {
   assert.equal(dataConsulta.protocolo.escolaNome, 'Creche Municipal Tia Luci');
   console.log('✓ Consulta pública de protocolo por código OK');
 
+  // 1.8.1 Teste de Autocancelamento pelo Cidadão com Token HMAC
+  const tokenCancCidadao = dataProt.protocolo.tokenCancelamento;
+  assert.ok(tokenCancCidadao, 'Token de cancelamento deve ser retornado para o cidadão');
+
+  // Tentativa de cancelamento com token inválido -> 403 Forbidden
+  const rCancTokenInvalido = await fetch(`${BASE_URL}/api/v1/protocolos/${codigoProt}/cancelar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-protocolo-token': 'token-falsificado-1234',
+    },
+  });
+  assert.equal(rCancTokenInvalido.status, 403, 'Cancelamento com token inválido deve falhar com 403');
+  console.log('✓ Cancelamento cidadão com token inválido bloqueado com 403');
+
+  // 1.8.2 Teste de Proteção Antifraude / Reserva Única por Criança (CPF/Certidão)
+  const docCriancaTeste = '123.456.789-00';
+  const rProtCrianca1 = await fetch(`${BASE_URL}/api/v1/protocolos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      escolaId: 'creche-tia-luci',
+      etapa: 'maternal',
+      turma: 'Maternal I',
+      periodo: 'integral',
+      responsavel: 'Maria Joana da Silva',
+      documentoEstudante: docCriancaTeste,
+      telefone: '83991112233',
+      turnoVisita: 'manha',
+      dataVisita: '2027-02-15',
+      documentosMarcados: ['certidao'],
+      totalObrigatorios: 7,
+    }),
+  });
+  assert.equal(rProtCrianca1.status, 201);
+  const dataProtCrianca1 = await rProtCrianca1.json();
+  const codCrianca1 = dataProtCrianca1.protocolo.codigo;
+  const tokenCrianca1 = dataProtCrianca1.protocolo.tokenCancelamento;
+
+  // Tentativa de agendamento duplicado para a mesma criança -> HTTP 409
+  const rProtCriancaDuplicada = await fetch(`${BASE_URL}/api/v1/protocolos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      escolaId: 'emef-monsenhor-manoel-vieira',
+      etapa: 'fund1',
+      turma: '1º ano',
+      periodo: 'parcial',
+      responsavel: 'Pai ou Outro Parente',
+      documentoEstudante: '12345678900', // Mesmos dígitos, formato diferente
+      telefone: '83998887766',
+      turnoVisita: 'tarde',
+      dataVisita: '2027-02-16',
+      documentosMarcados: ['certidao'],
+      totalObrigatorios: 7,
+    }),
+  });
+  assert.equal(rProtCriancaDuplicada.status, 409, 'Segunda reserva ativa para a mesma criança deve retornar 409 Conflict');
+  console.log('✓ Proteção antifraude: reserva duplicada para a mesma criança bloqueada com 409');
+
+  // Cancelamento pelo cidadão do protocolo da criança 1 libera para nova reserva
+  const rCancCidadaoValido = await fetch(`${BASE_URL}/api/v1/protocolos/${codCrianca1}/cancelar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-protocolo-token': tokenCrianca1,
+    },
+  });
+  assert.equal(rCancCidadaoValido.status, 200);
+  const dataCancCidadao = await rCancCidadaoValido.json();
+  assert.equal(dataCancCidadao.protocolo.status, 'cancelado');
+  console.log('✓ Autocancelamento pelo cidadão com token individual HMAC realizado com sucesso');
+
+  // Agora nova reserva para a mesma criança deve ser permitida (não há mais reserva ativa)
+  const rProtCriancaReagendada = await fetch(`${BASE_URL}/api/v1/protocolos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      escolaId: 'emef-monsenhor-manoel-vieira',
+      etapa: 'fund1',
+      turma: '1º ano',
+      periodo: 'parcial',
+      responsavel: 'Pai ou Outro Parente',
+      documentoEstudante: docCriancaTeste,
+      telefone: '83998887766',
+      turnoVisita: 'tarde',
+      dataVisita: '2027-02-16',
+      documentosMarcados: ['certidao'],
+      totalObrigatorios: 7,
+    }),
+  });
+  assert.equal(rProtCriancaReagendada.status, 201);
+  console.log('✓ Nova reserva permitida após cancelamento da anterior para a mesma criança');
+
   // 1.9 Emissão com dados inválidos
   const rProtInvalido = await fetch(`${BASE_URL}/api/v1/protocolos`, {
     method: 'POST',
@@ -662,9 +756,27 @@ try {
   assert.ok(painel.kpis.totalUnidades >= 10);
   assert.ok(painel.kpis.capacidadeRede > 0);
   assert.ok(painel.kpis.taxaOcupacao > 0 && painel.kpis.taxaOcupacao <= 100);
+  assert.ok(typeof painel.kpis.protocolosCancelados === 'number', 'KPI cancelados deve ser numérico');
+  assert.ok(typeof painel.kpis.protocolosExpirados === 'number', 'KPI expirados deve ser numérico');
+  assert.ok(typeof painel.kpis.taxaAbsenteismo === 'number', 'Taxa de absenteísmo deve ser calculada');
   assert.ok(Array.isArray(painel.demandaPorBairro) && painel.demandaPorBairro.length > 0);
   assert.ok(Array.isArray(painel.resumoPorEtapa) && painel.resumoPorEtapa.length === 5);
-  console.log(`✓ Painel SEDUC: ${painel.kpis.totalUnidades} escolas, ${painel.kpis.capacidadeRede} vagas totais, taxa ${painel.kpis.taxaOcupacao}%`);
+  console.log(`✓ Painel SEDUC: ${painel.kpis.totalUnidades} escolas, ${painel.kpis.capacidadeRede} vagas totais, taxa ${painel.kpis.taxaOcupacao}%, absenteísmo ${painel.kpis.taxaAbsenteismo}%`);
+
+  // 3.3.1 Endpoint de Cron Serverless (/api/v1/cron/rotinas)
+  // Sem segredo ou com segredo inválido -> 401
+  const rCronSemAuth = await fetch(`${BASE_URL}/api/v1/cron/rotinas`);
+  assert.equal(rCronSemAuth.status, 401, 'Endpoint de cron sem segredo deve ser rejeitado com 401');
+
+  // Com segredo correto -> 200 e executa tanto expiração quanto notificações
+  const rCronOk = await fetch(`${BASE_URL}/api/v1/cron/rotinas?secret=patos-cron-secret-2026`, {
+    method: 'POST',
+  });
+  assert.equal(rCronOk.status, 200, 'Endpoint de cron com segredo válido deve retornar 200');
+  const dataCron = await rCronOk.json();
+  assert.ok(dataCron.ok);
+  assert.ok(dataCron.expiracao && dataCron.notificacoes, 'Cron deve executar expiracao e notificacoes');
+  console.log('✓ Endpoint serverless de rotinas automáticas (/api/v1/cron/rotinas) protegido e operacional');
 
   // 3.4 SEDUC tem autorização de alterar vagas de QUALQUER escola
   const rPatchSeduc = await fetch(

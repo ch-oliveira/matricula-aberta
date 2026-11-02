@@ -1,4 +1,4 @@
-import { randomInt } from 'node:crypto';
+import { createHash, randomInt } from 'node:crypto';
 import {
   anoLetivo,
   proximoDiaUtilISO,
@@ -10,8 +10,14 @@ import {
   type StatusProtocolo,
   type TurnoVisita,
 } from '../../../../shared/src/index.ts';
+import {
+  gerarTokenCancelamentoProtocolo,
+  verificarTokenCancelamentoProtocolo,
+} from '../../infra/auth.ts';
 import { db } from '../../infra/db.ts';
+import { HttpError } from '../../infra/security.ts';
 import { mascararTelefoneLGPD } from '../alertas/alertas.module.ts';
+import { enviarMensagemConfirmacaoImediata } from '../notificacoes/notificacoes.module.ts';
 import { atualizarOfertaUnidade, invalidarCacheEscolas } from '../unidades/unidades.module.ts';
 
 interface LinhaProtocoloDB {
@@ -34,6 +40,10 @@ interface LinhaProtocoloDB {
   status: StatusProtocolo;
   reserva_vaga?: number;
   motivo_cancelamento?: string | null;
+  posicao_fila?: number | null;
+  documento_estudante?: string | null;
+  documento_estudante_hash?: string | null;
+  token_cancelamento?: string | null;
   notificado_dia_em?: number | null;
   notificado_1h_em?: number | null;
   criado_em: number;
@@ -68,6 +78,9 @@ function mapearLinhaProtocolo(r: LinhaProtocoloDB): ProtocoloVisita {
     status: r.status,
     reservaVaga: Boolean(r.reserva_vaga ?? 1),
     motivoCancelamento: r.motivo_cancelamento ?? undefined,
+    posicaoFila: r.posicao_fila ?? undefined,
+    documentoEstudante: r.documento_estudante ?? undefined,
+    tokenCancelamento: r.token_cancelamento ?? undefined,
     notificadoDiaEm: r.notificado_dia_em ?? undefined,
     notificado1hEm: r.notificado_1h_em ?? undefined,
     criadoEm: r.criado_em,
@@ -259,6 +272,7 @@ export async function criarProtocoloVisita(dados: {
   dataVisita: string;
   documentosMarcados: string[];
   totalObrigatorios: number;
+  documentoEstudante?: string;
 }): Promise<{ protocolo: ProtocoloVisita | null; evento: EventoVaga | null }> {
   const esc = await db.queryOne<{ id: string; nome: string; endereco: string; bairro: string }>(
     'SELECT id, nome, endereco, bairro FROM escolas WHERE id = $1',
@@ -267,7 +281,29 @@ export async function criarProtocoloVisita(dados: {
 
   if (!esc) return { protocolo: null, evento: null };
 
+  // Prevenção de reservas múltiplas abusivas (1 reserva ativa por criança na rede)
+  let docLimpo: string | null = null;
+  let docHash: string | null = null;
+  if (dados.documentoEstudante) {
+    const limpo = dados.documentoEstudante.replace(/\D/g, '') || dados.documentoEstudante.trim();
+    if (limpo.length >= 4) {
+      docLimpo = limpo;
+      docHash = createHash('sha256').update(limpo).digest('hex');
+      const existente = await db.queryOne<{ codigo: string; escola_nome: string }>(
+        `SELECT codigo, escola_nome FROM protocolos_visita WHERE status = 'aguardando' AND documento_estudante_hash = $1 LIMIT 1`,
+        [docHash],
+      );
+      if (existente) {
+        throw new HttpError(
+          409,
+          `A criança já possui a reserva ativa ${existente.codigo} na unidade "${existente.escola_nome}". Para reservar nesta unidade, cancele o agendamento anterior primeiro.`,
+        );
+      }
+    }
+  }
+
   const codigo = await gerarCodigoProtocolo();
+  const tokenCancelamento = gerarTokenCancelamentoProtocolo(codigo);
   const criadoEm = Date.now();
   const { mascarado } = mascararTelefoneLGPD(dados.telefone);
   const telefoneContato = dados.telefone?.replace(/\D/g, '') || null;
@@ -283,6 +319,7 @@ export async function criarProtocoloVisita(dados: {
 
   let reservaVaga = false;
   let eventoVaga: EventoVaga | null = null;
+  let posicaoFila: number | null = null;
 
   if (of) {
     const vagasNum = Number(of.vagas);
@@ -299,6 +336,7 @@ export async function criarProtocoloVisita(dados: {
       eventoVaga = res.evento;
     } else {
       reservaVaga = false;
+      posicaoFila = filaNum + 1;
       await atualizarOfertaUnidade({
         escolaId: esc.id,
         etapa: dados.etapa,
@@ -314,9 +352,10 @@ export async function criarProtocoloVisita(dados: {
       codigo, escola_id, escola_nome, escola_endereco, escola_bairro,
       etapa, turma, periodo, responsavel, telefone_mascarado, telefone_contato, nascimento,
       turno_visita, data_visita, documentos_json, total_obrigatorios,
-      status, reserva_vaga, motivo_cancelamento, notificado_dia_em, notificado_1h_em,
+      status, reserva_vaga, motivo_cancelamento, posicao_fila, documento_estudante,
+      documento_estudante_hash, token_cancelamento, notificado_dia_em, notificado_1h_em,
       criado_em, atendido_em
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'aguardando', $17, NULL, NULL, NULL, $18, NULL)`,
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'aguardando', $17, NULL, $18, $19, $20, $21, NULL, NULL, $22, NULL)`,
     [
       codigo,
       esc.id,
@@ -335,13 +374,54 @@ export async function criarProtocoloVisita(dados: {
       JSON.stringify(dados.documentosMarcados),
       dados.totalObrigatorios,
       reservaVaga ? 1 : 0,
+      posicaoFila,
+      docLimpo,
+      docHash,
+      tokenCancelamento,
       criadoEm,
     ],
   );
 
   invalidarCacheEscolas();
   const protocolo = await obterProtocoloPorCodigo(codigo);
+
+  // Disparo assíncrono de confirmação imediata no WhatsApp caso configurado
+  if (protocolo && telefoneContato) {
+    void enviarMensagemConfirmacaoImediata(protocolo).catch((err) => {
+      console.warn('[WhatsApp] Falha ao enviar confirmação imediata:', err);
+    });
+  }
+
   return { protocolo, evento: eventoVaga };
+}
+
+/**
+ * Cancelamento de protocolo pelo próprio cidadão mediante apresentação do token HMAC individual.
+ * Devolve a vaga imediatamente para o quadro escolar.
+ */
+export async function cancelarProtocoloPorCidadao(
+  codigo: string,
+  token: string,
+): Promise<{ protocolo: ProtocoloVisita | null; evento: EventoVaga | null }> {
+  const autorizado = verificarTokenCancelamentoProtocolo(codigo, token);
+  if (!autorizado) {
+    throw new HttpError(403, 'Token de cancelamento inválido para este protocolo.');
+  }
+
+  const atual = await obterProtocoloPorCodigo(codigo);
+  if (!atual) {
+    throw new HttpError(404, 'Protocolo não encontrado.');
+  }
+
+  if (atual.status === 'cancelado') {
+    return { protocolo: atual, evento: null };
+  }
+
+  if (atual.status === 'atendido') {
+    throw new HttpError(400, 'Este agendamento já foi atendido presencialmente e a matrícula foi concluída.');
+  }
+
+  return atualizarStatusProtocolo(codigo, 'cancelado', 'cancelado_cidadao');
 }
 
 export async function atualizarStatusProtocolo(

@@ -5,7 +5,14 @@ import { toast } from '../components/Toasts';
 import { Ocupacao, StatusPill } from '../components/ui';
 import { ETAPAS, statusDaOferta } from '../domain/etapas';
 import { desatualizado, tempoRelativo } from '../domain/geo';
-import type { Escola, Oferta, PainelSecretariaDTO, ProtocoloVisita } from '../domain/types';
+import {
+  dataLocalISO,
+  gerarCsv,
+  type Escola,
+  type Oferta,
+  type PainelSecretariaDTO,
+  type ProtocoloVisita,
+} from '../domain/types';
 import { useAgora, useHashRoute } from '../hooks';
 import {
   useEscolas,
@@ -71,29 +78,41 @@ export function Gestao() {
 
   return (
     <div className="gestao">
-      {/* Aviso exclusivo caso alguém acesse a rota #/gestao pelo celular */}
-      <section className="gestao-bloqueio-mobile so-mobile" aria-labelledby="t-gestao-web-only">
-        <div className="gestao-bloqueio-card">
-          <div className="login-card-topo">
-            <Sticker icon={padlock} palette={PALETTES.clay} loop={false} replayOnHover style={{ width: 52 }} />
-            <span className="lp-tag">Exclusivo Versão Web</span>
-          </div>
-          <h1 id="t-gestao-web-only">Fluxo de Secretaria e Escola disponível apenas no computador</h1>
-          <p className="legenda">
-            O painel administrativo da <strong>Secretaria Municipal de Educação (SEDUC)</strong> e das{' '}
-            <strong>Unidades Escolares de Patos - PB</strong> é exclusivo para a versão web em computadores e notebooks.
-          </p>
-          <p className="legenda">
-            Pelo celular, acesse o portal público de consulta de vagas, checklist de documentos e emissão de protocolo
-            com QR Code para pais e responsáveis.
-          </p>
-          <a className="btn btn-primario btn-largo" href="#">
-            <span aria-hidden="true">←</span> Ir para Consulta de Vagas (Pais)
-          </a>
-        </div>
-      </section>
+      <div className="gestao-shell">
+        {/* Aviso amigável em telas pequenas se estiver na visão analítica macro da SEDUC */}
+        {aba === 'secretaria' && (
+          <aside
+            className="aviso-seduc-mobile so-mobile"
+            style={{
+              margin: '12px 16px',
+              padding: '12px 14px',
+              background: '#FFF3E0',
+              border: '2px solid #E65100',
+              borderRadius: '8px',
+              fontSize: '0.88rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            <strong>📱 Triagem e Atendimento no Celular / Tablet:</strong>
+            <p style={{ margin: 0, color: '#444' }}>
+              O painel da Secretaria possui tabelas completas para computadores. Para bipar QR Codes na recepção ou portaria da escola, use o <strong>Painel da Unidade</strong>.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primario btn-pequeno"
+              style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+              onClick={() => {
+                setAba('unidade');
+                window.history.replaceState(null, '', '#/gestao/unidade');
+              }}
+            >
+              Ir para Painel da Unidade (Leitor QR) →
+            </button>
+          </aside>
+        )}
 
-      <div className="gestao-desktop-shell so-desktop">
         <header className="gestao-topo">
           <div className="gestao-topo-interno">
             <a className="marca" href="#">
@@ -166,6 +185,7 @@ export function Gestao() {
               painelSecretaria ? (
                 <PainelMacroSecretaria
                   painel={painelSecretaria}
+                  protocolos={protocolos}
                   onAbrirUnidade={(id) => {
                     setEscolaInspecionadaSeduc(id);
                     setAba('unidade');
@@ -246,17 +266,123 @@ export function Gestao() {
 
 function PainelMacroSecretaria({
   painel,
+  protocolos,
   onAbrirUnidade,
   onAbrirLeitor,
   onSair,
 }: {
   painel: PainelSecretariaDTO;
+  protocolos: ProtocoloVisita[];
   onAbrirUnidade: (id: string) => void;
   onAbrirLeitor?: () => void;
   onSair: () => void;
 }) {
   const agora = useAgora(15_000);
   const { kpis } = painel;
+
+  function baixarCsv(nomeArquivo: string, conteudo: string) {
+    const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nomeArquivo;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast(`Planilha ${nomeArquivo} baixada com sucesso!`, { emoji: 'check-circle', tom: 'ok' });
+  }
+
+  function exportarProtocolosCsv() {
+    const cabecalhos = [
+      'Código',
+      'Unidade Escolar',
+      'Bairro',
+      'Etapa',
+      'Turma',
+      'Período',
+      'Responsável',
+      'Telefone',
+      'Data da Visita',
+      'Turno',
+      'Status',
+      'Reserva de Vaga',
+      'Motivo Cancelamento',
+      'Data de Emissão',
+    ];
+    const linhas = protocolos.map((p) => [
+      p.codigo,
+      p.escolaNome,
+      p.escolaBairro,
+      p.etapa,
+      p.turma,
+      p.periodo,
+      p.responsavel,
+      p.telefone ?? '',
+      p.dataVisita,
+      p.turnoVisita,
+      p.status,
+      p.reservaVaga ? 'Sim (Vaga Pré-Reservada)' : 'Não (Fila de Espera)',
+      p.motivoCancelamento ?? '',
+      new Date(p.criadoEm).toLocaleString('pt-BR'),
+    ]);
+    baixarCsv(`protocolos-patos-pb-${dataLocalISO()}.csv`, gerarCsv(cabecalhos, linhas));
+  }
+
+  function exportarFilaEsperaCsv() {
+    const cabecalhos = [
+      'Código',
+      'Unidade Escolar',
+      'Bairro',
+      'Etapa',
+      'Turma',
+      'Posição na Fila',
+      'Responsável',
+      'Telefone',
+      'Data da Visita',
+      'Data de Inscrição',
+    ];
+    const fila = protocolos.filter((p) => p.status === 'aguardando' && !p.reservaVaga);
+    const linhas = fila.map((p) => [
+      p.codigo,
+      p.escolaNome,
+      p.escolaBairro,
+      p.etapa,
+      p.turma,
+      p.posicaoFila ?? 1,
+      p.responsavel,
+      p.telefone ?? '',
+      p.dataVisita,
+      new Date(p.criadoEm).toLocaleString('pt-BR'),
+    ]);
+    baixarCsv(`fila-espera-patos-pb-${dataLocalISO()}.csv`, gerarCsv(cabecalhos, linhas));
+  }
+
+  function exportarOcupacaoBairrosCsv() {
+    const cabecalhos = [
+      'Bairro',
+      'Zona',
+      'Unidades',
+      'Vagas Livres',
+      'Capacidade Total',
+      'Fila de Espera',
+      'Alertas Ativos',
+      'Demanda Reprimida',
+      'Déficit de Vagas',
+      'Status de Pressão',
+    ];
+    const linhas = painel.demandaPorBairro.map((b) => [
+      b.bairro,
+      b.zona,
+      b.unidades,
+      b.vagasLivres,
+      b.capacidadeTotal,
+      b.filaEspera,
+      b.alertasAtivos,
+      b.demandaReprimida,
+      b.deficitVagas,
+      b.statusPressao.toUpperCase(),
+    ]);
+    baixarCsv(`demanda-bairros-patos-pb-${dataLocalISO()}.csv`, gerarCsv(cabecalhos, linhas));
+  }
 
   return (
     <div className="secretaria-grid">
@@ -270,6 +396,32 @@ function PainelMacroSecretaria({
           </p>
         </div>
         <div className="secretaria-acoes-topo">
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="btn btn-secundario btn-pequeno"
+              onClick={exportarProtocolosCsv}
+              title="Exportar todos os protocolos da rede em planilha CSV"
+            >
+              <Icone nome="file-text" tamanho={14} /> Protocolos (CSV)
+            </button>
+            <button
+              type="button"
+              className="btn btn-secundario btn-pequeno"
+              onClick={exportarFilaEsperaCsv}
+              title="Exportar fila de espera da rede em planilha CSV"
+            >
+              <Icone nome="list" tamanho={14} /> Fila de Espera (CSV)
+            </button>
+            <button
+              type="button"
+              className="btn btn-secundario btn-pequeno"
+              onClick={exportarOcupacaoBairrosCsv}
+              title="Exportar indicador de demanda por bairro em CSV"
+            >
+              <Icone nome="pin" tamanho={14} /> Bairros (CSV)
+            </button>
+          </div>
           {onAbrirLeitor && (
             <button
               type="button"
@@ -311,6 +463,10 @@ function PainelMacroSecretaria({
         <div className="kpi kpi-destaque">
           <span className="kpi-num">{kpis.protocolosAguardando}</span>
           <span>protocolos QR aguardando ({kpis.protocolosAtendidos} já atendidos)</span>
+        </div>
+        <div className="kpi">
+          <span className="kpi-num">{kpis.taxaAbsenteismo ?? 0}%</span>
+          <span>taxa de absenteísmo ({kpis.protocolosExpirados ?? 0} expirados)</span>
         </div>
       </section>
 
@@ -522,6 +678,49 @@ function PainelUnidade({
   const protPendentes = protocolos.filter((p) => p.status === 'aguardando');
   const seletorId = useId();
 
+  function exportarProtocolosUnidadeCsv() {
+    const cabecalhos = [
+      'Código',
+      'Etapa',
+      'Turma',
+      'Período',
+      'Responsável',
+      'Telefone',
+      'Data da Visita',
+      'Turno',
+      'Documentos Marcados',
+      'Total Obrigatórios',
+      'Status',
+      'Reserva de Vaga',
+      'Posição na Fila',
+      'Data de Emissão',
+    ];
+    const linhas = protocolos.map((p) => [
+      p.codigo,
+      p.etapa,
+      p.turma,
+      p.periodo,
+      p.responsavel,
+      p.telefone ?? '',
+      p.dataVisita,
+      p.turnoVisita,
+      p.documentosMarcados.length,
+      p.totalObrigatorios,
+      p.status,
+      p.reservaVaga ? 'Sim (Vaga Pré-Reservada)' : 'Não (Fila de Espera)',
+      p.posicaoFila ?? '',
+      new Date(p.criadoEm).toLocaleString('pt-BR'),
+    ]);
+    const blob = new Blob([gerarCsv(cabecalhos, linhas)], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `protocolos-${escola.id}-${dataLocalISO()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast(`Planilha da unidade baixada!`, { emoji: 'check-circle', tom: 'ok' });
+  }
+
   return (
     <>
       <section className="painel-cabecalho">
@@ -596,15 +795,26 @@ function PainelUnidade({
             </p>
           </div>
           {onAbrirLeitor && (
-            <button
-              type="button"
-              className="btn btn-primario btn-pequeno btn-escanear-qr"
-              onClick={onAbrirLeitor}
-              title="Abrir câmera para escanear QR Code do voucher presencial"
-            >
-              <Icone nome="qr-code" tamanho={16} />
-              <span>Escanear QR Code</span>
-            </button>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secundario btn-pequeno"
+                onClick={exportarProtocolosUnidadeCsv}
+                title="Exportar protocolos desta unidade escolar em CSV"
+              >
+                <Icone nome="file-text" tamanho={15} />
+                <span>Exportar CSV</span>
+              </button>
+              <button
+                type="button"
+                className="btn btn-primario btn-pequeno btn-escanear-qr"
+                onClick={onAbrirLeitor}
+                title="Abrir câmera para escanear QR Code do voucher presencial"
+              >
+                <Icone nome="qr-code" tamanho={16} />
+                <span>Escanear QR Code</span>
+              </button>
+            </div>
           )}
         </div>
 

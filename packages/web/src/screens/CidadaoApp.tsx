@@ -15,6 +15,7 @@ import { bell, bulb, school } from '../stickers/icons';
 import { Sticker } from '../stickers/Sticker';
 import { AlertSheet } from './AlertSheet';
 import { CompareSheet } from './CompareSheet';
+import { ConsultarProtocoloSheet } from './ConsultarProtocoloSheet';
 import { Landing } from './Landing';
 import { StepOnde } from './StepOnde';
 import { StepQuem } from './StepQuem';
@@ -52,6 +53,7 @@ export function CidadaoApp() {
   const [comparar, setComparar] = useState<string[]>([]);
   const [compOpen, setCompOpen] = useState(false);
   const [alerta, setAlerta] = useState<{ open: boolean; escolaId?: string }>({ open: false });
+  const [consultarProtAberto, setConsultarProtAberto] = useState(false);
   const [destaque, setDestaque] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [meusCodigos] = usePersistido<Record<string, string>>('ma:protocolos:por-escola:v1', {});
@@ -242,6 +244,15 @@ export function CidadaoApp() {
 
           <div className="topo-acoes">
             <div className="topo-grupo-acess" role="group" aria-label="Preferências e acessibilidade">
+              <button
+                type="button"
+                className="btn-barra"
+                onClick={() => setConsultarProtAberto(true)}
+                title="Consultar ou resgatar protocolo pelo código"
+              >
+                <Icone nome="ticket" tamanho={15} /> <span className="rotulo-topo">Buscar Senha</span>
+              </button>
+
               {protocoloMaisRecente && (
                 <button
                   type="button"
@@ -304,6 +315,7 @@ export function CidadaoApp() {
             onVerEscola={verEscolaDaLanding}
             protocoloAtivo={protocoloMaisRecente}
             onAbrirProtocolo={abrirProtocolo}
+            onConsultarProtocolo={() => setConsultarProtAberto(true)}
           />
         ) : (
           <div className="consulta-grid">
@@ -664,6 +676,11 @@ export function CidadaoApp() {
         onClose={() => setAlerta({ open: false })}
         busca={busca}
         escolaId={alerta.escolaId}
+      />
+      <ConsultarProtocoloSheet
+        open={consultarProtAberto}
+        onClose={() => setConsultarProtAberto(false)}
+        onProtocoloEncontrado={(escolaId) => abrirProtocolo(escolaId)}
       />
     </div>
   );
