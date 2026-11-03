@@ -1022,7 +1022,7 @@ function PainelMacroSecretaria({
                     <th scope="col">Etapa & Turma</th>
                     <th scope="col" style={{ minWidth: '180px' }}>Score Regulatório</th>
                     <th scope="col" style={{ textAlign: 'center' }}>Origem</th>
-                    <th scope="col" style={{ textAlign: 'center' }}>Status</th>
+                    <th scope="col" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>Status</th>
                     <th scope="col" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>Inscrição</th>
                   </tr>
                 </thead>
@@ -1084,19 +1084,24 @@ function PainelMacroSecretaria({
                           <span style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>Regular</span>
                         )}
                       </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <span
-                          className="badge-mini"
-                          style={{
-                            background: item.reservaVaga ? 'var(--ok-bg)' : 'var(--surface-2)',
-                            color: item.reservaVaga ? 'var(--ok)' : 'var(--muted)',
-                            borderColor: item.reservaVaga ? 'var(--ok)' : 'var(--line)',
-                            fontWeight: 800,
-                            padding: '3px 8px',
-                          }}
-                        >
-                          {item.reservaVaga ? 'Vaga Pré-Reservada' : 'Fila de Espera'}
-                        </span>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        {item.reservaVaga ? (
+                          <span
+                            className="status-fila-badge status-reservada"
+                            title="Vaga pré-reservada aguardando confirmação presencial"
+                          >
+                            <span className="status-fila-ponto" aria-hidden="true" />
+                            Pré-Reservada
+                          </span>
+                        ) : (
+                          <span
+                            className="status-fila-badge status-espera"
+                            title="Candidato aguardando abertura de nova vaga"
+                          >
+                            <span className="status-fila-ponto" aria-hidden="true" />
+                            Fila de Espera
+                          </span>
+                        )}
                       </td>
                       <td style={{ fontSize: '0.8rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                         {new Date(item.criadoEm).toLocaleDateString('pt-BR')} {new Date(item.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -1594,17 +1599,11 @@ function PainelUnidade({
                     <strong className="prot-badge-codigo">{p.codigo}</strong>
                     {p.reservaVaga && p.status === 'aguardando' && (
                       <span
-                        style={{
-                          fontSize: '0.75rem',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          background: '#E8F5E9',
-                          color: '#1B5E20',
-                          border: '1px solid #81C784',
-                        }}
+                        className="status-fila-badge status-reservada"
+                        title="Vaga pré-reservada aguardando confirmação presencial"
                       >
-                        🔒 Vaga Pré-Reservada
+                        <span className="status-fila-ponto" aria-hidden="true" />
+                        Pré-Reservada
                       </span>
                     )}
                     {p.motivoCancelamento === 'expirado_sem_comparecimento' && (
