@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Icone, IconeEtapa } from '../components/Icone';
 import { LeitorQrModal } from '../components/LeitorQrModal';
 import { toast } from '../components/Toasts';
@@ -144,13 +144,20 @@ export function Gestao() {
             </nav>
 
             <div className="gestao-topo-acoes">
+              <a className="btn btn-secundario btn-pequeno" href="#" title="Voltar ao portal dos pais">
+                <Icone nome="arrow-left" tamanho={13} />
+                <span className="btn-voltar-texto-longo">Portal dos Pais</span>
+                <span className="btn-voltar-texto-curto">Voltar</span>
+              </a>
+
               {aba === 'secretaria' && authSecretaria && (
                 <button
                   type="button"
                   className="btn btn-fantasma btn-pequeno"
                   onClick={sairSecretaria}
+                  title="Encerrar sessão da Secretaria"
                 >
-                  <Icone nome="x" tamanho={14} /> Sair da Secretaria
+                  <Icone nome="x" tamanho={14} /> Sair
                 </button>
               )}
 
@@ -159,15 +166,11 @@ export function Gestao() {
                   type="button"
                   className="btn btn-fantasma btn-pequeno"
                   onClick={sairUnidade}
+                  title="Encerrar sessão da Unidade"
                 >
-                  <Icone nome="x" tamanho={14} /> Sair da Unidade
+                  <Icone nome="x" tamanho={14} /> Sair
                 </button>
               )}
-
-              <a className="btn btn-secundario btn-pequeno" href="#" title="Voltar ao portal dos pais">
-                <span className="btn-voltar-texto-longo">← Voltar ao portal dos pais</span>
-                <span className="btn-voltar-texto-curto">← Voltar</span>
-              </a>
             </div>
           </div>
         </header>
@@ -185,7 +188,6 @@ export function Gestao() {
                     window.history.replaceState(null, '', '#/gestao/unidade');
                   }}
                   onAbrirLeitor={() => setLeitorQrAberto(true)}
-                  onSair={sairSecretaria}
                 />
               ) : (
                 <p className="aviso-suave">Carregando indicadores da Secretaria Municipal de Educação de Patos - PB…</p>
@@ -257,18 +259,39 @@ export function Gestao() {
   );
 }
 
+function formatarAcaoAuditoria(acao: string): { label: string; classe: string; icone: any } {
+  switch (acao) {
+    case 'ALOCACAO_JUDICIAL':
+      return { label: 'Alocação Judicial', classe: 'acao-judicial', icone: 'scale' };
+    case 'AUTUACAO_JUDICIAL':
+      return { label: 'Mandado Autuado', classe: 'acao-judicial', icone: 'file-text' };
+    case 'BAIXA_PRESENCIAL':
+      return { label: 'Matrícula Confirmada', classe: 'acao-ok', icone: 'check-circle' };
+    case 'EXPIRACAO_AUTOMATICA':
+      return { label: 'Expirou Comparecimento', classe: 'acao-alerta', icone: 'clock' };
+    case 'CANCELAMENTO_PRESENCIAL':
+      return { label: 'Cancelamento Presencial', classe: 'acao-perigo', icone: 'x' };
+    case 'DESISTENCIA_VOLUNTARIA':
+      return { label: 'Desistência Voluntária', classe: 'acao-perigo', icone: 'x' };
+    case 'ATUALIZACAO_VAGAS':
+      return { label: 'Vagas Atualizadas', classe: 'acao-info', icone: 'refresh' };
+    case 'AUDITORIA_EXPORTADA':
+      return { label: 'Exportação CSV', classe: 'acao-info', icone: 'file-text' };
+    default:
+      return { label: acao.replace(/_/g, ' '), classe: 'acao-info', icone: 'info' };
+  }
+}
+
 function PainelMacroSecretaria({
   painel,
   protocolos,
   onAbrirUnidade,
   onAbrirLeitor,
-  onSair,
 }: {
   painel: PainelSecretariaDTO;
   protocolos: ProtocoloVisita[];
   onAbrirUnidade: (id: string) => void;
   onAbrirLeitor?: () => void;
-  onSair: () => void;
 }) {
   const agora = useAgora(15_000);
   const escolas = useEscolas();
@@ -283,10 +306,36 @@ function PainelMacroSecretaria({
   const [demandasJudiciais, setDemandasJudiciais] = useState<DemandaJudicial[]>([]);
   const [carregandoJudicial, setCarregandoJudicial] = useState(false);
   const [modalCadastroJudicial, setModalCadastroJudicial] = useState(false);
+  const [demandaParaAlocar, setDemandaParaAlocar] = useState<DemandaJudicial | null>(null);
+  const [alocandoJudicial, setAlocandoJudicial] = useState(false);
   const [certidaoAtiva, setCertidaoAtiva] = useState<CertidaoCumprimentoJudicialDTO | null>(null);
 
   const [logsAuditoria, setLogsAuditoria] = useState<LogAuditoria[]>([]);
   const [carregandoAuditoria, setCarregandoAuditoria] = useState(false);
+  const [buscaAuditoria, setBuscaAuditoria] = useState('');
+  const [filtroAcaoAuditoria, setFiltroAcaoAuditoria] = useState<'todas' | 'judicial' | 'expiracao' | 'confirmacao'>('todas');
+
+  // Logs de auditoria filtrados por texto e categoria
+  const logsAuditoriaFiltrados = useMemo(() => {
+    let filtrados = logsAuditoria;
+    if (filtroAcaoAuditoria === 'judicial') {
+      filtrados = filtrados.filter((l) => l.acao.includes('JUDICIAL'));
+    } else if (filtroAcaoAuditoria === 'expiracao') {
+      filtrados = filtrados.filter((l) => l.acao === 'EXPIRACAO_AUTOMATICA');
+    } else if (filtroAcaoAuditoria === 'confirmacao') {
+      filtrados = filtrados.filter((l) => l.acao === 'BAIXA_PRESENCIAL');
+    }
+
+    if (!buscaAuditoria.trim()) return filtrados;
+    const termo = buscaAuditoria.toLowerCase();
+    return filtrados.filter(
+      (l) =>
+        l.operadorUsuario.toLowerCase().includes(termo) ||
+        l.acao.toLowerCase().includes(termo) ||
+        (l.protocoloCodigo && l.protocoloCodigo.toLowerCase().includes(termo)) ||
+        (l.justificativa && l.justificativa.toLowerCase().includes(termo)),
+    );
+  }, [logsAuditoria, buscaAuditoria, filtroAcaoAuditoria]);
 
   // Carrega dados da Fila Auditável quando selecionada
   useEffect(() => {
@@ -361,11 +410,7 @@ function PainelMacroSecretaria({
   }, [subAba]);
 
   async function executarAlocacaoJudicial(demanda: DemandaJudicial) {
-    const confirmou = window.confirm(
-      `Confirma a alocação prioritária imediata de vaga para "${demanda.estudanteNome}" na unidade "${demanda.escolaNome}" em cumprimento ao Processo nº ${demanda.numeroProcesso}?`,
-    );
-    if (!confirmou) return;
-
+    setAlocandoJudicial(true);
     try {
       const res = await vagasStore.alocarVagaJudicial(
         demanda.id,
@@ -375,12 +420,15 @@ function PainelMacroSecretaria({
         emoji: 'check-circle',
         tom: 'ok',
       });
+      setDemandaParaAlocar(null);
       recarregarDemandasJudiciais();
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Falha ao alocar vaga judicial.', {
         emoji: 'alert-triangle',
         tom: 'aviso',
       });
+    } finally {
+      setAlocandoJudicial(false);
     }
   }
 
@@ -554,7 +602,17 @@ function PainelMacroSecretaria({
           </p>
         </div>
         <div className="secretaria-acoes-topo">
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onAbrirLeitor && (
+            <button
+              type="button"
+              className="btn btn-primario btn-pequeno btn-escanear-qr"
+              onClick={onAbrirLeitor}
+              title="Abrir câmera para escanear QR Code do comprovante presencial"
+            >
+              <Icone nome="qr-code" tamanho={15} /> Escanear / Localizar Protocolo
+            </button>
+          )}
+          <div className="export-acoes-grupo">
             <button
               type="button"
               className="btn btn-secundario btn-pequeno"
@@ -569,7 +627,7 @@ function PainelMacroSecretaria({
               onClick={exportarFilaEsperaCsv}
               title="Exportar fila de espera da rede em planilha CSV"
             >
-              <Icone nome="list" tamanho={14} /> Fila de Espera (CSV)
+              <Icone nome="list" tamanho={14} /> Fila (CSV)
             </button>
             <button
               type="button"
@@ -580,84 +638,45 @@ function PainelMacroSecretaria({
               <Icone nome="pin" tamanho={14} /> Bairros (CSV)
             </button>
           </div>
-          {onAbrirLeitor && (
-            <button
-              type="button"
-              className="btn btn-primario btn-pequeno btn-escanear-qr"
-              onClick={onAbrirLeitor}
-              title="Abrir câmera para escanear QR Code do comprovante presencial"
-            >
-              <Icone nome="qr-code" tamanho={15} /> Escanear / Localizar Protocolo
-            </button>
-          )}
-          <button
-            type="button"
-            className="btn btn-fantasma btn-pequeno"
-            onClick={onSair}
-            title="Encerrar sessão de gestão da Secretaria"
-          >
-            <Icone nome="x" tamanho={14} /> Sair da Secretaria
-          </button>
         </div>
       </section>
 
       {/* Navegação entre Visão Geral da Rede, Fila Regulada, Demandas Judiciais e Auditoria */}
-      <div
-        className="sub-abas-navegacao"
-        style={{
-          display: 'flex',
-          gap: '8px',
-          borderBottom: '1px solid #E2E8F0',
-          paddingBottom: '12px',
-          marginBottom: '20px',
-          flexWrap: 'wrap',
-        }}
-      >
+      <nav className="gestao-sub-abas" aria-label="Seções do Painel da Secretaria">
         <button
           type="button"
-          className={`btn ${subAba === 'rede' ? 'btn-primario' : 'btn-secundario'}`}
+          className={`gestao-sub-aba-btn ${subAba === 'rede' ? 'ativo' : ''}`}
           onClick={() => setSubAba('rede')}
         >
           <Icone nome="landmark" tamanho={16} /> Visão Geral da Rede
         </button>
         <button
           type="button"
-          className={`btn ${subAba === 'regulacao' ? 'btn-primario' : 'btn-secundario'}`}
+          className={`gestao-sub-aba-btn ${subAba === 'regulacao' ? 'ativo' : ''}`}
           onClick={() => setSubAba('regulacao')}
         >
           <Icone nome="scale" tamanho={16} /> Fila & Regulação Auditável
         </button>
         <button
           type="button"
-          className={`btn ${subAba === 'judicial' ? 'btn-primario' : 'btn-secundario'}`}
+          className={`gestao-sub-aba-btn ${subAba === 'judicial' ? 'ativo' : ''}`}
           onClick={() => setSubAba('judicial')}
-          style={{ position: 'relative' }}
         >
           <Icone nome="file-text" tamanho={16} /> Demandas Judiciais (PJ-e)
           {demandasJudiciais.filter((d) => d.status === 'pendente').length > 0 && (
-            <span
-              style={{
-                background: '#EF4444',
-                color: '#FFF',
-                borderRadius: '10px',
-                padding: '2px 7px',
-                fontSize: '0.75rem',
-                fontWeight: 700,
-                marginLeft: '6px',
-              }}
-            >
+            <span className="gestao-sub-aba-badge">
               {demandasJudiciais.filter((d) => d.status === 'pendente').length}
             </span>
           )}
         </button>
         <button
           type="button"
-          className={`btn ${subAba === 'auditoria' ? 'btn-primario' : 'btn-secundario'}`}
+          className={`gestao-sub-aba-btn ${subAba === 'auditoria' ? 'ativo' : ''}`}
           onClick={() => setSubAba('auditoria')}
         >
           <Icone nome="history" tamanho={16} /> Trilha de Auditoria (TCE / MP)
         </button>
-      </div>
+      </nav>
 
       {subAba === 'rede' && (
         <>
@@ -893,43 +912,34 @@ function PainelMacroSecretaria({
           </div>
 
           {/* Banner de Critérios Legais */}
-          <div
-            style={{
-              background: '#F0F9FF',
-              border: '1px solid #BAE6FD',
-              borderRadius: '10px',
-              padding: '14px 16px',
-              fontSize: '0.86rem',
-              color: '#0369A1',
-              lineHeight: '1.45',
-            }}
-          >
-            <strong>Critérios Legais de Desempate e Vulnerabilidade Ativos (Patos - PB):</strong>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+          <div className="criterios-banner-seduc">
+            <div className="criterios-banner-topo">
+              <span className="criterios-banner-titulo">
+                <Icone nome="scale" tamanho={18} /> Critérios Legais de Desempate e Vulnerabilidade Ativos (Patos - PB)
+              </span>
+              <span className="criterios-banner-sub">
+                Marco Legal da 1ª Infância (Lei 13.257/16), ECA art. 53 e Lei 12.764/12 (TEA)
+              </span>
+            </div>
+            <div className="criterios-chips-grid">
               {LISTA_CRITERIOS_VULNERABILIDADE.map((c) => (
-                <span
-                  key={c.id}
-                  style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #7DD3FC',
-                    borderRadius: '6px',
-                    padding: '4px 8px',
-                    fontWeight: 500,
-                  }}
-                >
-                  +{c.pontos} pts · {c.nome}
-                </span>
+                <div key={c.id} className="criterio-chip" title={c.descricao}>
+                  <strong>+{c.pontos} pts</strong>
+                  <span>{c.nome}</span>
+                </div>
               ))}
             </div>
           </div>
 
           {/* Filtros da Fila */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Etapa:</span>
+          <div className="toolbar-filtro-fila">
+            <div className="toolbar-filtro-chips">
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--muted)', marginRight: '2px' }}>
+                Etapa:
+              </span>
               <button
                 type="button"
-                className={`btn btn-pequeno ${etapaFiltro === 'todas' ? 'btn-primario' : 'btn-secundario'}`}
+                className={`filtro-chip-btn ${etapaFiltro === 'todas' ? 'ativo' : ''}`}
                 onClick={() => setEtapaFiltro('todas')}
               >
                 Todas as Etapas
@@ -938,7 +948,7 @@ function PainelMacroSecretaria({
                 <button
                   key={eid}
                   type="button"
-                  className={`btn btn-pequeno ${etapaFiltro === eid ? 'btn-primario' : 'btn-secundario'}`}
+                  className={`filtro-chip-btn ${etapaFiltro === eid ? 'ativo' : ''}`}
                   onClick={() => setEtapaFiltro(eid)}
                 >
                   <IconeEtapa etapa={eid} tamanho={14} /> {ETAPAS[eid]?.nome ?? eid}
@@ -946,34 +956,30 @@ function PainelMacroSecretaria({
               ))}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="toolbar-filtro-busca">
+              <span className="icone-busca" aria-hidden="true">
+                <Icone nome="compass" tamanho={16} />
+              </span>
               <input
                 type="search"
                 className="campo-busca-fila"
                 placeholder="Buscar por código ou iniciais..."
                 value={buscaFila}
                 onChange={(e) => setBuscaFila(e.target.value)}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '6px',
-                  border: '1px solid #CBD5E1',
-                  fontSize: '0.88rem',
-                  minWidth: '240px',
-                }}
               />
             </div>
           </div>
 
           {/* Tabela de Fila */}
           {carregandoFila ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>
               <Icone nome="hourglass" tamanho={24} />
-              <p style={{ marginTop: '8px' }}>Carregando fila regulatória auditável...</p>
+              <p style={{ marginTop: '8px', fontWeight: 600 }}>Carregando fila regulatória auditável...</p>
             </div>
           ) : filaAuditavel.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F8FAFC', borderRadius: '8px', color: '#64748B' }}>
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '2px solid var(--line)', color: 'var(--muted)' }}>
               <Icone nome="check-circle" tamanho={32} />
-              <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
+              <p style={{ margin: '8px 0 0', fontWeight: 700, color: 'var(--text)' }}>
                 Nenhuma solicitação na fila para o filtro selecionado.
               </p>
             </div>
@@ -982,101 +988,87 @@ function PainelMacroSecretaria({
               <table className="tabela-secretaria">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ width: '60px' }}>Pos.</th>
-                    <th scope="col">Protocolo</th>
-                    <th scope="col">Estudante</th>
-                    <th scope="col">Responsável</th>
+                    <th scope="col" style={{ width: '54px', textAlign: 'center' }}>Pos.</th>
+                    <th scope="col" style={{ width: '140px' }}>Protocolo</th>
+                    <th scope="col">Candidato / Responsável</th>
                     <th scope="col">Unidade / Bairro</th>
                     <th scope="col">Etapa & Turma</th>
                     <th scope="col">Score Regulatório</th>
-                    <th scope="col">Origem</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Inscrição</th>
+                    <th scope="col" style={{ textAlign: 'center', width: '100px' }}>Origem</th>
+                    <th scope="col" style={{ textAlign: 'center', width: '150px' }}>Status</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap', width: '130px' }}>Inscrição</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filaAuditavel.map((item) => (
                     <tr key={item.codigo}>
-                      <td style={{ fontWeight: 700, textAlign: 'center' }}>
+                      <td style={{ fontWeight: 800, textAlign: 'center' }}>
                         {item.origem === 'judicial' ? (
                           <span title="Prioridade Absoluta por Decisão Judicial">⚖️ 1º</span>
                         ) : (
                           `#${item.posicao}`
                         )}
                       </td>
-                      <td>
-                        <strong style={{ fontFamily: 'monospace', color: '#0F172A' }}>{item.codigo}</strong>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <strong style={{ fontFamily: 'monospace', color: 'var(--text)' }}>{item.codigo}</strong>
                       </td>
-                      <td style={{ fontWeight: 600 }}>{item.estudanteIniciais}</td>
-                      <td style={{ color: '#475569' }}>{item.responsavelIniciais}</td>
                       <td>
-                        <div><strong>{item.escolaNome}</strong></div>
-                        <small style={{ color: '#64748B' }}>{item.escolaBairro}</small>
+                        <div style={{ fontWeight: 800, color: 'var(--text)' }}>{item.estudanteIniciais}</div>
+                        <small className="celula-sub">Resp: {item.responsavelIniciais}</small>
+                      </td>
+                      <td>
+                        <div><strong style={{ color: 'var(--text)' }}>{item.escolaNome}</strong></div>
+                        <small className="celula-sub">{item.escolaBairro}</small>
                       </td>
                       <td>
                         <div>{ETAPAS[item.etapa]?.nome ?? item.etapa}</div>
-                        <small style={{ color: '#64748B' }}>{item.turma} ({item.periodo})</small>
+                        <small className="celula-sub">{item.turma} ({item.periodo})</small>
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <span style={{ fontWeight: 700, color: item.pontosTotais > 0 ? '#1D4ED8' : '#64748B' }}>
+                          <span style={{ fontWeight: 800, color: item.pontosTotais > 0 ? 'var(--primary)' : 'var(--muted)' }}>
                             {item.pontosTotais} pontos
                           </span>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
-                            {item.criteriosAtendidos.map((cid) => (
-                              <span
-                                key={cid}
-                                style={{
-                                  background: '#EFF6FF',
-                                  color: '#1E40AF',
-                                  fontSize: '0.72rem',
-                                  padding: '1px 5px',
-                                  borderRadius: '4px',
-                                  border: '1px solid #BFDBFE',
-                                }}
-                                title={CRITERIOS_VULNERABILIDADE[cid]?.descricao}
-                              >
-                                {CRITERIOS_VULNERABILIDADE[cid]?.nome}
-                              </span>
-                            ))}
-                          </div>
+                          {item.criteriosAtendidos.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                              {item.criteriosAtendidos.map((cid) => (
+                                <span
+                                  key={cid}
+                                  className="badge-mini"
+                                  style={{ fontSize: '0.72rem', padding: '1px 6px' }}
+                                  title={CRITERIOS_VULNERABILIDADE[cid]?.descricao}
+                                >
+                                  {CRITERIOS_VULNERABILIDADE[cid]?.nome}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'center' }}>
                         {item.origem === 'judicial' ? (
-                          <span
-                            style={{
-                              background: '#FEF2F2',
-                              color: '#991B1B',
-                              border: '1px solid #FECACA',
-                              borderRadius: '4px',
-                              padding: '2px 6px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                            }}
-                          >
-                            Mandado Judicial
+                          <span className="badge-acao-auditoria acao-judicial">
+                            <Icone nome="scale" tamanho={12} /> Judicial
                           </span>
                         ) : (
-                          <span style={{ color: '#64748B', fontSize: '0.8rem' }}>Regular</span>
+                          <span style={{ color: 'var(--muted)', fontSize: '0.8rem', fontWeight: 700 }}>Regular</span>
                         )}
                       </td>
-                      <td>
+                      <td style={{ textAlign: 'center' }}>
                         <span
+                          className="badge-mini"
                           style={{
-                            display: 'inline-block',
+                            background: item.reservaVaga ? 'var(--ok-bg)' : 'var(--surface-2)',
+                            color: item.reservaVaga ? 'var(--ok)' : 'var(--muted)',
+                            borderColor: item.reservaVaga ? 'var(--ok)' : 'var(--line)',
+                            fontWeight: 800,
                             padding: '3px 8px',
-                            borderRadius: '12px',
-                            fontSize: '0.75rem',
-                            fontWeight: 600,
-                            background: item.reservaVaga ? '#ECFDF5' : '#F1F5F9',
-                            color: item.reservaVaga ? '#065F46' : '#475569',
                           }}
                         >
                           {item.reservaVaga ? 'Vaga Pré-Reservada' : 'Fila de Espera'}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.8rem', color: '#64748B', whiteSpace: 'nowrap' }}>
+                      <td style={{ fontSize: '0.8rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
                         {new Date(item.criadoEm).toLocaleDateString('pt-BR')} {new Date(item.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </td>
                     </tr>
@@ -1110,82 +1102,39 @@ function PainelMacroSecretaria({
           </div>
 
           {carregandoJudicial ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>
               <Icone nome="hourglass" tamanho={24} />
-              <p style={{ marginTop: '8px' }}>Carregando processos judiciais autuados...</p>
+              <p style={{ marginTop: '8px', fontWeight: 600 }}>Carregando processos judiciais autuados...</p>
             </div>
           ) : demandasJudiciais.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F8FAFC', borderRadius: '8px', color: '#64748B' }}>
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '2px solid var(--line)', color: 'var(--muted)' }}>
               <Icone nome="check-circle" tamanho={32} />
-              <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
+              <p style={{ margin: '8px 0 0', fontWeight: 700, color: 'var(--text)' }}>
                 Nenhuma ordem judicial pendente ou cadastrada no sistema.
               </p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+            <div className="grid-demandas-judiciais">
               {demandasJudiciais.map((demanda) => {
                 const prazoDate = new Date(demanda.prazoLimiteEm);
                 const horasRestantes = Math.round((demanda.prazoLimiteEm - agora) / (1000 * 60 * 60));
                 const estaVencendo = demanda.status === 'pendente' && horasRestantes <= 24 && horasRestantes > 0;
                 const estaVencida = demanda.status === 'pendente' && horasRestantes <= 0;
 
+                const statusClasse = demanda.status === 'alocado'
+                  ? 'status-alocado'
+                  : (estaVencida || estaVencendo)
+                  ? 'status-urgente'
+                  : '';
+
                 return (
-                  <div
-                    key={demanda.id}
-                    style={{
-                      background: '#FFFFFF',
-                      border: estaVencida
-                        ? '2px solid #EF4444'
-                        : estaVencendo
-                        ? '2px solid #F59E0B'
-                        : demanda.status === 'alocado'
-                        ? '1px solid #10B981'
-                        : '1px solid #E2E8F0',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                    }}
-                  >
+                  <div key={demanda.id} className={`card-demanda-judicial ${statusClasse}`}>
                     <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                        <span
-                          style={{
-                            fontFamily: 'monospace',
-                            fontWeight: 700,
-                            fontSize: '0.85rem',
-                            color: '#1E293B',
-                            background: '#F1F5F9',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                          }}
-                          title={demanda.numeroProcesso}
-                        >
+                      <div className="card-demanda-judicial-topo">
+                        <span className="demanda-proc-badge" title={demanda.numeroProcesso}>
                           {mascararProcessoCNJ(demanda.numeroProcesso)}
                         </span>
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            padding: '3px 8px',
-                            borderRadius: '10px',
-                            background:
-                              demanda.status === 'alocado'
-                                ? '#DEF7EC'
-                                : estaVencida
-                                ? '#FDE8E8'
-                                : '#FEF08A',
-                            color:
-                              demanda.status === 'alocado'
-                                ? '#03543F'
-                                : estaVencida
-                                ? '#9B1C1C'
-                                : '#713F12',
-                          }}
-                        >
+                        <span className={`demanda-status-pill ${demanda.status === 'alocado' ? 'alocado' : estaVencida ? 'expirado' : 'pendente'}`}>
                           {demanda.status === 'alocado'
                             ? 'Alocado (Cumprida)'
                             : estaVencida
@@ -1194,39 +1143,38 @@ function PainelMacroSecretaria({
                         </span>
                       </div>
 
-                      <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0F172A' }}>
+                      <h3 className="demanda-nome-aluno">
                         {demanda.estudanteNome}
                       </h3>
-                      <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#64748B' }}>
+                      <p className="demanda-resp-info">
                         Responsável: <strong>{demanda.responsavelNome}</strong> (CPF: {demanda.cpfCertidao})
                       </p>
 
-                      <div style={{ fontSize: '0.85rem', color: '#334155', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div><strong>Vara:</strong> {demanda.vara}</div>
-                        <div><strong>Destino:</strong> {demanda.escolaNome} ({ETAPAS[demanda.etapa]?.nome ?? demanda.etapa})</div>
+                      <div className="demanda-dados-lista">
+                        <div className="demanda-dado-item">
+                          <Icone nome="landmark" tamanho={14} />
+                          <span><strong>Vara:</strong> {demanda.vara}</span>
+                        </div>
+                        <div className="demanda-dado-item">
+                          <Icone nome="school" tamanho={14} />
+                          <span><strong>Destino:</strong> {demanda.escolaNome} ({ETAPAS[demanda.etapa]?.nome ?? demanda.etapa})</span>
+                        </div>
                         {demanda.multaDiaria ? (
-                          <div style={{ color: '#DC2626', fontWeight: 600 }}>
-                            ⚠️ Multa cominatória (astreinte): R$ {demanda.multaDiaria.toLocaleString('pt-BR')}/dia
+                          <div className="demanda-astreinte-aviso">
+                            <Icone nome="alert-triangle" tamanho={13} />
+                            <span>Multa cominatória (astreinte): R$ {demanda.multaDiaria.toLocaleString('pt-BR')}/dia</span>
                           </div>
                         ) : null}
                       </div>
 
                       {/* Contador do Prazo */}
                       {demanda.status !== 'alocado' && (
-                        <div
-                          style={{
-                            background: estaVencida ? '#FEF2F2' : estaVencendo ? '#FFFBEB' : '#F8FAFC',
-                            border: `1px solid ${estaVencida ? '#FECACA' : estaVencendo ? '#FDE68A' : '#E2E8F0'}`,
-                            borderRadius: '8px',
-                            padding: '8px 12px',
-                            marginBottom: '14px',
-                            fontSize: '0.82rem',
-                          }}
-                        >
-                          <div style={{ fontWeight: 600, color: estaVencida ? '#991B1B' : estaVencendo ? '#92400E' : '#475569' }}>
+                        <div className={`demanda-prazo-box ${estaVencida ? 'expirado' : estaVencendo ? 'urgente' : ''}`}>
+                          <div style={{ fontWeight: 800, color: estaVencida ? 'var(--wait)' : estaVencendo ? 'var(--warn)' : 'var(--text)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icone nome="clock" tamanho={14} />
                             Prazo Fatal: {prazoDate.toLocaleDateString('pt-BR')} às {prazoDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
-                          <div style={{ fontSize: '0.78rem', marginTop: '2px', color: estaVencida ? '#B91C1C' : '#64748B' }}>
+                          <div style={{ fontSize: '0.78rem', color: estaVencida ? 'var(--wait)' : 'var(--muted)', fontWeight: 600 }}>
                             {estaVencida
                               ? `⚠️ Vencido há ${Math.abs(horasRestantes)} horas!`
                               : `Restam aproximadamente ${horasRestantes} horas para cumprimento.`}
@@ -1237,27 +1185,28 @@ function PainelMacroSecretaria({
                       {demanda.protocoloCodigo && (
                         <div
                           style={{
-                            background: '#ECFDF5',
-                            border: '1px solid #A7F3D0',
-                            borderRadius: '8px',
+                            background: 'var(--ok-bg)',
+                            border: '1.5px solid var(--ok)',
+                            borderRadius: 'var(--r-sm)',
                             padding: '8px 12px',
                             marginBottom: '14px',
                             fontSize: '0.82rem',
-                            color: '#065F46',
+                            color: 'var(--ok)',
+                            fontWeight: 800,
                           }}
                         >
-                          <strong>Protocolo Vinculado:</strong> {demanda.protocoloCodigo}
+                          Protocolo Vinculado: <span style={{ fontFamily: 'monospace' }}>{demanda.protocoloCodigo}</span>
                         </div>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                       {demanda.status !== 'alocado' ? (
                         <button
                           type="button"
                           className="btn btn-primario btn-pequeno"
                           style={{ width: '100%', justifyContent: 'center' }}
-                          onClick={() => executarAlocacaoJudicial(demanda)}
+                          onClick={() => setDemandaParaAlocar(demanda)}
                         >
                           <Icone nome="check-circle" tamanho={14} /> Alocar Vaga Prioritária
                         </button>
@@ -1292,16 +1241,66 @@ function PainelMacroSecretaria({
             </p>
           </div>
 
-          {carregandoAuditoria ? (
-            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
-              <Icone nome="hourglass" tamanho={24} />
-              <p style={{ marginTop: '8px' }}>Carregando registros de auditoria...</p>
+          {/* Filtros da Auditoria */}
+          <div className="toolbar-filtro-fila">
+            <div className="toolbar-filtro-chips">
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--muted)', marginRight: '2px' }}>
+                Ações:
+              </span>
+              <button
+                type="button"
+                className={`filtro-chip-btn ${filtroAcaoAuditoria === 'todas' ? 'ativo' : ''}`}
+                onClick={() => setFiltroAcaoAuditoria('todas')}
+              >
+                Todas ({logsAuditoria.length})
+              </button>
+              <button
+                type="button"
+                className={`filtro-chip-btn ${filtroAcaoAuditoria === 'judicial' ? 'ativo' : ''}`}
+                onClick={() => setFiltroAcaoAuditoria('judicial')}
+              >
+                <Icone nome="scale" tamanho={13} /> Judiciais
+              </button>
+              <button
+                type="button"
+                className={`filtro-chip-btn ${filtroAcaoAuditoria === 'expiracao' ? 'ativo' : ''}`}
+                onClick={() => setFiltroAcaoAuditoria('expiracao')}
+              >
+                <Icone nome="clock" tamanho={13} /> Expirações
+              </button>
+              <button
+                type="button"
+                className={`filtro-chip-btn ${filtroAcaoAuditoria === 'confirmacao' ? 'ativo' : ''}`}
+                onClick={() => setFiltroAcaoAuditoria('confirmacao')}
+              >
+                <Icone nome="check-circle" tamanho={13} /> Confirmações
+              </button>
             </div>
-          ) : logsAuditoria.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F8FAFC', borderRadius: '8px', color: '#64748B' }}>
+
+            <div className="toolbar-filtro-busca">
+              <span className="icone-busca" aria-hidden="true">
+                <Icone nome="compass" tamanho={16} />
+              </span>
+              <input
+                type="search"
+                className="campo-busca-fila"
+                placeholder="Buscar por protocolo, operador ou motivo..."
+                value={buscaAuditoria}
+                onChange={(e) => setBuscaAuditoria(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {carregandoAuditoria ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>
+              <Icone nome="hourglass" tamanho={24} />
+              <p style={{ marginTop: '8px', fontWeight: 600 }}>Carregando registros de auditoria...</p>
+            </div>
+          ) : logsAuditoriaFiltrados.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: 'var(--surface-2)', borderRadius: 'var(--r-md)', border: '2px solid var(--line)', color: 'var(--muted)' }}>
               <Icone nome="check-circle" tamanho={32} />
-              <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
-                Nenhum log registrado até o momento.
+              <p style={{ margin: '8px 0 0', fontWeight: 700, color: 'var(--text)' }}>
+                Nenhum log registrado para os filtros aplicados.
               </p>
             </div>
           ) : (
@@ -1309,61 +1308,45 @@ function PainelMacroSecretaria({
               <table className="tabela-secretaria">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ width: '150px' }}>Data / Hora</th>
-                    <th scope="col">Operador / Papel</th>
-                    <th scope="col">Ação Regulada</th>
-                    <th scope="col">Entidade</th>
+                    <th scope="col" style={{ width: '145px', whiteSpace: 'nowrap' }}>Data / Hora</th>
+                    <th scope="col" style={{ width: '140px' }}>Operador / Papel</th>
+                    <th scope="col" style={{ width: '180px' }}>Ação Regulada</th>
+                    <th scope="col" style={{ width: '170px' }}>Entidade</th>
                     <th scope="col">Justificativa & Detalhes</th>
-                    <th scope="col">Rastro / IP</th>
+                    <th scope="col" style={{ width: '110px' }}>Rastro / IP</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {logsAuditoria.map((log) => (
-                    <tr key={log.id}>
-                      <td style={{ fontSize: '0.8rem', color: '#475569', whiteSpace: 'nowrap' }}>
-                        {new Date(log.criadoEm).toLocaleDateString('pt-BR')} {new Date(log.criadoEm).toLocaleTimeString('pt-BR')}
-                      </td>
-                      <td>
-                        <strong>{log.operadorUsuario}</strong>
-                        <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{log.operadorPerfil.toUpperCase()}</div>
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            background:
-                              log.acao === 'ALOCACAO_JUDICIAL'
-                                ? '#FEF2F2'
-                                : log.acao === 'BAIXA_PRESENCIAL'
-                                ? '#ECFDF5'
-                                : '#F1F5F9',
-                            color:
-                              log.acao === 'ALOCACAO_JUDICIAL'
-                                ? '#991B1B'
-                                : log.acao === 'BAIXA_PRESENCIAL'
-                                ? '#065F46'
-                                : '#334155',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            fontSize: '0.75rem',
-                            fontWeight: 700,
-                          }}
-                        >
-                          {log.acao}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{log.protocoloCodigo ?? log.escolaId ?? '-'}</div>
-                        <small style={{ color: '#64748B' }}>{log.protocoloCodigo ? 'Protocolo' : log.escolaId ? 'Escola' : 'Geral'}</small>
-                      </td>
-                      <td style={{ fontSize: '0.84rem', maxWidth: '300px' }}>
-                        {log.justificativa}
-                      </td>
-                      <td style={{ fontSize: '0.78rem', color: '#64748B', fontFamily: 'monospace' }}>
-                        {log.ip ?? '127.0.0.1'}
-                      </td>
-                    </tr>
-                  ))}
+                  {logsAuditoriaFiltrados.map((log) => {
+                    const infoAcao = formatarAcaoAuditoria(log.acao);
+                    return (
+                      <tr key={log.id}>
+                        <td style={{ fontSize: '0.8rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                          {new Date(log.criadoEm).toLocaleDateString('pt-BR')} {new Date(log.criadoEm).toLocaleTimeString('pt-BR')}
+                        </td>
+                        <td>
+                          <strong style={{ color: 'var(--text)' }}>{log.operadorUsuario}</strong>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 700 }}>{log.operadorPerfil.toUpperCase()}</div>
+                        </td>
+                        <td>
+                          <span className={`badge-acao-auditoria ${infoAcao.classe}`}>
+                            <Icone nome={infoAcao.icone} tamanho={12} />
+                            {infoAcao.label}
+                          </span>
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <div className="celula-entidade-auditoria">{log.protocoloCodigo ?? log.escolaId ?? '-'}</div>
+                          <small className="celula-sub">{log.protocoloCodigo ? 'Protocolo' : log.escolaId ? 'Escola' : 'Geral'}</small>
+                        </td>
+                        <td style={{ fontSize: '0.84rem', maxWidth: '320px', lineHeight: 1.4 }}>
+                          {log.justificativa}
+                        </td>
+                        <td style={{ fontSize: '0.78rem', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                          {log.ip ?? '127.0.0.1'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1372,6 +1355,15 @@ function PainelMacroSecretaria({
       )}
 
       {/* Modais de Gestão Judicial e Certidão */}
+      {demandaParaAlocar && (
+        <ModalConfirmacaoAlocacaoJudicial
+          demanda={demandaParaAlocar}
+          aoFechar={() => setDemandaParaAlocar(null)}
+          aoConfirmar={() => executarAlocacaoJudicial(demandaParaAlocar)}
+          carregando={alocandoJudicial}
+        />
+      )}
+
       {modalCadastroJudicial && (
         <ModalCadastroDemandaJudicial
           escolas={escolas}
@@ -2105,6 +2097,158 @@ function Contador({
         >
           +
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ModalConfirmacaoAlocacaoJudicial({
+  demanda,
+  aoFechar,
+  aoConfirmar,
+  carregando,
+}: {
+  demanda: DemandaJudicial;
+  aoFechar: () => void;
+  aoConfirmar: () => void;
+  carregando: boolean;
+}) {
+  return (
+    <div className="sheet-backdrop" onClick={aoFechar} role="presentation">
+      <div
+        className="sheet-conteudo"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="t-modal-confirm-judicial"
+        aria-modal="true"
+        style={{
+          maxWidth: '560px',
+          width: '95%',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '24px',
+          gap: '16px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <span className="lp-tag" style={{ background: 'var(--accent)', color: '#fff' }}>
+              Tutela de Urgência · PJ-e
+            </span>
+            <h2 id="t-modal-confirm-judicial" style={{ margin: '8px 0 2px', fontSize: '1.25rem', fontWeight: 900 }}>
+              Confirmar Alocação Prioritária Imediata
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.86rem', color: 'var(--muted)' }}>
+              Cumprimento tempestivo de determinação judicial vinculante (CF art. 227 / ECA art. 53).
+            </p>
+          </div>
+          <button type="button" className="btn btn-fantasma btn-pequeno" onClick={aoFechar} disabled={carregando}>
+            <Icone nome="x" tamanho={18} />
+          </button>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--surface-2)',
+            border: '2px solid var(--line)',
+            borderRadius: 'var(--r-md)',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            boxShadow: 'var(--shadow-xs)',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+              Processo Judicial (CNJ)
+            </span>
+            <span style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '0.9rem', color: 'var(--text)' }}>
+              {mascararProcessoCNJ(demanda.numeroProcesso)}
+            </span>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--soft-line)', paddingTop: '8px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+              Estudante Beneficiário
+            </span>
+            <div style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text)' }}>
+              {demanda.estudanteNome}
+            </div>
+            <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
+              Responsável: <strong>{demanda.responsavelNome}</strong> (CPF: {demanda.cpfCertidao})
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--soft-line)', paddingTop: '8px' }}>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+              Unidade Escolar & Etapa Destinada
+            </span>
+            <div style={{ fontWeight: 800, color: 'var(--text)' }}>
+              {demanda.escolaNome}
+            </div>
+            <div style={{ fontSize: '0.84rem', color: 'var(--muted)' }}>
+              {ETAPAS[demanda.etapa]?.nome ?? demanda.etapa} · Período {demanda.periodo === 'integral' ? 'Integral' : 'Parcial'}
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--soft-line)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>
+              Juízo / Vara: <strong>{demanda.vara}</strong>
+            </span>
+            {demanda.multaDiaria ? (
+              <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--wait)' }}>
+                Astreinte: R$ {demanda.multaDiaria.toLocaleString('pt-BR')}/dia
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: 'var(--warn-bg)',
+            border: '1.5px solid var(--warn)',
+            borderRadius: 'var(--r-sm)',
+            padding: '12px 14px',
+            fontSize: '0.82rem',
+            color: 'var(--text)',
+            lineHeight: 1.45,
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-start',
+          }}
+        >
+          <Icone nome="alert-triangle" tamanho={18} />
+          <div>
+            <strong>Efeitos imediatos da confirmação:</strong>
+            <div style={{ marginTop: '2px', color: 'var(--muted)' }}>
+              Será alocada vaga imediata para o estudante, gerado protocolo com vaga pré-reservada, registrado o ato na Trilha de Auditoria do TCE-PB e lavrada a Certidão Oficial com validação SHA-256 para juntada ao PJ-e.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '6px' }}>
+          <button type="button" className="btn btn-secundario" onClick={aoFechar} disabled={carregando}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className="btn btn-primario"
+            onClick={aoConfirmar}
+            disabled={carregando}
+            style={{ minWidth: '180px', justifyContent: 'center' }}
+          >
+            {carregando ? (
+              <>
+                <Icone nome="hourglass" tamanho={16} /> Alocando vaga...
+              </>
+            ) : (
+              <>
+                <Icone nome="check-circle" tamanho={16} /> Confirmar Alocação Imediata
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
