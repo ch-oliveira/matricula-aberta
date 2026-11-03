@@ -27,6 +27,7 @@
   --primary: light-dark(#5538d4, #8c75ff);
   --primary-ink: light-dark(#ffffff, #130e26);
   --primary-soft: light-dark(#ece8ff, #2d2452);
+  --accent: light-dark(#5538d4, #8c75ff);
   --coral: #ff7a59;
   --sun: #ffd24c;
   --mint: #9be3c3;
@@ -3236,7 +3237,7 @@ dialog:modal {
 
 .gestao {
   inline-size: 100%;
-  max-inline-size: 1080px;
+  max-inline-size: 1320px;
   margin-inline: auto;
   padding: 0 20px 56px;
   box-sizing: border-box;
@@ -3840,25 +3841,62 @@ dialog:modal {
   gap: 20px;
 }
 .secretaria-hero {
-  padding: 22px 24px;
+  padding: 24px 28px;
   background: var(--surface);
-  border: 2.5px solid var(--line);
+  border: 2px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
-.secretaria-hero h1 {
+.secretaria-hero-info h1 {
   margin-block: 6px 4px;
 }
-.kpi-alerta {
-  background: var(--warn-bg);
+.secretaria-hero-barra-acoes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-block-start: 16px;
+  border-block-start: 1.5px solid var(--soft-line);
+}
+.btn-escanear-destaque {
+  padding: 10px 20px;
+  font-size: 0.95rem;
+  font-weight: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+}
+.secretaria-export-bloco {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.secretaria-export-titulo {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.secretaria-export-botoes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .sec-bloco {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 22px;
+  gap: 16px;
+  padding: 24px;
   background: var(--surface);
-  border: 2.5px solid var(--line);
+  border: 2px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
 }
@@ -4235,6 +4273,77 @@ td.vis-desktop {
   gap: 8px;
 }
 
+/* ---------- KPIs Macro da Secretaria (Refactoring UI) ---------- */
+.kpis-secretaria-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+@media (max-width: 1100px) {
+  .kpis-secretaria-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 680px) {
+  .kpis-secretaria-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: 2px 2px 0 var(--shadow-ink);
+  gap: 6px;
+  transition: transform 0.12s ease;
+}
+.kpi-card:hover {
+  transform: translateY(-1px);
+}
+.kpi-card-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+}
+.kpi-card-rotulo {
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.kpi-card-valor {
+  font-size: 2.25rem;
+  font-weight: 900;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  margin-block: 4px 2px;
+}
+.kpi-destaque-ok {
+  color: var(--ok);
+}
+.kpi-destaque-alerta {
+  color: var(--warn);
+}
+.kpi-destaque-primario {
+  color: var(--primary);
+}
+.kpi-destaque-perigo {
+  color: var(--wait);
+}
+.kpi-card-contexto {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
 /* ---------- Sub-abas Segmentadas da Secretaria ---------- */
 .gestao-sub-abas {
   display: flex;
@@ -4381,10 +4490,10 @@ td.vis-desktop {
   transform: translateY(-1px);
 }
 .filtro-chip-btn.ativo {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-ink, #ffffff);
   border-color: var(--line);
-  box-shadow: 2px 2px 0 var(--line);
+  box-shadow: 2px 2px 0 var(--shadow-ink);
 }
 .toolbar-filtro-busca {
   display: flex;
@@ -4416,7 +4525,63 @@ td.vis-desktop {
   align-items: center;
 }
 
-/* ---------- Demandas Judiciais (PJ-e) ---------- */
+/* ---------- Score Regulatório e Critérios (Refactoring UI) ---------- */
+.celula-score-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-inline-size: 160px;
+}
+.score-total-linha {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.score-total-num {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+.score-total-unit {
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.score-tags-container {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.score-criterio-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--soft-line);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.25;
+}
+.score-criterio-tag .tag-pts {
+  font-weight: 900;
+  color: var(--primary);
+  font-size: 0.7rem;
+}
+.score-criterio-tag .tag-nome {
+  white-space: normal;
+}
+.score-sem-criterio {
+  font-size: 0.74rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ---------- Demandas Judiciais (PJ-e) (Refactoring UI: Cores Contidas) ---------- */
 .grid-demandas-judiciais {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
@@ -4424,21 +4589,24 @@ td.vis-desktop {
 }
 .card-demanda-judicial {
   background: var(--surface);
-  border: 2.5px solid var(--line);
+  border: 2px solid var(--line);
   border-radius: var(--r-md);
-  padding: 18px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  box-shadow: var(--shadow-sm);
-  transition: all 0.15s ease;
+  box-shadow: 2px 2px 0 var(--shadow-ink);
+  transition: transform 0.12s ease;
+  position: relative;
+}
+.card-demanda-judicial:hover {
+  transform: translateY(-1px);
 }
 .card-demanda-judicial.status-alocado {
-  border-color: var(--ok);
+  border-inline-start: 6px solid var(--ok);
 }
 .card-demanda-judicial.status-urgente {
-  border-color: var(--wait);
-  box-shadow: 4px 4px 0 var(--wait);
+  border-inline-start: 6px solid var(--wait);
 }
 .card-demanda-judicial-topo {
   display: flex;

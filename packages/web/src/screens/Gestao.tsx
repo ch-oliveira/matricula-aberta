@@ -593,50 +593,56 @@ function PainelMacroSecretaria({
   return (
     <div className="secretaria-grid">
       <section className="painel-cabecalho secretaria-hero">
-        <div>
+        <div className="secretaria-hero-info">
           <span className="lp-tag">Gestão Municipal · Patos - PB</span>
           <h1>{painel.orgao}</h1>
           <p>
             Monitoramento integrado de vagas livres, demanda reprimida por bairro de <strong>Patos - PB</strong>,
-            alertas ativos no WhatsApp e protocolos presenciais.
+            alertas ativos no WhatsApp e regulação de protocolos presenciais.
           </p>
         </div>
-        <div className="secretaria-acoes-topo">
+
+        <div className="secretaria-hero-barra-acoes">
           {onAbrirLeitor && (
             <button
               type="button"
-              className="btn btn-primario btn-pequeno btn-escanear-qr"
+              className="btn btn-primario btn-escanear-destaque"
               onClick={onAbrirLeitor}
-              title="Abrir câmera para escanear QR Code do comprovante presencial"
+              title="Abrir câmera ou digitar código do comprovante presencial"
             >
-              <Icone nome="qr-code" tamanho={15} /> Escanear / Localizar Protocolo
+              <Icone nome="qr-code" tamanho={18} />
+              <span>Escanear / Localizar Protocolo</span>
             </button>
           )}
-          <div className="export-acoes-grupo">
-            <button
-              type="button"
-              className="btn btn-secundario btn-pequeno"
-              onClick={exportarProtocolosCsv}
-              title="Exportar todos os protocolos da rede em planilha CSV"
-            >
-              <Icone nome="file-text" tamanho={14} /> Protocolos (CSV)
-            </button>
-            <button
-              type="button"
-              className="btn btn-secundario btn-pequeno"
-              onClick={exportarFilaEsperaCsv}
-              title="Exportar fila de espera da rede em planilha CSV"
-            >
-              <Icone nome="list" tamanho={14} /> Fila (CSV)
-            </button>
-            <button
-              type="button"
-              className="btn btn-secundario btn-pequeno"
-              onClick={exportarOcupacaoBairrosCsv}
-              title="Exportar indicador de demanda por bairro em CSV"
-            >
-              <Icone nome="pin" tamanho={14} /> Bairros (CSV)
-            </button>
+
+          <div className="secretaria-export-bloco">
+            <span className="secretaria-export-titulo">Planilhas da Rede:</span>
+            <div className="secretaria-export-botoes">
+              <button
+                type="button"
+                className="btn btn-secundario btn-pequeno"
+                onClick={exportarProtocolosCsv}
+                title="Exportar todos os protocolos da rede em CSV"
+              >
+                <Icone nome="file-text" tamanho={14} /> Protocolos (.csv)
+              </button>
+              <button
+                type="button"
+                className="btn btn-secundario btn-pequeno"
+                onClick={exportarFilaEsperaCsv}
+                title="Exportar fila de espera da rede em CSV"
+              >
+                <Icone nome="list" tamanho={14} /> Fila de Espera (.csv)
+              </button>
+              <button
+                type="button"
+                className="btn btn-secundario btn-pequeno"
+                onClick={exportarOcupacaoBairrosCsv}
+                title="Exportar indicador de demanda por bairro em CSV"
+              >
+                <Icone nome="pin" tamanho={14} /> Demanda Bairros (.csv)
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -681,31 +687,52 @@ function PainelMacroSecretaria({
       {subAba === 'rede' && (
         <>
           {/* KPIs Macro da Rede Municipal de Patos-PB */}
-      <section className="kpis kpis-secretaria" aria-label="Indicadores globais da rede de Patos - PB">
-        <div className="kpi">
-          <span className="kpi-num">{kpis.vagasLivres}</span>
-          <span>vagas livres hoje (de {kpis.capacidadeRede})</span>
-        </div>
-        <div className="kpi">
-          <span className="kpi-num">{kpis.taxaOcupacao}%</span>
-          <span>taxa de ocupação da rede ({kpis.totalUnidades} unidades)</span>
-        </div>
-        <div className="kpi kpi-alerta">
-          <span className="kpi-num">{kpis.filaEsperaTotal + kpis.alertasAtivosTotal}</span>
-          <span>
-            demanda reprimida ({kpis.filaEsperaTotal} em fila + {kpis.alertasAtivosTotal} alertas{' '}
-            <Icone nome="bell" tamanho={14} />)
-          </span>
-        </div>
-        <div className="kpi kpi-destaque">
-          <span className="kpi-num">{kpis.protocolosAguardando}</span>
-          <span>protocolos QR aguardando ({kpis.protocolosAtendidos} já atendidos)</span>
-        </div>
-        <div className="kpi">
-          <span className="kpi-num">{kpis.taxaAbsenteismo ?? 0}%</span>
-          <span>taxa de absenteísmo ({kpis.protocolosExpirados ?? 0} expirados)</span>
-        </div>
-      </section>
+          <section className="kpis-secretaria-grid" aria-label="Indicadores globais da rede de Patos - PB">
+            <div className="kpi-card">
+              <div className="kpi-card-topo">
+                <span className="kpi-card-rotulo">Vagas Livres</span>
+                <Icone nome="school" tamanho={16} />
+              </div>
+              <div className="kpi-card-valor kpi-destaque-ok">{kpis.vagasLivres}</div>
+              <div className="kpi-card-contexto">de {kpis.capacidadeRede.toLocaleString('pt-BR')} vagas na rede municipal</div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-card-topo">
+                <span className="kpi-card-rotulo">Taxa de Ocupação</span>
+                <Icone nome="radar" tamanho={16} />
+              </div>
+              <div className="kpi-card-valor">{kpis.taxaOcupacao}%</div>
+              <div className="kpi-card-contexto">ocupação média em {kpis.totalUnidades} unidades</div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-card-topo">
+                <span className="kpi-card-rotulo">Demanda Reprimida</span>
+                <Icone nome="bell" tamanho={16} />
+              </div>
+              <div className="kpi-card-valor kpi-destaque-alerta">{kpis.filaEsperaTotal + kpis.alertasAtivosTotal}</div>
+              <div className="kpi-card-contexto">{kpis.filaEsperaTotal} na fila · {kpis.alertasAtivosTotal} alertas WhatsApp</div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-card-topo">
+                <span className="kpi-card-rotulo">Protocolos QR</span>
+                <Icone nome="qr-code" tamanho={16} />
+              </div>
+              <div className="kpi-card-valor kpi-destaque-primario">{kpis.protocolosAguardando}</div>
+              <div className="kpi-card-contexto">aguardando · {kpis.protocolosAtendidos} já confirmados</div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-card-topo">
+                <span className="kpi-card-rotulo">Absenteísmo</span>
+                <Icone nome="trending-down" tamanho={16} />
+              </div>
+              <div className="kpi-card-valor">{kpis.taxaAbsenteismo ?? 0}%</div>
+              <div className="kpi-card-contexto">{kpis.protocolosExpirados ?? 0} expirados sem comparecimento</div>
+            </div>
+          </section>
 
       {/* Ranking de Demanda Reprimida por Bairro de Patos - PB */}
       <section className="sec-bloco demanda-bairro-bloco" aria-labelledby="t-demanda-bairros">
@@ -988,15 +1015,15 @@ function PainelMacroSecretaria({
               <table className="tabela-secretaria">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ width: '54px', textAlign: 'center' }}>Pos.</th>
-                    <th scope="col" style={{ width: '140px' }}>Protocolo</th>
+                    <th scope="col" style={{ width: '48px', textAlign: 'center' }}>Pos.</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap' }}>Protocolo</th>
                     <th scope="col">Candidato / Responsável</th>
                     <th scope="col">Unidade / Bairro</th>
                     <th scope="col">Etapa & Turma</th>
-                    <th scope="col">Score Regulatório</th>
-                    <th scope="col" style={{ textAlign: 'center', width: '100px' }}>Origem</th>
-                    <th scope="col" style={{ textAlign: 'center', width: '150px' }}>Status</th>
-                    <th scope="col" style={{ whiteSpace: 'nowrap', width: '130px' }}>Inscrição</th>
+                    <th scope="col" style={{ minWidth: '180px' }}>Score Regulatório</th>
+                    <th scope="col" style={{ textAlign: 'center' }}>Origem</th>
+                    <th scope="col" style={{ textAlign: 'center' }}>Status</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>Inscrição</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1025,23 +1052,26 @@ function PainelMacroSecretaria({
                         <small className="celula-sub">{item.turma} ({item.periodo})</small>
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                          <span style={{ fontWeight: 800, color: item.pontosTotais > 0 ? 'var(--primary)' : 'var(--muted)' }}>
-                            {item.pontosTotais} pontos
-                          </span>
-                          {item.criteriosAtendidos.length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                        <div className="celula-score-box">
+                          <div className="score-total-linha">
+                            <strong className="score-total-num">{item.pontosTotais}</strong>
+                            <span className="score-total-unit">pts</span>
+                          </div>
+                          {item.criteriosAtendidos.length > 0 ? (
+                            <div className="score-tags-container">
                               {item.criteriosAtendidos.map((cid) => (
-                                <span
+                                <div
                                   key={cid}
-                                  className="badge-mini"
-                                  style={{ fontSize: '0.72rem', padding: '1px 6px' }}
+                                  className="score-criterio-tag"
                                   title={CRITERIOS_VULNERABILIDADE[cid]?.descricao}
                                 >
-                                  {CRITERIOS_VULNERABILIDADE[cid]?.nome}
-                                </span>
+                                  <span className="tag-pts">+{CRITERIOS_VULNERABILIDADE[cid]?.pontos ?? 0}</span>
+                                  <span className="tag-nome">{CRITERIOS_VULNERABILIDADE[cid]?.nome}</span>
+                                </div>
                               ))}
                             </div>
+                          ) : (
+                            <span className="score-sem-criterio">Demanda regular</span>
                           )}
                         </div>
                       </td>
@@ -1308,12 +1338,12 @@ function PainelMacroSecretaria({
               <table className="tabela-secretaria">
                 <thead>
                   <tr>
-                    <th scope="col" style={{ width: '145px', whiteSpace: 'nowrap' }}>Data / Hora</th>
-                    <th scope="col" style={{ width: '140px' }}>Operador / Papel</th>
-                    <th scope="col" style={{ width: '180px' }}>Ação Regulada</th>
-                    <th scope="col" style={{ width: '170px' }}>Entidade</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap' }}>Data / Hora</th>
+                    <th scope="col">Operador / Papel</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap' }}>Ação Regulada</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap' }}>Entidade</th>
                     <th scope="col">Justificativa & Detalhes</th>
-                    <th scope="col" style={{ width: '110px' }}>Rastro / IP</th>
+                    <th scope="col" style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>Rastro / IP</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1322,26 +1352,27 @@ function PainelMacroSecretaria({
                     return (
                       <tr key={log.id}>
                         <td style={{ fontSize: '0.8rem', color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                          {new Date(log.criadoEm).toLocaleDateString('pt-BR')} {new Date(log.criadoEm).toLocaleTimeString('pt-BR')}
+                          <div><strong style={{ color: 'var(--ink)' }}>{new Date(log.criadoEm).toLocaleDateString('pt-BR')}</strong></div>
+                          <small style={{ color: 'var(--muted)' }}>{new Date(log.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</small>
                         </td>
                         <td>
-                          <strong style={{ color: 'var(--text)' }}>{log.operadorUsuario}</strong>
-                          <div style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 700 }}>{log.operadorPerfil.toUpperCase()}</div>
+                          <strong style={{ color: 'var(--ink)' }}>{log.operadorUsuario}</strong>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--muted)', fontWeight: 800 }}>{log.operadorPerfil.toUpperCase()}</div>
                         </td>
-                        <td>
+                        <td style={{ whiteSpace: 'nowrap' }}>
                           <span className={`badge-acao-auditoria ${infoAcao.classe}`}>
                             <Icone nome={infoAcao.icone} tamanho={12} />
                             {infoAcao.label}
                           </span>
                         </td>
                         <td style={{ whiteSpace: 'nowrap' }}>
-                          <div className="celula-entidade-auditoria">{log.protocoloCodigo ?? log.escolaId ?? '-'}</div>
+                          <div className="celula-entidade-auditoria">{log.protocoloCodigo ?? log.escolaId ?? 'REDE'}</div>
                           <small className="celula-sub">{log.protocoloCodigo ? 'Protocolo' : log.escolaId ? 'Escola' : 'Geral'}</small>
                         </td>
-                        <td style={{ fontSize: '0.84rem', maxWidth: '320px', lineHeight: 1.4 }}>
+                        <td style={{ fontSize: '0.84rem', lineHeight: 1.4 }}>
                           {log.justificativa}
                         </td>
-                        <td style={{ fontSize: '0.78rem', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                        <td style={{ fontSize: '0.78rem', color: 'var(--muted)', fontFamily: 'monospace', whiteSpace: 'nowrap', textAlign: 'right' }}>
                           {log.ip ?? '127.0.0.1'}
                         </td>
                       </tr>
