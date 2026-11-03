@@ -507,6 +507,30 @@ export async function gerarCertidaoCumprimentoJudicial(demandaId: string): Promi
 
 /** Seed de processos judiciais de exemplo e histórico de auditoria para Patos - PB */
 export async function garantirSeedRegulacaoPatos(forcarReset = false): Promise<void> {
+  const agora = Date.now();
+
+  // Garante que o protocolo da demanda judicial cumprida exista na base de dados
+  await db.execute(
+    `INSERT INTO protocolos_visita (
+      codigo, escola_id, escola_nome, escola_endereco, escola_bairro,
+      etapa, turma, periodo, responsavel, telefone_mascarado, telefone_contato, nascimento,
+      turno_visita, data_visita, documentos_json, total_obrigatorios,
+      status, reserva_vaga, motivo_cancelamento, posicao_fila, documento_estudante,
+      documento_estudante_hash, token_cancelamento, notificado_dia_em, notificado_1h_em,
+      criterios_prioridade_json, pontos_prioridade, origem, numero_processo_judicial,
+      criado_em, atendido_em
+    ) VALUES (
+      'PATOS-JUD-2026-8812', 'creche-maria-eunice', 'Creche Municipal Maria Eunice', 'Rua Manoel Mota, s/n', 'Maternidade',
+      'maternal', 'Maternal I', 'integral', 'Francisca Wanderley Medeiros', '(83) 988••-••••', '83988776655', '2023-04-10',
+      'manha', '2026-11-04', '[]', 5,
+      'aguardando', 1, NULL, 1, '987.654.321-00',
+      'hash-doc-sophia', 'tok-jud-sophia', NULL, NULL,
+      '["crianca_com_deficiencia_tea"]', 50, 'judicial', '0800921-14.2026.8.15.0251',
+      $1, NULL
+    ) ON CONFLICT (codigo) DO NOTHING`,
+    [agora - 24 * 3600 * 1000],
+  );
+
   const rowCount = await db.queryOne<{ c: number }>('SELECT COUNT(*) as c FROM demandas_judiciais');
   const count = Number(rowCount?.c ?? 0);
   if (count > 0 && !forcarReset) return;
@@ -515,8 +539,6 @@ export async function garantirSeedRegulacaoPatos(forcarReset = false): Promise<v
     await db.execute('DELETE FROM demandas_judiciais');
     await db.execute('DELETE FROM logs_auditoria');
   }
-
-  const agora = Date.now();
 
   // 1. Demanda Judicial Urgente (Restam poucas horas para o prazo fatal)
   await db.execute(
