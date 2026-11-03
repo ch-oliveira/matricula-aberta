@@ -15,6 +15,74 @@ export type TurnoVisita = 'manha' | 'tarde';
 export type StatusProtocolo = 'aguardando' | 'atendido' | 'cancelado';
 export type PerfilGestao = 'secretaria' | 'unidade';
 
+/** Identificador de critérios de vulnerabilidade e prioridade legal regulatória */
+export type CriterioVulnerabilidadeId =
+  | 'medida_protetiva'
+  | 'deficiencia_tea'
+  | 'cadunico_bolsafamilia'
+  | 'mae_trabalhadora'
+  | 'irmao_na_escola';
+
+export interface CriterioVulnerabilidade {
+  id: CriterioVulnerabilidadeId;
+  nome: string;
+  pontos: number;
+  descricao: string;
+  amparoLegal: string;
+  documentoExigido: string;
+  icone: string;
+}
+
+export const CRITERIOS_VULNERABILIDADE: Record<CriterioVulnerabilidadeId, CriterioVulnerabilidade> = {
+  medida_protetiva: {
+    id: 'medida_protetiva',
+    nome: 'Medida Protetiva / Acolhimento Institucional',
+    pontos: 100,
+    descricao: 'Criança sob tutela do Conselho Tutelar ou Vara da Infância com medida de proteção ativa.',
+    amparoLegal: 'ECA (Lei 8.069/90, arts. 98 e 101) e Marco Legal da 1ª Infância',
+    documentoExigido: 'Ofício do Conselho Tutelar ou determinação judicial sigilosa',
+    icone: 'shield',
+  },
+  deficiencia_tea: {
+    id: 'deficiencia_tea',
+    nome: 'Criança com Deficiência ou TEA (AEE)',
+    pontos: 50,
+    descricao: 'Estudante público-alvo da Educação Especial (Deficiência Física, Sensorial, Intelectual ou TEA).',
+    amparoLegal: 'Lei Brasileira de Inclusão (Lei 13.146/15) e Lei Berenice Piana (Lei 12.764/12)',
+    documentoExigido: 'Laudo médico com CID ou parecer multiprofissional da UBS',
+    icone: 'heart-pulse',
+  },
+  cadunico_bolsafamilia: {
+    id: 'cadunico_bolsafamilia',
+    nome: 'Beneficiário do Bolsa Família / CadÚnico',
+    pontos: 30,
+    descricao: 'Família inscrita no Cadastro Único com benefício social ativo em Patos - PB.',
+    amparoLegal: 'Marco Legal da Primeira Infância (Lei 13.257/16, art. 5º)',
+    documentoExigido: 'Comprovante com Número do NIS / Folha Resumo do CadÚnico',
+    icone: 'credit-card',
+  },
+  mae_trabalhadora: {
+    id: 'mae_trabalhadora',
+    nome: 'Mãe Trabalhadora / Família Monoparental',
+    pontos: 25,
+    descricao: 'Mãe ou responsável com vínculo empregatício formal, MEI ou autônomo com comprovação.',
+    amparoLegal: 'Decreto Municipal de Regulação de Vagas e Incentivo ao Trabalho Feminino',
+    documentoExigido: 'Carteira de Trabalho (CTPS), holerite recente ou declaração de trabalho',
+    icone: 'briefcase',
+  },
+  irmao_na_escola: {
+    id: 'irmao_na_escola',
+    nome: 'Irmão Matriculado na Mesma Unidade',
+    pontos: 20,
+    descricao: 'Garantia legal de irmãos frequentarem a mesma escola para convivência e facilitação familiar.',
+    amparoLegal: 'Estatuto da Criança e do Adolescente (ECA - Lei 8.069/90, art. 53, V)',
+    documentoExigido: 'Declaração de matrícula ativa do irmão na unidade escolar',
+    icone: 'users',
+  },
+};
+
+export const LISTA_CRITERIOS_VULNERABILIDADE = Object.values(CRITERIOS_VULNERABILIDADE);
+
 export const ORDEM_ETAPAS: EtapaId[] = ['bercario', 'maternal', 'pre', 'fund1', 'fund2'];
 export const PERIODOS_VALIDOS: Periodo[] = ['integral', 'parcial'];
 export const CANAIS_VALIDOS: Canal[] = ['whatsapp', 'push'];
@@ -147,6 +215,92 @@ export interface ProtocoloVisita {
   notificadoDiaEm?: number;
   /** Timestamp de envio do lembrete de 1 hora antes do início do turno */
   notificado1hEm?: number;
+  /** Critérios de vulnerabilidade e prioridade social atendidos (Pilar B - Regulação) */
+  criteriosPrioridade?: CriterioVulnerabilidadeId[];
+  /** Total de pontos acumulados nos critérios legais de prioridade */
+  pontosPrioridade?: number;
+  /** Origem da demanda: regular (cidadão) ou judicial (determinação do MP / Defensoria / Juizado) */
+  origem?: 'regular' | 'judicial';
+  /** Número do processo eletrônico judicial (PJ-e) caso seja demanda judicial */
+  numeroProcessoJudicial?: string;
+}
+
+/** Item da Fila Pública Auditável (LGPD Safe - sem vazamento de dados de menores) */
+export interface FilaItemAuditavel {
+  posicao: number;
+  codigo: string;
+  estudanteIniciais: string;
+  responsavelIniciais: string;
+  etapa: EtapaId;
+  turma: string;
+  periodo: Periodo;
+  escolaId: string;
+  escolaNome: string;
+  escolaBairro: string;
+  pontosTotais: number;
+  criteriosAtendidos: CriterioVulnerabilidadeId[];
+  origem: 'regular' | 'judicial';
+  criadoEm: number;
+  status: StatusProtocolo;
+  reservaVaga: boolean;
+}
+
+export type StatusDemandaJudicial = 'pendente' | 'alocado' | 'recurso' | 'cancelado';
+
+/** Demanda Judicial (Mandado de Segurança, Ação Civil Pública ou Liminar da Infância) */
+export interface DemandaJudicial {
+  id: string;
+  numeroProcesso: string;
+  vara: string;
+  juizPromotor?: string;
+  estudanteNome: string;
+  responsavelNome: string;
+  cpfCertidao: string;
+  escolaId: string;
+  escolaNome: string;
+  etapa: EtapaId;
+  periodo: Periodo;
+  protocoloCodigo?: string;
+  prazoLimiteEm: number;
+  multaDiaria?: number;
+  status: StatusDemandaJudicial;
+  alocadoEm?: number;
+  observacoes?: string;
+  criadoEm: number;
+}
+
+/** Trilha de Auditoria Imutável (Audit Trail para TCE e Ministério Público) */
+export interface LogAuditoria {
+  id: string;
+  operadorUsuario: string;
+  operadorPerfil: PerfilGestao | 'sistema' | 'cidadao';
+  acao: string;
+  protocoloCodigo?: string;
+  escolaId?: string;
+  justificativa: string;
+  detalhes?: Record<string, unknown>;
+  ip?: string;
+  criadoEm: number;
+}
+
+/** Certidão Oficial Eletrônica de Cumprimento de Liminar (Juntada no PJ-e) */
+export interface CertidaoCumprimentoJudicialDTO {
+  numeroProcesso: string;
+  vara: string;
+  estudanteNome: string;
+  responsavelNome: string;
+  cpfCertidaoMascarado: string;
+  escolaNome: string;
+  escolaEndereco: string;
+  etapaNome: string;
+  turma: string;
+  periodo: Periodo;
+  protocoloCodigo: string;
+  dataVisita: string;
+  turnoVisita: TurnoVisita;
+  emitidoEm: number;
+  hashAutenticidade: string;
+  textoCertidao: string;
 }
 
 export interface DemandaBairroDTO {
@@ -562,5 +716,40 @@ export function gerarCsv(cabecalhos: string[], linhas: Array<Array<string | numb
   const corpo = linhas.map((l) => l.map(escapar).join(';')).join('\r\n');
   return `\uFEFF${cabecalhoLinha}\r\n${corpo}`;
 }
+
+/** Calcula pontuação regulatória somando os critérios legais de vulnerabilidade */
+export function calcularPontuacaoVulnerabilidade(criterios?: CriterioVulnerabilidadeId[]): number {
+  if (!Array.isArray(criterios) || criterios.length === 0) return 0;
+  const unicos = new Set(criterios);
+  let soma = 0;
+  for (const c of unicos) {
+    if (CRITERIOS_VULNERABILIDADE[c]) {
+      soma += CRITERIOS_VULNERABILIDADE[c].pontos;
+    }
+  }
+  return soma;
+}
+
+/** Extrai as iniciais do nome para divulgação em conformidade estrita com a LGPD e ECA (ex: "Maria Clara Silva" -> "M. C. S.") */
+export function iniciaisNome(nomeCompleto?: string | null): string {
+  if (!nomeCompleto) return '---';
+  const partes = nomeCompleto
+    .trim()
+    .split(/\s+/)
+    .filter((p) => p.length > 0 && !['de', 'da', 'do', 'dos', 'das', 'e'].includes(p.toLowerCase()));
+  if (partes.length === 0) return '---';
+  return partes.map((p) => `${p[0].toUpperCase()}.`).join(' ');
+}
+
+/** Formata número de processo judicial no padrão CNJ (0000000-00.0000.0.00.0000) */
+export function mascararProcessoCNJ(numero?: string | null): string {
+  if (!numero) return '';
+  const d = numero.replace(/\D/g, '');
+  if (d.length === 20) {
+    return `${d.slice(0, 7)}-${d.slice(7, 9)}.${d.slice(9, 13)}.${d.slice(13, 14)}.${d.slice(14, 16)}.${d.slice(16, 20)}`;
+  }
+  return numero.trim();
+}
+
 
 

@@ -22,6 +22,7 @@ import { registrarClienteSSE, totalClientesSSE, transmitirAtualizacaoSSE } from 
 import {
   ehStatusProtocoloValido,
   validarPayloadAlerta,
+  validarPayloadDemandaJudicial,
   validarPayloadOferta,
   validarPayloadProtocolo,
 } from './infra/validation.ts';
@@ -47,6 +48,15 @@ import {
   obterProtocoloPorCodigo,
   processarExpiracaoProtocolosVencidos,
 } from './modules/protocolos/protocolos.module.ts';
+import {
+  alocarVagaJudicial,
+  cadastrarDemandaJudicial,
+  garantirSeedRegulacaoPatos,
+  gerarCertidaoCumprimentoJudicial,
+  listarDemandasJudiciais,
+  listarLogsAuditoria,
+  obterFilaPublicaAuditavel,
+} from './modules/regulacao/regulacao.module.ts';
 import { obterPainelSecretariaPatos } from './modules/secretaria/secretaria.module.ts';
 import {
   atualizarOfertaUnidade,
@@ -65,6 +75,7 @@ async function inicializarBancoPatos(forcarReset = false): Promise<void> {
   await popularUnidadesPatos(forcarReset);
   await garantirSeedAlertasPatos(forcarReset);
   await garantirSeedProtocolosPatos(forcarReset);
+  await garantirSeedRegulacaoPatos(forcarReset);
 }
 
 await inicializarBancoPatos(false);
@@ -665,6 +676,99 @@ const server = createServer(async (req, res) => {
       exigirRateLimit(req, 'leitura', 60, 60_000);
       exigirSessaoGestao(req, url, { perfil: 'secretaria' });
       return json(req, res, 200, await obterPainelSecretariaPatos());
+    }
+
+    // 7. MÓDULO REGULAÇÃO & CONFORMIDADE LEGAL (PILAR B - AUDITORIA, FILA PÚBLICA & JUDICIÁRIO)
+    // 7.1. Fila Pública Auditável (Acesso Público com Proteção LGPD estrita e sem vazamento de dados de menores)
+    if (req.method === 'GET' && path === '/api/v1/regulacao/fila-publica') {
+      exigirRateLimit(req, 'leitura', 120, 60_000);
+      const etapaRaw = url.searchParams.get('etapa');
+      const escolaId = url.searchParams.get('escolaId') || undefined;
+      const busca = url.searchParams.get('busca') || undefined;
+      const etapa = etapaRaw && ['bercario', 'maternal', 'pre', 'fund1', 'fund2'].includes(etapaRaw)
+        ? (etapaRaw as any)
+        : undefined;
+
+      const fila = await obterFilaPublicaAuditavel({ etapa, escolaId, busca });
+      return json(req, res, 200, {
+        ok: true,
+        municipio: 'Patos - PB',
+        total: fila.length,
+        geradoEm: Date.now(),
+        fila,
+      });
+    }
+
+    // 7.2. Listar Demandas Judiciais (SEDUC / PGM)
+    if (req.method === 'GET' && path === '/api/v1/gestao/judicial') {
+      exigirRateLimit(req, 'leitura', 60, 60_000);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const demandas = await listarDemandasJudiciais();
+      return json(req, res, 200, { ok: true, demandas });
+    }
+
+    // 7.3. Cadastrar Demanda Judicial (Mandado de Segurança / Liminar)
+    if (req.method === 'POST' && path === '/api/v1/gestao/judicial') {
+      exigirRateLimit(req, 'gestao-mutacao', 30, 60_000);
+      const sessao = exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const bodyRaw = await lerJsonSeguro<Record<string, unknown>>(req);
+      const payload = validarPayloadDemandaJudicial(bodyRaw);
+      const demanda = await cadastrarDemandaJudicial({
+        ...payload,
+        operadorUsuario: sessao.usuario,
+      });
+
+      invalidarSnapshotPublico();
+      await transmitirAtualizacaoSSE();
+      return json(req, res, 201, { ok: true, demanda });
+    }
+
+    // 7.4. Alocar Vaga Judicial com Prioridade Absoluta e Vínculo ao Processo
+    const matchAlocarJudicial = path.match(/^\/api\/v1\/gestao\/judicial\/([^/]+)\/alocar$/);
+    if (req.method === 'POST' && matchAlocarJudicial) {
+      exigirRateLimit(req, 'gestao-mutacao', 30, 60_000);
+      const sessao = exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const demandaId = decodeURIComponent(matchAlocarJudicial[1]).trim();
+      const body = await lerJsonSeguro<{ justificativa?: unknown }>(req);
+      const justificativa =
+        typeof body.justificativa === 'string' && body.justificativa.trim().length > 3
+          ? body.justificativa.trim()
+          : 'Alocação prioritária em cumprimento à decisão judicial liminar';
+
+      const resultado = await alocarVagaJudicial({
+        demandaId,
+        operadorUsuario: sessao.usuario,
+        justificativa,
+      });
+
+      invalidarSnapshotPublico();
+      if (resultado.evento) {
+        await transmitirAtualizacaoSSE(resultado.evento);
+      } else {
+        await transmitirAtualizacaoSSE();
+      }
+
+      return json(req, res, 200, { ok: true, ...resultado });
+    }
+
+    // 7.5. Emitir Certidão Eletrônica de Cumprimento de Liminar (para juntada no PJ-e)
+    const matchCertidaoJudicial = path.match(/^\/api\/v1\/gestao\/judicial\/([^/]+)\/certidao$/);
+    if (req.method === 'GET' && matchCertidaoJudicial) {
+      exigirRateLimit(req, 'leitura', 60, 60_000);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const demandaId = decodeURIComponent(matchCertidaoJudicial[1]).trim();
+      const certidao = await gerarCertidaoCumprimentoJudicial(demandaId);
+      return json(req, res, 200, { ok: true, certidao });
+    }
+
+    // 7.6. Trilha de Auditoria Imutável (Audit Trail para TCE e Promotoria)
+    if (req.method === 'GET' && path === '/api/v1/gestao/auditoria') {
+      exigirRateLimit(req, 'leitura', 60, 60_000);
+      exigirSessaoGestao(req, url, { perfil: 'secretaria' });
+      const limiteNum = Number(url.searchParams.get('limite') ?? 100);
+      const limite = Number.isFinite(limiteNum) ? Math.max(10, Math.min(500, Math.round(limiteNum))) : 100;
+      const logs = await listarLogsAuditoria(limite);
+      return json(req, res, 200, { ok: true, total: logs.length, logs });
     }
 
     return json(req, res, 404, { erro: 'Rota não encontrada na API.' });

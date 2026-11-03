@@ -7,13 +7,14 @@ interface Props {
   titulo: ReactNode;
   children: ReactNode;
   rodape?: ReactNode;
+  className?: string;
 }
 
 /**
  * Bottom-sheet acessível baseado no <dialog> nativo:
  * foco, Esc, gesto de voltar e inércia da página vêm de graça do navegador.
  */
-export function Sheet({ open, onClose, titulo, children, rodape }: Props) {
+export function Sheet({ open, onClose, titulo, children, rodape, className }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const tituloId = useId();
 
@@ -46,7 +47,13 @@ export function Sheet({ open, onClose, titulo, children, rodape }: Props) {
   }, []);
 
   return (
-    <dialog ref={ref} className="sheet" aria-labelledby={tituloId} onClose={onClose} {...{ closedby: 'any' }}>
+    <dialog
+      ref={ref}
+      className={`sheet ${className ?? ''}`.trim()}
+      aria-labelledby={tituloId}
+      onClose={onClose}
+      {...{ closedby: 'any' }}
+    >
       <div className="sheet-alca" aria-hidden="true" />
       <header className="sheet-topo">
         <h2 id={tituloId}>{titulo}</h2>

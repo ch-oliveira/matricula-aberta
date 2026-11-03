@@ -6,11 +6,21 @@ import { Ocupacao, StatusPill } from '../components/ui';
 import { ETAPAS, statusDaOferta } from '../domain/etapas';
 import { desatualizado, tempoRelativo } from '../domain/geo';
 import {
+  CRITERIOS_VULNERABILIDADE,
   dataLocalISO,
   gerarCsv,
+  LISTA_CRITERIOS_VULNERABILIDADE,
+  mascararProcessoCNJ,
+  ORDEM_ETAPAS,
+  type CertidaoCumprimentoJudicialDTO,
+  type DemandaJudicial,
   type Escola,
+  type EtapaId,
+  type FilaItemAuditavel,
+  type LogAuditoria,
   type Oferta,
   type PainelSecretariaDTO,
+  type Periodo,
   type ProtocoloVisita,
 } from '../domain/types';
 import { useAgora, useHashRoute } from '../hooks';
@@ -261,7 +271,130 @@ function PainelMacroSecretaria({
   onSair: () => void;
 }) {
   const agora = useAgora(15_000);
+  const escolas = useEscolas();
   const { kpis } = painel;
+
+  const [subAba, setSubAba] = useState<'rede' | 'regulacao' | 'judicial' | 'auditoria'>('rede');
+  const [filaAuditavel, setFilaAuditavel] = useState<FilaItemAuditavel[]>([]);
+  const [etapaFiltro, setEtapaFiltro] = useState<EtapaId | 'todas'>('todas');
+  const [buscaFila, setBuscaFila] = useState('');
+  const [carregandoFila, setCarregandoFila] = useState(false);
+
+  const [demandasJudiciais, setDemandasJudiciais] = useState<DemandaJudicial[]>([]);
+  const [carregandoJudicial, setCarregandoJudicial] = useState(false);
+  const [modalCadastroJudicial, setModalCadastroJudicial] = useState(false);
+  const [certidaoAtiva, setCertidaoAtiva] = useState<CertidaoCumprimentoJudicialDTO | null>(null);
+
+  const [logsAuditoria, setLogsAuditoria] = useState<LogAuditoria[]>([]);
+  const [carregandoAuditoria, setCarregandoAuditoria] = useState(false);
+
+  // Carrega dados da Fila Auditável quando selecionada
+  useEffect(() => {
+    if (subAba !== 'regulacao') return;
+    let cancelado = false;
+    setCarregandoFila(true);
+    vagasStore
+      .obterFilaPublicaAuditavel({
+        etapa: etapaFiltro === 'todas' ? undefined : etapaFiltro,
+        busca: buscaFila.trim() || undefined,
+      })
+      .then((res) => {
+        if (!cancelado) {
+          setFilaAuditavel(res);
+          setCarregandoFila(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelado) {
+          toast(err instanceof Error ? err.message : 'Falha ao carregar fila auditável.', { emoji: 'alert-triangle', tom: 'aviso' });
+          setCarregandoFila(false);
+        }
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [subAba, etapaFiltro, buscaFila]);
+
+  // Carrega Demandas Judiciais quando selecionadas
+  const recarregarDemandasJudiciais = () => {
+    setCarregandoJudicial(true);
+    vagasStore
+      .listarDemandasJudiciais()
+      .then((res) => {
+        setDemandasJudiciais(res);
+        setCarregandoJudicial(false);
+      })
+      .catch((err) => {
+        toast(err instanceof Error ? err.message : 'Falha ao consultar processos judiciais.', { emoji: 'alert-triangle', tom: 'aviso' });
+        setCarregandoJudicial(false);
+      });
+  };
+
+  useEffect(() => {
+    if (subAba === 'judicial') {
+      recarregarDemandasJudiciais();
+    }
+  }, [subAba]);
+
+  // Carrega Trilha de Auditoria quando selecionada
+  useEffect(() => {
+    if (subAba !== 'auditoria') return;
+    let cancelado = false;
+    setCarregandoAuditoria(true);
+    vagasStore
+      .listarLogsAuditoria(150)
+      .then((res) => {
+        if (!cancelado) {
+          setLogsAuditoria(res);
+          setCarregandoAuditoria(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelado) {
+          toast(err instanceof Error ? err.message : 'Falha ao carregar trilha de auditoria.', { emoji: 'alert-triangle', tom: 'aviso' });
+          setCarregandoAuditoria(false);
+        }
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [subAba]);
+
+  async function executarAlocacaoJudicial(demanda: DemandaJudicial) {
+    const confirmou = window.confirm(
+      `Confirma a alocação prioritária imediata de vaga para "${demanda.estudanteNome}" na unidade "${demanda.escolaNome}" em cumprimento ao Processo nº ${demanda.numeroProcesso}?`,
+    );
+    if (!confirmou) return;
+
+    try {
+      const res = await vagasStore.alocarVagaJudicial(
+        demanda.id,
+        `Alocação tempestiva em cumprimento ao Mandado do Processo ${demanda.numeroProcesso} (${demanda.vara})`,
+      );
+      toast(`Vaga judicial alocada com sucesso! Protocolo emitido: ${res.protocoloCodigo}`, {
+        emoji: 'check-circle',
+        tom: 'ok',
+      });
+      recarregarDemandasJudiciais();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Falha ao alocar vaga judicial.', {
+        emoji: 'alert-triangle',
+        tom: 'aviso',
+      });
+    }
+  }
+
+  async function abrirCertidaoJudicial(demandaId: string) {
+    try {
+      const cert = await vagasStore.obterCertidaoJudicial(demandaId);
+      setCertidaoAtiva(cert);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Falha ao emitir certidão de cumprimento.', {
+        emoji: 'alert-triangle',
+        tom: 'aviso',
+      });
+    }
+  }
 
   function baixarCsv(nomeArquivo: string, conteudo: string) {
     const blob = new Blob([conteudo], { type: 'text/csv;charset=utf-8;' });
@@ -288,6 +421,8 @@ function PainelMacroSecretaria({
       'Turno',
       'Status',
       'Reserva de Vaga',
+      'Pontos Prioridade',
+      'Origem',
       'Motivo Cancelamento',
       'Data de Emissão',
     ];
@@ -304,10 +439,50 @@ function PainelMacroSecretaria({
       p.turnoVisita,
       p.status,
       p.reservaVaga ? 'Sim (Vaga Pré-Reservada)' : 'Não (Fila de Espera)',
+      p.pontosPrioridade ?? 0,
+      p.origem ?? 'regular',
       p.motivoCancelamento ?? '',
       new Date(p.criadoEm).toLocaleString('pt-BR'),
     ]);
     baixarCsv(`protocolos-patos-pb-${dataLocalISO()}.csv`, gerarCsv(cabecalhos, linhas));
+  }
+
+  function exportarFilaAuditavelCsv() {
+    const cabecalhos = [
+      'Posição',
+      'Código',
+      'Iniciais do Aluno',
+      'Iniciais do Responsável',
+      'Unidade Escolar',
+      'Bairro',
+      'Etapa',
+      'Turma',
+      'Período',
+      'Pontos Regulatórios',
+      'Critérios Atendidos',
+      'Origem Demanda',
+      'Reserva de Vaga',
+      'Status',
+      'Data de Entrada',
+    ];
+    const linhas = filaAuditavel.map((item) => [
+      item.posicao,
+      item.codigo,
+      item.estudanteIniciais,
+      item.responsavelIniciais,
+      item.escolaNome,
+      item.escolaBairro,
+      item.etapa,
+      item.turma,
+      item.periodo,
+      item.pontosTotais,
+      item.criteriosAtendidos.map((c) => CRITERIOS_VULNERABILIDADE[c]?.nome ?? c).join('; '),
+      item.origem,
+      item.reservaVaga ? 'Sim' : 'Não',
+      item.status,
+      new Date(item.criadoEm).toLocaleString('pt-BR'),
+    ]);
+    baixarCsv(`fila-auditavel-patos-pb-${dataLocalISO()}.csv`, gerarCsv(cabecalhos, linhas));
   }
 
   function exportarFilaEsperaCsv() {
@@ -426,7 +601,67 @@ function PainelMacroSecretaria({
         </div>
       </section>
 
-      {/* KPIs Macro da Rede Municipal de Patos-PB */}
+      {/* Navegação entre Visão Geral da Rede, Fila Regulada, Demandas Judiciais e Auditoria */}
+      <div
+        className="sub-abas-navegacao"
+        style={{
+          display: 'flex',
+          gap: '8px',
+          borderBottom: '1px solid #E2E8F0',
+          paddingBottom: '12px',
+          marginBottom: '20px',
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          className={`btn ${subAba === 'rede' ? 'btn-primario' : 'btn-secundario'}`}
+          onClick={() => setSubAba('rede')}
+        >
+          <Icone nome="landmark" tamanho={16} /> Visão Geral da Rede
+        </button>
+        <button
+          type="button"
+          className={`btn ${subAba === 'regulacao' ? 'btn-primario' : 'btn-secundario'}`}
+          onClick={() => setSubAba('regulacao')}
+        >
+          <Icone nome="scale" tamanho={16} /> Fila & Regulação Auditável
+        </button>
+        <button
+          type="button"
+          className={`btn ${subAba === 'judicial' ? 'btn-primario' : 'btn-secundario'}`}
+          onClick={() => setSubAba('judicial')}
+          style={{ position: 'relative' }}
+        >
+          <Icone nome="file-text" tamanho={16} /> Demandas Judiciais (PJ-e)
+          {demandasJudiciais.filter((d) => d.status === 'pendente').length > 0 && (
+            <span
+              style={{
+                background: '#EF4444',
+                color: '#FFF',
+                borderRadius: '10px',
+                padding: '2px 7px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                marginLeft: '6px',
+              }}
+            >
+              {demandasJudiciais.filter((d) => d.status === 'pendente').length}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          className={`btn ${subAba === 'auditoria' ? 'btn-primario' : 'btn-secundario'}`}
+          onClick={() => setSubAba('auditoria')}
+        >
+          <Icone nome="history" tamanho={16} /> Trilha de Auditoria (TCE / MP)
+        </button>
+      </div>
+
+      {subAba === 'rede' && (
+        <>
+          {/* KPIs Macro da Rede Municipal de Patos-PB */}
       <section className="kpis kpis-secretaria" aria-label="Indicadores globais da rede de Patos - PB">
         <div className="kpi">
           <span className="kpi-num">{kpis.vagasLivres}</span>
@@ -632,6 +867,528 @@ function PainelMacroSecretaria({
           </ul>
         </section>
       </div>
+        </>
+      )}
+
+      {/* SUB-ABA 2: Regulação Municipal & Fila Unificada Auditável */}
+      {subAba === 'regulacao' && (
+        <section className="sec-bloco" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Icone nome="scale" tamanho={22} /> Regulação Municipal & Fila Unificada Auditável
+              </h2>
+              <p className="legenda" style={{ margin: '4px 0 0' }}>
+                Classificação determinística por pontuação objetiva de vulnerabilidade e prioridades legais (Marco Legal da 1ª Infância, ECA art. 53, Lei 12.764/12 TEA).
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secundario btn-pequeno"
+              onClick={exportarFilaAuditavelCsv}
+              disabled={filaAuditavel.length === 0}
+            >
+              <Icone nome="file-text" tamanho={14} /> Exportar Fila Regulada (CSV)
+            </button>
+          </div>
+
+          {/* Banner de Critérios Legais */}
+          <div
+            style={{
+              background: '#F0F9FF',
+              border: '1px solid #BAE6FD',
+              borderRadius: '10px',
+              padding: '14px 16px',
+              fontSize: '0.86rem',
+              color: '#0369A1',
+              lineHeight: '1.45',
+            }}
+          >
+            <strong>Critérios Legais de Desempate e Vulnerabilidade Ativos (Patos - PB):</strong>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+              {LISTA_CRITERIOS_VULNERABILIDADE.map((c) => (
+                <span
+                  key={c.id}
+                  style={{
+                    background: '#FFFFFF',
+                    border: '1px solid #7DD3FC',
+                    borderRadius: '6px',
+                    padding: '4px 8px',
+                    fontWeight: 500,
+                  }}
+                >
+                  +{c.pontos} pts · {c.nome}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Filtros da Fila */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569' }}>Etapa:</span>
+              <button
+                type="button"
+                className={`btn btn-pequeno ${etapaFiltro === 'todas' ? 'btn-primario' : 'btn-secundario'}`}
+                onClick={() => setEtapaFiltro('todas')}
+              >
+                Todas as Etapas
+              </button>
+              {ORDEM_ETAPAS.map((eid) => (
+                <button
+                  key={eid}
+                  type="button"
+                  className={`btn btn-pequeno ${etapaFiltro === eid ? 'btn-primario' : 'btn-secundario'}`}
+                  onClick={() => setEtapaFiltro(eid)}
+                >
+                  <IconeEtapa etapa={eid} tamanho={14} /> {ETAPAS[eid]?.nome ?? eid}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input
+                type="search"
+                className="campo-busca-fila"
+                placeholder="Buscar por código ou iniciais..."
+                value={buscaFila}
+                onChange={(e) => setBuscaFila(e.target.value)}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '6px',
+                  border: '1px solid #CBD5E1',
+                  fontSize: '0.88rem',
+                  minWidth: '240px',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Tabela de Fila */}
+          {carregandoFila ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
+              <Icone nome="hourglass" tamanho={24} />
+              <p style={{ marginTop: '8px' }}>Carregando fila regulatória auditável...</p>
+            </div>
+          ) : filaAuditavel.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F8FAFC', borderRadius: '8px', color: '#64748B' }}>
+              <Icone nome="check-circle" tamanho={32} />
+              <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
+                Nenhuma solicitação na fila para o filtro selecionado.
+              </p>
+            </div>
+          ) : (
+            <div className="tabela-quadro-container" role="region" aria-label="Fila auditável">
+              <table className="tabela-secretaria">
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '60px' }}>Pos.</th>
+                    <th scope="col">Protocolo</th>
+                    <th scope="col">Estudante</th>
+                    <th scope="col">Responsável</th>
+                    <th scope="col">Unidade / Bairro</th>
+                    <th scope="col">Etapa & Turma</th>
+                    <th scope="col">Score Regulatório</th>
+                    <th scope="col">Origem</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Inscrição</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filaAuditavel.map((item) => (
+                    <tr key={item.codigo}>
+                      <td style={{ fontWeight: 700, textAlign: 'center' }}>
+                        {item.origem === 'judicial' ? (
+                          <span title="Prioridade Absoluta por Decisão Judicial">⚖️ 1º</span>
+                        ) : (
+                          `#${item.posicao}`
+                        )}
+                      </td>
+                      <td>
+                        <strong style={{ fontFamily: 'monospace', color: '#0F172A' }}>{item.codigo}</strong>
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{item.estudanteIniciais}</td>
+                      <td style={{ color: '#475569' }}>{item.responsavelIniciais}</td>
+                      <td>
+                        <div><strong>{item.escolaNome}</strong></div>
+                        <small style={{ color: '#64748B' }}>{item.escolaBairro}</small>
+                      </td>
+                      <td>
+                        <div>{ETAPAS[item.etapa]?.nome ?? item.etapa}</div>
+                        <small style={{ color: '#64748B' }}>{item.turma} ({item.periodo})</small>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <span style={{ fontWeight: 700, color: item.pontosTotais > 0 ? '#1D4ED8' : '#64748B' }}>
+                            {item.pontosTotais} pontos
+                          </span>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                            {item.criteriosAtendidos.map((cid) => (
+                              <span
+                                key={cid}
+                                style={{
+                                  background: '#EFF6FF',
+                                  color: '#1E40AF',
+                                  fontSize: '0.72rem',
+                                  padding: '1px 5px',
+                                  borderRadius: '4px',
+                                  border: '1px solid #BFDBFE',
+                                }}
+                                title={CRITERIOS_VULNERABILIDADE[cid]?.descricao}
+                              >
+                                {CRITERIOS_VULNERABILIDADE[cid]?.nome}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        {item.origem === 'judicial' ? (
+                          <span
+                            style={{
+                              background: '#FEF2F2',
+                              color: '#991B1B',
+                              border: '1px solid #FECACA',
+                              borderRadius: '4px',
+                              padding: '2px 6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                            }}
+                          >
+                            Mandado Judicial
+                          </span>
+                        ) : (
+                          <span style={{ color: '#64748B', fontSize: '0.8rem' }}>Regular</span>
+                        )}
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            background: item.reservaVaga ? '#ECFDF5' : '#F1F5F9',
+                            color: item.reservaVaga ? '#065F46' : '#475569',
+                          }}
+                        >
+                          {item.reservaVaga ? 'Vaga Pré-Reservada' : 'Fila de Espera'}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.8rem', color: '#64748B', whiteSpace: 'nowrap' }}>
+                        {new Date(item.criadoEm).toLocaleDateString('pt-BR')} {new Date(item.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* SUB-ABA 3: Demandas Judiciais (PJ-e) */}
+      {subAba === 'judicial' && (
+        <section className="sec-bloco" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+            <div>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Icone nome="file-text" tamanho={22} /> Central de Demandas Judiciais & Liminares (PJ-e)
+              </h2>
+              <p className="legenda" style={{ margin: '4px 0 0' }}>
+                Cumprimento tempestivo de decisões judiciais e tutela de urgência. Mitigação de astreintes (multas diárias) e emissão de Certidão Oficial com validação criptográfica SHA-256 para juntada aos autos.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-primario btn-pequeno"
+              onClick={() => setModalCadastroJudicial(true)}
+            >
+              + Autuar Mandado Judicial
+            </button>
+          </div>
+
+          {carregandoJudicial ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
+              <Icone nome="hourglass" tamanho={24} />
+              <p style={{ marginTop: '8px' }}>Carregando processos judiciais autuados...</p>
+            </div>
+          ) : demandasJudiciais.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F8FAFC', borderRadius: '8px', color: '#64748B' }}>
+              <Icone nome="check-circle" tamanho={32} />
+              <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
+                Nenhuma ordem judicial pendente ou cadastrada no sistema.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+              {demandasJudiciais.map((demanda) => {
+                const prazoDate = new Date(demanda.prazoLimiteEm);
+                const horasRestantes = Math.round((demanda.prazoLimiteEm - agora) / (1000 * 60 * 60));
+                const estaVencendo = demanda.status === 'pendente' && horasRestantes <= 24 && horasRestantes > 0;
+                const estaVencida = demanda.status === 'pendente' && horasRestantes <= 0;
+
+                return (
+                  <div
+                    key={demanda.id}
+                    style={{
+                      background: '#FFFFFF',
+                      border: estaVencida
+                        ? '2px solid #EF4444'
+                        : estaVencendo
+                        ? '2px solid #F59E0B'
+                        : demanda.status === 'alocado'
+                        ? '1px solid #10B981'
+                        : '1px solid #E2E8F0',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                        <span
+                          style={{
+                            fontFamily: 'monospace',
+                            fontWeight: 700,
+                            fontSize: '0.85rem',
+                            color: '#1E293B',
+                            background: '#F1F5F9',
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                          }}
+                          title={demanda.numeroProcesso}
+                        >
+                          {mascararProcessoCNJ(demanda.numeroProcesso)}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            padding: '3px 8px',
+                            borderRadius: '10px',
+                            background:
+                              demanda.status === 'alocado'
+                                ? '#DEF7EC'
+                                : estaVencida
+                                ? '#FDE8E8'
+                                : '#FEF08A',
+                            color:
+                              demanda.status === 'alocado'
+                                ? '#03543F'
+                                : estaVencida
+                                ? '#9B1C1C'
+                                : '#713F12',
+                          }}
+                        >
+                          {demanda.status === 'alocado'
+                            ? 'Alocado (Cumprida)'
+                            : estaVencida
+                            ? 'Prazo Expirado'
+                            : 'Pendente'}
+                        </span>
+                      </div>
+
+                      <h3 style={{ margin: '0 0 4px', fontSize: '1.05rem', color: '#0F172A' }}>
+                        {demanda.estudanteNome}
+                      </h3>
+                      <p style={{ margin: '0 0 10px', fontSize: '0.82rem', color: '#64748B' }}>
+                        Responsável: <strong>{demanda.responsavelNome}</strong> (CPF: {demanda.cpfCertidao})
+                      </p>
+
+                      <div style={{ fontSize: '0.85rem', color: '#334155', marginBottom: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <div><strong>Vara:</strong> {demanda.vara}</div>
+                        <div><strong>Destino:</strong> {demanda.escolaNome} ({ETAPAS[demanda.etapa]?.nome ?? demanda.etapa})</div>
+                        {demanda.multaDiaria ? (
+                          <div style={{ color: '#DC2626', fontWeight: 600 }}>
+                            ⚠️ Multa cominatória (astreinte): R$ {demanda.multaDiaria.toLocaleString('pt-BR')}/dia
+                          </div>
+                        ) : null}
+                      </div>
+
+                      {/* Contador do Prazo */}
+                      {demanda.status !== 'alocado' && (
+                        <div
+                          style={{
+                            background: estaVencida ? '#FEF2F2' : estaVencendo ? '#FFFBEB' : '#F8FAFC',
+                            border: `1px solid ${estaVencida ? '#FECACA' : estaVencendo ? '#FDE68A' : '#E2E8F0'}`,
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            marginBottom: '14px',
+                            fontSize: '0.82rem',
+                          }}
+                        >
+                          <div style={{ fontWeight: 600, color: estaVencida ? '#991B1B' : estaVencendo ? '#92400E' : '#475569' }}>
+                            Prazo Fatal: {prazoDate.toLocaleDateString('pt-BR')} às {prazoDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <div style={{ fontSize: '0.78rem', marginTop: '2px', color: estaVencida ? '#B91C1C' : '#64748B' }}>
+                            {estaVencida
+                              ? `⚠️ Vencido há ${Math.abs(horasRestantes)} horas!`
+                              : `Restam aproximadamente ${horasRestantes} horas para cumprimento.`}
+                          </div>
+                        </div>
+                      )}
+
+                      {demanda.protocoloCodigo && (
+                        <div
+                          style={{
+                            background: '#ECFDF5',
+                            border: '1px solid #A7F3D0',
+                            borderRadius: '8px',
+                            padding: '8px 12px',
+                            marginBottom: '14px',
+                            fontSize: '0.82rem',
+                            color: '#065F46',
+                          }}
+                        >
+                          <strong>Protocolo Vinculado:</strong> {demanda.protocoloCodigo}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                      {demanda.status !== 'alocado' ? (
+                        <button
+                          type="button"
+                          className="btn btn-primario btn-pequeno"
+                          style={{ width: '100%', justifyContent: 'center' }}
+                          onClick={() => executarAlocacaoJudicial(demanda)}
+                        >
+                          <Icone nome="check-circle" tamanho={14} /> Alocar Vaga Prioritária
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-secundario btn-pequeno"
+                          style={{ width: '100%', justifyContent: 'center' }}
+                          onClick={() => abrirCertidaoJudicial(demanda.id)}
+                        >
+                          <Icone nome="file-text" tamanho={14} /> Emitir Certidão (PJ-e)
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* SUB-ABA 4: Trilha de Auditoria Governamental */}
+      {subAba === 'auditoria' && (
+        <section className="sec-bloco" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <div>
+            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icone nome="history" tamanho={22} /> Trilha de Auditoria Governamental (TCE-PB / MP-PB)
+            </h2>
+            <p className="legenda" style={{ margin: '4px 0 0' }}>
+              Registro cronológico e imutável de todas as mutações e atos de regulação de vagas escolares. Rastreabilidade com IP, operador, perfil de acesso e fundamentação legal.
+            </p>
+          </div>
+
+          {carregandoAuditoria ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: '#64748B' }}>
+              <Icone nome="hourglass" tamanho={24} />
+              <p style={{ marginTop: '8px' }}>Carregando registros de auditoria...</p>
+            </div>
+          ) : logsAuditoria.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', background: '#F8FAFC', borderRadius: '8px', color: '#64748B' }}>
+              <Icone nome="check-circle" tamanho={32} />
+              <p style={{ margin: '8px 0 0', fontWeight: 500 }}>
+                Nenhum log registrado até o momento.
+              </p>
+            </div>
+          ) : (
+            <div className="tabela-quadro-container" role="region" aria-label="Logs de auditoria">
+              <table className="tabela-secretaria">
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ width: '150px' }}>Data / Hora</th>
+                    <th scope="col">Operador / Papel</th>
+                    <th scope="col">Ação Regulada</th>
+                    <th scope="col">Entidade</th>
+                    <th scope="col">Justificativa & Detalhes</th>
+                    <th scope="col">Rastro / IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logsAuditoria.map((log) => (
+                    <tr key={log.id}>
+                      <td style={{ fontSize: '0.8rem', color: '#475569', whiteSpace: 'nowrap' }}>
+                        {new Date(log.criadoEm).toLocaleDateString('pt-BR')} {new Date(log.criadoEm).toLocaleTimeString('pt-BR')}
+                      </td>
+                      <td>
+                        <strong>{log.operadorUsuario}</strong>
+                        <div style={{ fontSize: '0.74rem', color: '#64748B' }}>{log.operadorPerfil.toUpperCase()}</div>
+                      </td>
+                      <td>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            background:
+                              log.acao === 'ALOCACAO_JUDICIAL'
+                                ? '#FEF2F2'
+                                : log.acao === 'BAIXA_PRESENCIAL'
+                                ? '#ECFDF5'
+                                : '#F1F5F9',
+                            color:
+                              log.acao === 'ALOCACAO_JUDICIAL'
+                                ? '#991B1B'
+                                : log.acao === 'BAIXA_PRESENCIAL'
+                                ? '#065F46'
+                                : '#334155',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                          }}
+                        >
+                          {log.acao}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{log.protocoloCodigo ?? log.escolaId ?? '-'}</div>
+                        <small style={{ color: '#64748B' }}>{log.protocoloCodigo ? 'Protocolo' : log.escolaId ? 'Escola' : 'Geral'}</small>
+                      </td>
+                      <td style={{ fontSize: '0.84rem', maxWidth: '300px' }}>
+                        {log.justificativa}
+                      </td>
+                      <td style={{ fontSize: '0.78rem', color: '#64748B', fontFamily: 'monospace' }}>
+                        {log.ip ?? '127.0.0.1'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Modais de Gestão Judicial e Certidão */}
+      {modalCadastroJudicial && (
+        <ModalCadastroDemandaJudicial
+          escolas={escolas}
+          aoFechar={() => setModalCadastroJudicial(false)}
+          aoSucesso={() => {
+            setModalCadastroJudicial(false);
+            recarregarDemandasJudiciais();
+          }}
+        />
+      )}
+
+      {certidaoAtiva && (
+        <ModalCertidaoJudicial
+          certidao={certidaoAtiva}
+          aoFechar={() => setCertidaoAtiva(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1348,6 +2105,429 @@ function Contador({
         >
           +
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ModalCadastroDemandaJudicial({
+  escolas,
+  aoFechar,
+  aoSucesso,
+}: {
+  escolas: Escola[];
+  aoFechar: () => void;
+  aoSucesso: () => void;
+}) {
+  const [numeroProcesso, setNumeroProcesso] = useState('0801234-56.2026.8.15.0251');
+  const [vara, setVara] = useState('1ª Vara da Infância e da Juventude');
+  const [juizPromotor, setJuizPromotor] = useState('Dra. Maria Clara / Juíza de Direito');
+  const [estudanteNome, setEstudanteNome] = useState('');
+  const [responsavelNome, setResponsavelNome] = useState('');
+  const [cpfCertidao, setCpfCertidao] = useState('');
+  const [escolaId, setEscolaId] = useState(escolas[0]?.id ?? '');
+  const [etapa, setEtapa] = useState<EtapaId>('maternal');
+  const [periodo, setPeriodo] = useState<Periodo>('integral');
+  const [prazoHoras, setPrazoHoras] = useState(48);
+  const [multaDiaria, setMultaDiaria] = useState('500');
+  const [observacoes, setObservacoes] = useState('Decisão liminar deferida para garantia imediata de vaga em unidade próxima à residência.');
+  const [salvando, setSalvando] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!numeroProcesso.trim() || !estudanteNome.trim() || !responsavelNome.trim() || !cpfCertidao.trim()) {
+      toast('Preencha os campos obrigatórios da determinação judicial.', { emoji: 'alert-triangle', tom: 'aviso' });
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await vagasStore.cadastrarDemandaJudicial({
+        numeroProcesso: numeroProcesso.trim(),
+        vara: vara.trim(),
+        juizPromotor: juizPromotor.trim() || undefined,
+        estudanteNome: estudanteNome.trim(),
+        responsavelNome: responsavelNome.trim(),
+        cpfCertidao: cpfCertidao.trim(),
+        escolaId,
+        etapa,
+        periodo,
+        prazoHoras: Number(prazoHoras) || 48,
+        multaDiaria: multaDiaria ? Number(multaDiaria) : undefined,
+        observacoes: observacoes.trim() || undefined,
+      });
+
+      toast('Demanda judicial autuada com sucesso!', { emoji: 'check-circle', tom: 'ok' });
+      aoSucesso();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Falha ao autuar processo judicial.', {
+        emoji: 'alert-triangle',
+        tom: 'aviso',
+      });
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={aoFechar} role="presentation">
+      <div
+        className="sheet-conteudo"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="t-modal-judicial"
+        aria-modal="true"
+        style={{
+          maxWidth: '680px',
+          width: '95%',
+          maxHeight: '90vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '24px',
+          overflowY: 'auto',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+          <div>
+            <span className="lp-tag">Poder Judiciário · PJ-e</span>
+            <h2 id="t-modal-judicial" style={{ margin: '6px 0 2px', fontSize: '1.35rem' }}>
+              Autuar Determinação Judicial / Liminar
+            </h2>
+            <p style={{ margin: 0, fontSize: '0.86rem', color: '#64748B' }}>
+              Cadastre o mandado ou decisão judicial para controle do prazo fatal e garantia de prioridade legal absoluta.
+            </p>
+          </div>
+          <button type="button" className="btn btn-fantasma btn-pequeno" onClick={aoFechar}>
+            <Icone nome="x" tamanho={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Número do Processo (CNJ) *
+              </label>
+              <input
+                type="text"
+                required
+                value={numeroProcesso}
+                onChange={(e) => setNumeroProcesso(e.target.value)}
+                placeholder="0000000-00.0000.8.15.0000"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Juiz(a) / Promotor(a)
+              </label>
+              <input
+                type="text"
+                value={juizPromotor}
+                onChange={(e) => setJuizPromotor(e.target.value)}
+                placeholder="Nome do magistrado..."
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+              Vara / Juízo *
+            </label>
+            <input
+              type="text"
+              required
+              value={vara}
+              onChange={(e) => setVara(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Nome do Aluno (Criança / Beneficiário) *
+              </label>
+              <input
+                type="text"
+                required
+                value={estudanteNome}
+                onChange={(e) => setEstudanteNome(e.target.value)}
+                placeholder="Nome do menor..."
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                CPF para Certidão *
+              </label>
+              <input
+                type="text"
+                required
+                value={cpfCertidao}
+                onChange={(e) => setCpfCertidao(e.target.value)}
+                placeholder="000.000.000-00"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+              Nome do Responsável Legal *
+            </label>
+            <input
+              type="text"
+              required
+              value={responsavelNome}
+              onChange={(e) => setResponsavelNome(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Unidade Escolar Indicada *
+              </label>
+              <select
+                value={escolaId}
+                onChange={(e) => setEscolaId(e.target.value)}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              >
+                {escolas.map((esc) => (
+                  <option key={esc.id} value={esc.id}>
+                    {esc.nome} ({esc.bairro})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Etapa Solicitada *
+              </label>
+              <select
+                value={etapa}
+                onChange={(e) => setEtapa(e.target.value as EtapaId)}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              >
+                {ORDEM_ETAPAS.map((eid) => (
+                  <option key={eid} value={eid}>
+                    {ETAPAS[eid]?.nome ?? eid}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Período *
+              </label>
+              <select
+                value={periodo}
+                onChange={(e) => setPeriodo(e.target.value as Periodo)}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              >
+                <option value="integral">Integral</option>
+                <option value="parcial">Parcial</option>
+              </select>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>
+                Prazo Fatal (em Horas) *
+              </label>
+              <input
+                type="number"
+                required
+                min="1"
+                max="720"
+                value={prazoHoras}
+                onChange={(e) => setPrazoHoras(Number(e.target.value) || 48)}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #DC2626' }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+                Multa Diária (Astreintes em R$)
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="50"
+                value={multaDiaria}
+                onChange={(e) => setMultaDiaria(e.target.value)}
+                placeholder="Ex: 500"
+                style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1' }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
+              Observações / Teor da Decisão Liminar
+            </label>
+            <textarea
+              rows={2}
+              value={observacoes}
+              onChange={(e) => setObservacoes(e.target.value)}
+              style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', resize: 'vertical' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
+            <button type="button" className="btn btn-secundario" onClick={aoFechar} disabled={salvando}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primario" disabled={salvando}>
+              {salvando ? 'Autuando...' : 'Autuar Mandado Judicial'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ModalCertidaoJudicial({
+  certidao,
+  aoFechar,
+}: {
+  certidao: CertidaoCumprimentoJudicialDTO;
+  aoFechar: () => void;
+}) {
+  function copiarHash() {
+    navigator.clipboard.writeText(certidao.hashAutenticidade);
+    toast('Hash SHA-256 copiado para a área de transferência!', { emoji: 'check-circle', tom: 'ok' });
+  }
+
+  function imprimir() {
+    window.print();
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={aoFechar} role="presentation">
+      <div
+        className="sheet-conteudo"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-labelledby="t-certidao-judicial"
+        aria-modal="true"
+        style={{
+          maxWidth: '750px',
+          width: '95%',
+          maxHeight: '92vh',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: '28px',
+          overflowY: 'auto',
+          background: '#FFFFFF',
+          borderRadius: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+          <div>
+            <span className="lp-tag">Certidão Oficial · PJ-e TJ-PB</span>
+            <h2 id="t-certidao-judicial" style={{ margin: '6px 0 0', fontSize: '1.4rem' }}>
+              Certidão de Cumprimento de Ordem Judicial
+            </h2>
+          </div>
+          <button type="button" className="btn btn-fantasma btn-pequeno" onClick={aoFechar} aria-label="Fechar">
+            <Icone nome="x" tamanho={20} />
+          </button>
+        </div>
+
+        {/* Corpo Oficial da Certidão */}
+        <div
+          id="area-impressao-certidao"
+          style={{
+            border: '2px solid #0F172A',
+            padding: '24px',
+            borderRadius: '8px',
+            background: '#FAFAFA',
+            fontFamily: 'serif',
+            color: '#0F172A',
+            lineHeight: '1.6',
+          }}
+        >
+          <div style={{ textAlign: 'center', borderBottom: '1px solid #CBD5E1', paddingBottom: '14px', marginBottom: '16px' }}>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              ESTADO DA PARAÍBA · MUNICÍPIO DE PATOS
+            </div>
+            <div style={{ fontWeight: 600, fontSize: '0.88rem' }}>SECRETARIA MUNICIPAL DE EDUCAÇÃO (SEDUC)</div>
+            <div style={{ fontSize: '0.8rem', color: '#475569' }}>Central de Regulação de Vagas e Atendimento ao Judiciário</div>
+          </div>
+
+          <div style={{ textAlign: 'center', margin: '14px 0 18px', fontWeight: 700, fontSize: '1.1rem' }}>
+            CERTIDÃO ELETRÔNICA DE CUMPRIMENTO TEMPESTIVO DE ORDEM JUDICIAL
+          </div>
+
+          <p style={{ textIndent: '2rem', textAlign: 'justify', fontSize: '0.92rem' }}>
+            CERTIFICO, para os devidos fins de direito e instrução processual perante a <strong>{certidao.vara}</strong>, que nos autos da ação nº <strong>{certidao.numeroProcesso}</strong>, o Município de Patos / SEDUC deu <strong>integral e tempestivo cumprimento</strong> à determinação judicial de garantia de vaga escolar em favor do(a) infante:
+          </p>
+
+          <div
+            style={{
+              background: '#FFFFFF',
+              border: '1px solid #E2E8F0',
+              borderRadius: '6px',
+              padding: '12px 16px',
+              margin: '14px 0',
+              fontFamily: 'sans-serif',
+              fontSize: '0.88rem',
+            }}
+          >
+            <div><strong>Beneficiário(a):</strong> {certidao.estudanteNome}</div>
+            <div><strong>Responsável Legal:</strong> {certidao.responsavelNome} (CPF: {certidao.cpfCertidaoMascarado})</div>
+            <div><strong>Unidade Alocada:</strong> {certidao.escolaNome}</div>
+            <div><strong>Endereço:</strong> {certidao.escolaEndereco}</div>
+            <div><strong>Etapa / Turma:</strong> {certidao.etapaNome} · Turma {certidao.turma} ({certidao.periodo})</div>
+            <div><strong>Protocolo Eletrônico de Reserva:</strong> <strong style={{ color: '#047857' }}>{certidao.protocoloCodigo}</strong></div>
+            <div><strong>Data e Turno da Visita:</strong> {certidao.dataVisita} ({certidao.turnoVisita})</div>
+            <div><strong>Emissão da Certidão:</strong> {new Date(certidao.emitidoEm).toLocaleString('pt-BR')}</div>
+          </div>
+
+          <p style={{ textIndent: '2rem', textAlign: 'justify', fontSize: '0.92rem' }}>
+            A vaga encontra-se formalmente reservada com prioridade legal absoluta no sistema integrado de matrículas do Município de Patos - PB, cessando quaisquer cominações pecuniárias ou astreintes fixadas.
+          </p>
+
+          {/* Autenticação Criptográfica SHA-256 */}
+          <div
+            style={{
+              marginTop: '20px',
+              padding: '12px',
+              background: '#F1F5F9',
+              border: '1px dashed #64748B',
+              borderRadius: '6px',
+              fontFamily: 'monospace',
+              fontSize: '0.78rem',
+            }}
+          >
+            <div style={{ fontWeight: 700, color: '#334155', marginBottom: '4px' }}>
+              CHAVE DE VALIDAÇÃO CRIPTOGRÁFICA (SHA-256):
+            </div>
+            <div style={{ wordBreak: 'break-all', color: '#0F172A' }}>{certidao.hashAutenticidade}</div>
+            <div style={{ marginTop: '6px', fontSize: '0.74rem', color: '#64748B' }}>
+              Documento emitido nos termos da Lei Federal nº 14.063/2020 e Lei 11.419/2006 para juntada aos autos do PJ-e.
+            </div>
+          </div>
+        </div>
+
+        {/* Ações */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', flexWrap: 'wrap', gap: '10px' }}>
+          <button type="button" className="btn btn-secundario" onClick={copiarHash}>
+            <Icone nome="clipboard-check" tamanho={16} /> Copiar Hash SHA-256
+          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" className="btn btn-primario" onClick={imprimir}>
+              <Icone nome="file-text" tamanho={16} /> Imprimir / Salvar PDF
+            </button>
+            <button type="button" className="btn btn-fantasma" onClick={aoFechar}>
+              Fechar
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

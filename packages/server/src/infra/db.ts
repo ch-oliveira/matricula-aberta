@@ -313,8 +313,46 @@ export async function inicializarSchema(): Promise<void> {
       token_cancelamento TEXT,
       notificado_dia_em BIGINT,
       notificado_1h_em BIGINT,
+      criterios_prioridade_json TEXT,
+      pontos_prioridade INTEGER NOT NULL DEFAULT 0,
+      origem TEXT NOT NULL DEFAULT 'regular',
+      numero_processo_judicial TEXT,
       criado_em BIGINT NOT NULL,
       atendido_em BIGINT
+    );
+
+    CREATE TABLE IF NOT EXISTS demandas_judiciais (
+      id TEXT PRIMARY KEY,
+      numero_processo TEXT NOT NULL,
+      vara TEXT NOT NULL,
+      juiz_promotor TEXT,
+      estudante_nome TEXT NOT NULL,
+      responsavel_nome TEXT NOT NULL,
+      cpf_certidao TEXT NOT NULL,
+      escola_id TEXT NOT NULL,
+      escola_nome TEXT NOT NULL,
+      etapa TEXT NOT NULL,
+      periodo TEXT NOT NULL,
+      protocolo_codigo TEXT,
+      prazo_limite_em BIGINT NOT NULL,
+      multa_diaria REAL,
+      status TEXT NOT NULL DEFAULT 'pendente',
+      alocado_em BIGINT,
+      observacoes TEXT,
+      criado_em BIGINT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS logs_auditoria (
+      id TEXT PRIMARY KEY,
+      operador_usuario TEXT NOT NULL,
+      operador_perfil TEXT NOT NULL,
+      acao TEXT NOT NULL,
+      protocolo_codigo TEXT,
+      escola_id TEXT,
+      justificativa TEXT NOT NULL,
+      detalhes_json TEXT,
+      ip TEXT,
+      criado_em BIGINT NOT NULL
     );
 
     CREATE INDEX IF NOT EXISTS idx_historico_em ON historico_vagas(em DESC);
@@ -322,6 +360,8 @@ export async function inicializarSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_alertas_expira ON alertas(expira_em);
     CREATE INDEX IF NOT EXISTS idx_protocolos_escola ON protocolos_visita(escola_id, criado_em DESC);
     CREATE INDEX IF NOT EXISTS idx_protocolos_status_escola ON protocolos_visita(status, escola_id);
+    CREATE INDEX IF NOT EXISTS idx_demandas_prazo ON demandas_judiciais(prazo_limite_em ASC, status);
+    CREATE INDEX IF NOT EXISTS idx_auditoria_criado_em ON logs_auditoria(criado_em DESC);
     CREATE INDEX IF NOT EXISTS idx_ofertas_escola ON ofertas(escola_id);
   `;
 
@@ -336,6 +376,10 @@ export async function inicializarSchema(): Promise<void> {
       'ALTER TABLE protocolos_visita ADD COLUMN token_cancelamento TEXT',
       'ALTER TABLE protocolos_visita ADD COLUMN notificado_dia_em BIGINT',
       'ALTER TABLE protocolos_visita ADD COLUMN notificado_1h_em BIGINT',
+      'ALTER TABLE protocolos_visita ADD COLUMN criterios_prioridade_json TEXT',
+      'ALTER TABLE protocolos_visita ADD COLUMN pontos_prioridade INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE protocolos_visita ADD COLUMN origem TEXT NOT NULL DEFAULT \'regular\'',
+      'ALTER TABLE protocolos_visita ADD COLUMN numero_processo_judicial TEXT',
     ];
     for (const sql of colunas) {
       try {
@@ -346,6 +390,9 @@ export async function inicializarSchema(): Promise<void> {
     }
     try {
       await execute('CREATE INDEX IF NOT EXISTS idx_protocolos_doc_ativo ON protocolos_visita(documento_estudante_hash, status)');
+      await execute('CREATE INDEX IF NOT EXISTS idx_protocolos_pontos ON protocolos_visita(pontos_prioridade DESC, criado_em ASC)');
+      await execute('CREATE INDEX IF NOT EXISTS idx_demandas_prazo ON demandas_judiciais(prazo_limite_em ASC, status)');
+      await execute('CREATE INDEX IF NOT EXISTS idx_auditoria_criado_em ON logs_auditoria(criado_em DESC)');
     } catch {
       // ignore
     }

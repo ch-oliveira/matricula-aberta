@@ -1,5 +1,6 @@
 import {
   CANAIS_VALIDOS,
+  CRITERIOS_VULNERABILIDADE,
   ETAPAS,
   ORDEM_ETAPAS,
   PERIODOS_VALIDOS,
@@ -7,6 +8,7 @@ import {
   STATUS_PROTOCOLO_VALIDOS,
   TURNOS_VISITA_VALIDOS,
   type Canal,
+  type CriterioVulnerabilidadeId,
   type EtapaId,
   type EventoVaga,
   type Periodo,
@@ -168,6 +170,9 @@ export function validarPayloadProtocolo(body: Record<string, unknown>): {
   documentosMarcados: string[];
   totalObrigatorios: number;
   documentoEstudante?: string;
+  criteriosPrioridade?: CriterioVulnerabilidadeId[];
+  origem?: 'regular' | 'judicial';
+  numeroProcessoJudicial?: string;
 } {
   const escolaId = limparTexto(body.escolaId, 80);
   if (!escolaId) {
@@ -209,6 +214,18 @@ export function validarPayloadProtocolo(body: Record<string, unknown>): {
     ? Math.max(1, Math.min(20, Math.round(totalNum)))
     : 6;
 
+  const criteriosPrioridade: CriterioVulnerabilidadeId[] = [];
+  if (Array.isArray(body.criteriosPrioridade)) {
+    for (const item of body.criteriosPrioridade) {
+      if (typeof item === 'string' && item in CRITERIOS_VULNERABILIDADE) {
+        criteriosPrioridade.push(item as CriterioVulnerabilidadeId);
+      }
+    }
+  }
+
+  const origem = body.origem === 'judicial' ? 'judicial' : 'regular';
+  const numeroProcessoJudicial = limparTexto(body.numeroProcessoJudicial, 40) || undefined;
+
   return {
     escolaId,
     etapa: body.etapa,
@@ -222,6 +239,83 @@ export function validarPayloadProtocolo(body: Record<string, unknown>): {
     documentosMarcados,
     totalObrigatorios,
     documentoEstudante,
+    criteriosPrioridade: criteriosPrioridade.length > 0 ? criteriosPrioridade : undefined,
+    origem,
+    numeroProcessoJudicial,
+  };
+}
+
+export function validarPayloadDemandaJudicial(body: Record<string, unknown>): {
+  numeroProcesso: string;
+  vara: string;
+  juizPromotor?: string;
+  estudanteNome: string;
+  responsavelNome: string;
+  cpfCertidao: string;
+  escolaId: string;
+  etapa: EtapaId;
+  periodo: Periodo;
+  prazoHoras: number;
+  multaDiaria?: number;
+  observacoes?: string;
+} {
+  const numeroProcesso = limparTexto(body.numeroProcesso, 40);
+  if (numeroProcesso.length < 5) {
+    throw new HttpError(400, 'Informe o número válido do processo judicial (formato CNJ/PJe).');
+  }
+
+  const vara = limparTexto(body.vara, 120);
+  if (vara.length < 3) {
+    throw new HttpError(400, 'Informe a Vara ou Promotoria de origem.');
+  }
+
+  const estudanteNome = limparTexto(body.estudanteNome, 100);
+  if (estudanteNome.length < 2) {
+    throw new HttpError(400, 'Informe o nome do estudante.');
+  }
+
+  const responsavelNome = limparTexto(body.responsavelNome, 100);
+  if (responsavelNome.length < 2) {
+    throw new HttpError(400, 'Informe o nome do representante legal.');
+  }
+
+  const cpfCertidao = limparTexto(body.cpfCertidao, 50);
+  if (cpfCertidao.length < 4) {
+    throw new HttpError(400, 'Informe o CPF ou número da certidão de nascimento do aluno.');
+  }
+
+  const escolaId = limparTexto(body.escolaId, 80);
+  if (!escolaId) {
+    throw new HttpError(400, 'Selecione a unidade escolar designada em Patos - PB.');
+  }
+
+  if (!ehEtapaValida(body.etapa)) {
+    throw new HttpError(400, 'Etapa de ensino inválida.');
+  }
+
+  const periodo: Periodo = ehPeriodoValido(body.periodo) ? body.periodo : 'integral';
+  const juizPromotor = limparTexto(body.juizPromotor, 100) || undefined;
+  const observacoes = limparTexto(body.observacoes, 500) || undefined;
+
+  const prazoNum = Number(body.prazoHoras ?? 48);
+  const prazoHoras = Number.isFinite(prazoNum) ? Math.max(1, Math.min(720, Math.round(prazoNum))) : 48;
+
+  const multaNum = Number(body.multaDiaria ?? 1000);
+  const multaDiaria = Number.isFinite(multaNum) && multaNum >= 0 ? multaNum : 1000;
+
+  return {
+    numeroProcesso,
+    vara,
+    juizPromotor,
+    estudanteNome,
+    responsavelNome,
+    cpfCertidao,
+    escolaId,
+    etapa: body.etapa,
+    periodo,
+    prazoHoras,
+    multaDiaria,
+    observacoes,
   };
 }
 

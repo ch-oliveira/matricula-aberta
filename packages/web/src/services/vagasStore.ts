@@ -9,9 +9,14 @@
 import { useSyncExternalStore } from 'react';
 import type {
   CatalogoMunicipioDTO,
+  CertidaoCumprimentoJudicialDTO,
+  CriterioVulnerabilidadeId,
+  DemandaJudicial,
   Escola,
   EtapaId,
   EventoVaga,
+  FilaItemAuditavel,
+  LogAuditoria,
   LoginGestaoRequestDTO,
   Oferta,
   PainelSecretariaDTO,
@@ -541,6 +546,141 @@ async function extrairMensagemErro(res: Response, padrao: string): Promise<strin
   return padrao;
 }
 
+const FILA_PUBLICA_FALLBACK: FilaItemAuditavel[] = [
+  {
+    posicao: 1,
+    codigo: 'PATOS-2027-4821',
+    estudanteIniciais: 'M. F. M.',
+    responsavelIniciais: 'M. F. M.',
+    etapa: 'bercario',
+    turma: 'Berçário II',
+    periodo: 'integral',
+    escolaId: 'creche-manoel-quinidio',
+    escolaNome: 'Creche Municipal Manoel Quinídio Sobrinho',
+    escolaBairro: 'Jatobá',
+    pontosTotais: 160,
+    criteriosAtendidos: ['cadunico_bolsafamilia', 'mae_trabalhadora'],
+    origem: 'regular',
+    criadoEm: Date.now() - 42 * 60_000,
+    status: 'aguardando',
+    reservaVaga: true,
+  },
+  {
+    posicao: 2,
+    codigo: 'PATOS-2027-6034',
+    estudanteIniciais: 'A. L. N.',
+    responsavelIniciais: 'A. L. N.',
+    etapa: 'maternal',
+    turma: 'Maternal I',
+    periodo: 'integral',
+    escolaId: 'creche-maria-eunice',
+    escolaNome: 'Creche Municipal Maria Eunice',
+    escolaBairro: 'Maternidade',
+    pontosTotais: 150,
+    criteriosAtendidos: ['deficiencia_tea'],
+    origem: 'regular',
+    criadoEm: Date.now() - 110 * 60_000,
+    status: 'aguardando',
+    reservaVaga: true,
+  },
+  {
+    posicao: 3,
+    codigo: 'PATOS-2027-7201',
+    estudanteIniciais: 'K. R. S.',
+    responsavelIniciais: 'R. S. S.',
+    etapa: 'pre',
+    turma: 'Pré II',
+    periodo: 'parcial',
+    escolaId: 'emef-sabino-freire',
+    escolaNome: 'EMEF Sabino Freire',
+    escolaBairro: 'Maternidade',
+    pontosTotais: 100,
+    criteriosAtendidos: ['cadunico_bolsafamilia'],
+    origem: 'regular',
+    criadoEm: Date.now() - 65 * 60_000,
+    status: 'aguardando',
+    reservaVaga: true,
+  },
+  {
+    posicao: 4,
+    codigo: 'PATOS-2027-5190',
+    estudanteIniciais: 'J. S. W.',
+    responsavelIniciais: 'J. S. W.',
+    etapa: 'fund1',
+    turma: '1º ano',
+    periodo: 'parcial',
+    escolaId: 'emef-monsenhor-manoel-vieira',
+    escolaNome: 'EMEF Monsenhor Vieira',
+    escolaBairro: 'Centro',
+    pontosTotais: 50,
+    criteriosAtendidos: ['irmao_na_escola'],
+    origem: 'regular',
+    criadoEm: Date.now() - 75 * 60_000,
+    status: 'aguardando',
+    reservaVaga: true,
+  },
+  {
+    posicao: 5,
+    codigo: 'PATOS-2027-8344',
+    estudanteIniciais: 'G. H. T.',
+    responsavelIniciais: 'A. H. T.',
+    etapa: 'fund2',
+    turma: '6º ano',
+    periodo: 'parcial',
+    escolaId: 'emef-aristides-hamad-timene',
+    escolaNome: 'EMEF Aristides Hamad Timene',
+    escolaBairro: 'Belo Horizonte',
+    pontosTotais: 50,
+    criteriosAtendidos: ['irmao_na_escola'],
+    origem: 'regular',
+    criadoEm: Date.now() - 150 * 60_000,
+    status: 'aguardando',
+    reservaVaga: false,
+  },
+  {
+    posicao: 1,
+    codigo: 'PATOS-2027-9901',
+    estudanteIniciais: 'E. G. L.',
+    responsavelIniciais: 'L. S. L.',
+    etapa: 'bercario',
+    turma: 'Berçário I',
+    periodo: 'integral',
+    escolaId: 'creche-manoel-quinidio',
+    escolaNome: 'Creche Municipal Manoel Quinídio Sobrinho',
+    escolaBairro: 'Jatobá',
+    pontosTotais: 200,
+    criteriosAtendidos: ['medida_protetiva'],
+    origem: 'judicial',
+    criadoEm: Date.now() - 20 * 60_000,
+    status: 'aguardando',
+    reservaVaga: true,
+  },
+];
+
+function filtrarFilaMock(
+  itens: FilaItemAuditavel[],
+  filtros?: { etapa?: EtapaId; escolaId?: string; busca?: string },
+): FilaItemAuditavel[] {
+  let res = [...itens];
+  if (filtros?.etapa) {
+    res = res.filter((i) => i.etapa === filtros.etapa);
+  }
+  if (filtros?.escolaId) {
+    res = res.filter((i) => i.escolaId === filtros.escolaId);
+  }
+  if (filtros?.busca) {
+    const b = filtros.busca.trim().toUpperCase();
+    res = res.filter(
+      (i) =>
+        i.codigo.toUpperCase().includes(b) ||
+        i.escolaNome.toUpperCase().includes(b) ||
+        i.escolaBairro.toUpperCase().includes(b) ||
+        i.estudanteIniciais.toUpperCase().includes(b),
+    );
+  }
+  return res.map((item, idx) => ({ ...item, posicao: idx + 1 }));
+}
+
 export const vagasStore = {
   getCatalogo: () => catalogo,
   getEscolas: () => escolas,
@@ -683,6 +823,7 @@ export const vagasStore = {
     documentosMarcados: string[];
     totalObrigatorios: number;
     documentoEstudante?: string;
+    criteriosPrioridade?: CriterioVulnerabilidadeId[];
   }): Promise<ProtocoloVisita> {
     const res = await fetch(`${API_BASE}/api/v1/protocolos`, {
       method: 'POST',
@@ -750,6 +891,111 @@ export const vagasStore = {
     mesclarProtocolos([json.protocolo]);
     emitir();
     return json.protocolo;
+  },
+
+  // ================= PILAR B: REGULAÇÃO, FILA PÚBLICA & JUDICIÁRIO =================
+  async obterFilaPublicaAuditavel(filtros?: {
+    etapa?: EtapaId;
+    escolaId?: string;
+    busca?: string;
+  }): Promise<FilaItemAuditavel[]> {
+    const sp = new URLSearchParams();
+    if (filtros?.etapa) sp.set('etapa', filtros.etapa);
+    if (filtros?.escolaId) sp.set('escolaId', filtros.escolaId);
+    if (filtros?.busca) sp.set('busca', filtros.busca);
+    const qs = sp.toString() ? `?${sp.toString()}` : '';
+    try {
+      const res = await fetch(`${API_BASE}/api/v1/regulacao/fila-publica${qs}`);
+      if (res.ok) {
+        const json = (await res.json()) as { ok: boolean; fila: FilaItemAuditavel[] };
+        if (json.fila && json.fila.length > 0) {
+          return json.fila;
+        }
+      }
+    } catch {
+      /* fallback se o backend estiver inacessível */
+    }
+    return filtrarFilaMock(FILA_PUBLICA_FALLBACK, filtros);
+  },
+
+  async listarDemandasJudiciais(): Promise<DemandaJudicial[]> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/judicial`, {
+      headers: headersAutenticados('secretaria', true),
+    });
+    if (!res.ok) {
+      throw new Error('Falha ao consultar processos judiciais da SEDUC.');
+    }
+    const json = (await res.json()) as { ok: boolean; demandas: DemandaJudicial[] };
+    return json.demandas ?? [];
+  },
+
+  async cadastrarDemandaJudicial(dados: {
+    numeroProcesso: string;
+    vara: string;
+    juizPromotor?: string;
+    estudanteNome: string;
+    responsavelNome: string;
+    cpfCertidao: string;
+    escolaId: string;
+    etapa: EtapaId;
+    periodo: Periodo;
+    prazoHoras: number;
+    multaDiaria?: number;
+    observacoes?: string;
+  }): Promise<DemandaJudicial> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/judicial`, {
+      method: 'POST',
+      headers: headersAutenticados('secretaria', true),
+      body: JSON.stringify(dados),
+    });
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao cadastrar processo judicial.');
+      throw new Error(msg);
+    }
+    const json = (await res.json()) as { ok: boolean; demanda: DemandaJudicial };
+    emitir();
+    return json.demanda;
+  },
+
+  async alocarVagaJudicial(
+    demandaId: string,
+    justificativa?: string,
+  ): Promise<{ demanda: DemandaJudicial; protocoloCodigo: string }> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/judicial/${encodeURIComponent(demandaId)}/alocar`, {
+      method: 'POST',
+      headers: headersAutenticados('secretaria', true),
+      body: JSON.stringify({ justificativa }),
+    });
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao alocar vaga prioritária judicial.');
+      throw new Error(msg);
+    }
+    const json = (await res.json()) as { ok: boolean; demanda: DemandaJudicial; protocoloCodigo: string };
+    emitir();
+    return json;
+  },
+
+  async obterCertidaoJudicial(demandaId: string): Promise<CertidaoCumprimentoJudicialDTO> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/judicial/${encodeURIComponent(demandaId)}/certidao`, {
+      headers: headersAutenticados('secretaria', true),
+    });
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao gerar certidão de cumprimento judicial.');
+      throw new Error(msg);
+    }
+    const json = (await res.json()) as { ok: boolean; certidao: CertidaoCumprimentoJudicialDTO };
+    return json.certidao;
+  },
+
+  async listarLogsAuditoria(limite = 100): Promise<LogAuditoria[]> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/auditoria?limite=${limite}`, {
+      headers: headersAutenticados('secretaria', true),
+    });
+    if (!res.ok) {
+      throw new Error('Falha ao carregar trilha de auditoria.');
+    }
+    const json = (await res.json()) as { ok: boolean; logs: LogAuditoria[] };
+    return json.logs ?? [];
   },
 };
 

@@ -210,6 +210,99 @@ try {
   assert.equal(dataGetProt.protocolo.status, 'aguardando');
   console.log(`✓ 7. Protocolo e Agendamento Presencial OK (${codigoProt})`);
 
+  // 8. PILAR B: Regulação, Fila Pública Auditável, Demandas Judiciais & Auditoria
+  // 8.1. Fila Pública Auditável (Acesso Cidadão / MP / TCE com anonimização LGPD)
+  const rFilaPublica = await fetch(`${BASE_URL}/api/v1/regulacao/fila-publica?etapa=bercario`);
+  assert.equal(rFilaPublica.status, 200);
+  const dataFila = await rFilaPublica.json();
+  assert.ok(dataFila.ok);
+  assert.ok(Array.isArray(dataFila.fila));
+  assert.ok(dataFila.fila.length > 0);
+  // Garante que não vaza CPF nem telefone na fila pública
+  const primeiroFila = dataFila.fila[0];
+  assert.ok(primeiroFila.codigo);
+  assert.ok(primeiroFila.estudanteIniciais);
+  assert.equal(primeiroFila.telefone, undefined);
+  assert.equal(primeiroFila.cpf, undefined);
+  assert.ok(typeof primeiroFila.pontosTotais === 'number');
+
+  // 8.2. Demandas Judiciais (SEDUC / PGM)
+  const rJudicial = await fetch(`${BASE_URL}/api/v1/gestao/judicial`, {
+    headers: { Authorization: `Bearer ${tokenSeduc}` },
+  });
+  assert.equal(rJudicial.status, 200);
+  const dataJudicial = await rJudicial.json();
+  assert.ok(Array.isArray(dataJudicial.demandas));
+  assert.ok(dataJudicial.demandas.length >= 2);
+
+  // Cadastrar nova demanda judicial
+  const rCadastrarJud = await fetch(`${BASE_URL}/api/v1/gestao/judicial`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${tokenSeduc}`,
+    },
+    body: JSON.stringify({
+      numeroProcesso: '0802999-12.2026.8.15.0251',
+      vara: '1ª Vara Mista de Patos - PB',
+      juizPromotor: 'Dra. Juíza de Direito',
+      estudanteNome: 'Bernardo Lucas Alves',
+      responsavelNome: 'Renata Alves',
+      cpfCertidao: '111.222.333-44',
+      escolaId: 'creche-tia-luci',
+      etapa: 'bercario',
+      periodo: 'integral',
+      prazoHoras: 24,
+      multaDiaria: 1000,
+      observacoes: 'Liminar urgente deferida para atendimento imediato',
+    }),
+  });
+  assert.equal(rCadastrarJud.status, 201);
+  const dataCadJud = await rCadastrarJud.json();
+  const demandaCriadaId = dataCadJud.demanda.id;
+  assert.ok(demandaCriadaId);
+  assert.equal(dataCadJud.demanda.status, 'pendente');
+
+  // Alocar Vaga Prioritária em Cumprimento à Liminar
+  const rAlocarJud = await fetch(`${BASE_URL}/api/v1/gestao/judicial/${demandaCriadaId}/alocar`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${tokenSeduc}`,
+    },
+    body: JSON.stringify({
+      justificativa: 'Cumprimento tempestivo da liminar do Processo 0802999-12.2026.8.15.0251',
+    }),
+  });
+  assert.equal(rAlocarJud.status, 200);
+  const dataAlocar = await rAlocarJud.json();
+  assert.equal(dataAlocar.demanda.status, 'alocado');
+  assert.match(dataAlocar.protocoloCodigo, /^PATOS-JUD-/);
+
+  // Emitir Certidão Oficial de Cumprimento para juntada no PJ-e
+  const rCertidao = await fetch(`${BASE_URL}/api/v1/gestao/judicial/${demandaCriadaId}/certidao`, {
+    headers: { Authorization: `Bearer ${tokenSeduc}` },
+  });
+  assert.equal(rCertidao.status, 200);
+  const dataCertidao = await rCertidao.json();
+  assert.ok(dataCertidao.certidao.hashAutenticidade);
+  assert.ok(dataCertidao.certidao.textoCertidao.includes('CERTIDÃO ELETRÔNICA'));
+  assert.ok(dataCertidao.certidao.textoCertidao.includes(dataAlocar.protocoloCodigo));
+
+  // 8.3. Trilha de Auditoria Imutável (TCE / MP)
+  const rAuditoria = await fetch(`${BASE_URL}/api/v1/gestao/auditoria?limite=50`, {
+    headers: { Authorization: `Bearer ${tokenSeduc}` },
+  });
+  assert.equal(rAuditoria.status, 200);
+  const dataAuditoria = await rAuditoria.json();
+  assert.ok(Array.isArray(dataAuditoria.logs));
+  assert.ok(dataAuditoria.logs.length > 0);
+  // O log de alocação judicial deve constar registrado
+  const logAlocacao = dataAuditoria.logs.find((l) => l.acao === 'ALOCACAO_VAGA_JUDICIAL');
+  assert.ok(logAlocacao);
+  assert.equal(logAlocacao.operadorPerfil, 'secretaria');
+  console.log('✓ 8. Pilar B: Regulação, Fila Pública Auditável, Liminares & Auditoria OK');
+
   console.log('\n======================================================');
   console.log(' TODOS OS TESTES PASSARAM COM 100% DE SUCESSO! ');
   console.log('======================================================\n');

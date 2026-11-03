@@ -10,8 +10,10 @@ import { gerarMatrizQrCodeReal } from '../domain/qr';
 import {
   dataLocalISO,
   formatarCpfOuCertidao,
+  LISTA_CRITERIOS_VULNERABILIDADE,
   proximoDiaUtilISO,
   type Busca,
+  type CriterioVulnerabilidadeId,
   type ProtocoloVisita,
   type TurnoVisita,
 } from '../domain/types';
@@ -58,6 +60,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
   const [telefone, setTelefone] = useState('');
   const [turnoVisita, setTurnoVisita] = useState<TurnoVisita>('manha');
   const [dataVisita, setDataVisita] = useState<string>(() => proximoDiaUtilISO(1));
+  const [criteriosSelecionados, setCriteriosSelecionados] = useState<CriterioVulnerabilidadeId[]>([]);
   const [emitindo, setEmitindo] = useState(false);
   const [erroProt, setErroProt] = useState<string | null>(null);
   const [protocoloLocal, setProtocoloLocal] = useState<ProtocoloVisita | null>(null);
@@ -147,6 +150,7 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
         documentosMarcados: marcados,
         totalObrigatorios: obrig.length,
         documentoEstudante: documentoEstudante.trim() || undefined,
+        criteriosPrioridade: criteriosSelecionados.length > 0 ? criteriosSelecionados : undefined,
       });
       setProtocoloLocal(novo);
       setMeusCodigos((ant) => ({ ...ant, [escola.id]: novo.codigo }));
@@ -521,6 +525,26 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 </div>
               </dl>
 
+              {protocoloAtivo.pontosPrioridade !== undefined && protocoloAtivo.pontosPrioridade > 0 && (
+                <div
+                  style={{
+                    background: '#EEF2FF',
+                    border: '1.5px solid #C7D2FE',
+                    borderRadius: '8px',
+                    padding: '10px 12px',
+                    margin: '10px 0',
+                    fontSize: '0.86rem',
+                    color: '#3730A3',
+                    lineHeight: '1.4',
+                  }}
+                >
+                  <strong>⚖️ Prioridade Regulatória: {protocoloAtivo.pontosPrioridade} pontos</strong>
+                  <div style={{ fontSize: '0.78rem', marginTop: '2px', color: '#4F46E5' }}>
+                    Critérios legais declarados para auditoria da fila pública. Apresente os comprovantes no comparecimento.
+                  </div>
+                </div>
+              )}
+
               {protocoloAtivo.reservaVaga && protocoloAtivo.status === 'aguardando' && (
                 <div
                   className="aviso-reserva-garantida"
@@ -799,6 +823,65 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                   </label>
                 </div>
               </fieldset>
+            </div>
+
+            {/* Critérios de Prioridade e Ação Social (Pilar B - Regulação) */}
+            <div
+              style={{
+                background: '#F8FAFC',
+                border: '1.5px solid #CBD5E1',
+                borderRadius: '10px',
+                padding: '14px',
+                margin: '16px 0',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <Icone nome="shield" tamanho={18} />
+                <strong style={{ fontSize: '0.92rem', color: '#1E293B' }}>
+                  Critérios de Prioridade e Ação Social (Opcional)
+                </strong>
+              </div>
+              <p style={{ fontSize: '0.8rem', color: '#64748B', margin: '0 0 10px', lineHeight: '1.4' }}>
+                Marque se a criança ou família se enquadra nos critérios da legislação municipal de Patos-PB (Marco Legal da 1ª Infância e ECA). Garante pontuação na fila auditável.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {LISTA_CRITERIOS_VULNERABILIDADE.filter((c) => c.id !== 'medida_protetiva').map((c) => {
+                  const marcado = criteriosSelecionados.includes(c.id);
+                  return (
+                    <label
+                      key={c.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        fontSize: '0.86rem',
+                        cursor: 'pointer',
+                        padding: '6px 8px',
+                        borderRadius: '6px',
+                        background: marcado ? '#F1F5F9' : 'transparent',
+                        border: marcado ? '1px solid #94A3B8' : '1px solid transparent',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={marcado}
+                        onChange={() => {
+                          setCriteriosSelecionados((prev) =>
+                            marcado ? prev.filter((x) => x !== c.id) : [...prev, c.id],
+                          );
+                        }}
+                        style={{ marginTop: '3px', accentColor: '#2563EB' }}
+                      />
+                      <div>
+                        <strong style={{ color: '#0F172A' }}>+{c.pontos} pts: {c.nome}</strong>
+                        <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '2px' }}>
+                          {c.descricao} (Apresentar: <em>{c.documentoExigido}</em>)
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
 
             {erroProt && (

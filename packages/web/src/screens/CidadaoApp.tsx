@@ -16,6 +16,7 @@ import { Sticker } from '../stickers/Sticker';
 import { AlertSheet } from './AlertSheet';
 import { CompareSheet } from './CompareSheet';
 import { ConsultarProtocoloSheet } from './ConsultarProtocoloSheet';
+import { FilaPublicaModal } from '../components/FilaPublicaModal';
 import { Landing } from './Landing';
 import { StepOnde } from './StepOnde';
 import { StepQuem } from './StepQuem';
@@ -54,6 +55,7 @@ export function CidadaoApp() {
   const [compOpen, setCompOpen] = useState(false);
   const [alerta, setAlerta] = useState<{ open: boolean; escolaId?: string }>({ open: false });
   const [consultarProtAberto, setConsultarProtAberto] = useState(false);
+  const [filaPublicaAberta, setFilaPublicaAberta] = useState(false);
   const [destaque, setDestaque] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [meusCodigos] = usePersistido<Record<string, string>>('ma:protocolos:por-escola:v1', {});
@@ -244,6 +246,15 @@ export function CidadaoApp() {
 
           <div className="topo-acoes">
             <div className="topo-grupo-acess" role="group" aria-label="Preferências e acessibilidade">
+              <button
+                type="button"
+                className="btn-barra"
+                onClick={() => setFilaPublicaAberta(true)}
+                title="Consultar a Fila Pública Auditável e critérios legais de prioridade de Patos - PB"
+              >
+                <Icone nome="shield" tamanho={15} /> <span className="rotulo-topo">Fila Pública</span>
+              </button>
+
               <button
                 type="button"
                 className="btn-barra"
@@ -681,6 +692,11 @@ export function CidadaoApp() {
         open={consultarProtAberto}
         onClose={() => setConsultarProtAberto(false)}
         onProtocoloEncontrado={(escolaId) => abrirProtocolo(escolaId)}
+      />
+      <FilaPublicaModal
+        aberto={filaPublicaAberta}
+        etapaInicial={busca.etapa}
+        aoFechar={() => setFilaPublicaAberta(false)}
       />
     </div>
   );

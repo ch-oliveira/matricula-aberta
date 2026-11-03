@@ -1,8 +1,10 @@
 import { createHash, randomInt } from 'node:crypto';
 import {
   anoLetivo,
+  calcularPontuacaoVulnerabilidade,
   proximoDiaUtilISO,
   verificarProtocoloExpirado,
+  type CriterioVulnerabilidadeId,
   type EtapaId,
   type EventoVaga,
   type Periodo,
@@ -18,6 +20,7 @@ import { db } from '../../infra/db.ts';
 import { HttpError } from '../../infra/security.ts';
 import { mascararTelefoneLGPD } from '../alertas/alertas.module.ts';
 import { enviarMensagemConfirmacaoImediata } from '../notificacoes/notificacoes.module.ts';
+import { registrarLogAuditoria } from '../regulacao/regulacao.module.ts';
 import { atualizarOfertaUnidade, invalidarCacheEscolas } from '../unidades/unidades.module.ts';
 
 interface LinhaProtocoloDB {
@@ -46,6 +49,10 @@ interface LinhaProtocoloDB {
   token_cancelamento?: string | null;
   notificado_dia_em?: number | null;
   notificado_1h_em?: number | null;
+  criterios_prioridade_json?: string | null;
+  pontos_prioridade?: number | null;
+  origem?: 'regular' | 'judicial' | null;
+  numero_processo_judicial?: string | null;
   criado_em: number;
   atendido_em: number | null;
 }
@@ -57,6 +64,18 @@ function mapearLinhaProtocolo(r: LinhaProtocoloDB): ProtocoloVisita {
     if (Array.isArray(parsed)) docs = parsed.filter((x): x is string => typeof x === 'string');
   } catch {
     docs = [];
+  }
+
+  let criterios: CriterioVulnerabilidadeId[] = [];
+  if (r.criterios_prioridade_json) {
+    try {
+      const parsed = JSON.parse(r.criterios_prioridade_json);
+      if (Array.isArray(parsed)) {
+        criterios = parsed.filter((x): x is CriterioVulnerabilidadeId => typeof x === 'string');
+      }
+    } catch {
+      criterios = [];
+    }
   }
 
   return {
@@ -83,8 +102,12 @@ function mapearLinhaProtocolo(r: LinhaProtocoloDB): ProtocoloVisita {
     tokenCancelamento: r.token_cancelamento ?? undefined,
     notificadoDiaEm: r.notificado_dia_em ?? undefined,
     notificado1hEm: r.notificado_1h_em ?? undefined,
-    criadoEm: r.criado_em,
-    atendidoEm: r.atendido_em ?? undefined,
+    criteriosPrioridade: criterios.length > 0 ? criterios : undefined,
+    pontosPrioridade: Number(r.pontos_prioridade ?? 0),
+    origem: (r.origem as 'regular' | 'judicial') || 'regular',
+    numeroProcessoJudicial: r.numero_processo_judicial ?? undefined,
+    criadoEm: Number(r.criado_em),
+    atendidoEm: r.atendido_em ? Number(r.atendido_em) : undefined,
   };
 }
 
@@ -133,6 +156,9 @@ export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<
       totalObrigatorios: 7,
       status: 'aguardando' as StatusProtocolo,
       reservaVaga: 1,
+      criterios: ['cadunico_bolsafamilia', 'mae_trabalhadora'] as CriterioVulnerabilidadeId[],
+      pontos: 55,
+      origem: 'regular' as const,
       criadoEm: agora - 42 * 60_000,
     },
     {
@@ -154,6 +180,9 @@ export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<
       totalObrigatorios: 7,
       status: 'aguardando' as StatusProtocolo,
       reservaVaga: 1,
+      criterios: ['irmao_na_escola'] as CriterioVulnerabilidadeId[],
+      pontos: 20,
+      origem: 'regular' as const,
       criadoEm: agora - 75 * 60_000,
     },
     {
@@ -175,6 +204,9 @@ export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<
       totalObrigatorios: 7,
       status: 'aguardando' as StatusProtocolo,
       reservaVaga: 1,
+      criterios: ['deficiencia_tea'] as CriterioVulnerabilidadeId[],
+      pontos: 50,
+      origem: 'regular' as const,
       criadoEm: agora - 110 * 60_000,
     },
     {
@@ -196,8 +228,59 @@ export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<
       totalObrigatorios: 7,
       status: 'atendido' as StatusProtocolo,
       reservaVaga: 1,
+      criterios: [] as CriterioVulnerabilidadeId[],
+      pontos: 0,
+      origem: 'regular' as const,
       criadoEm: agora - 240 * 60_000,
       atendidoEm: agora - 90 * 60_000,
+    },
+    {
+      codigo: 'PATOS-2027-7201',
+      escolaId: 'emef-sabino-freire',
+      escolaNome: 'EMEF Sabino Freire',
+      escolaEndereco: 'Rua Doutor Romero Nóbrega, 412 – Maternidade, Patos - PB',
+      escolaBairro: 'Maternidade',
+      etapa: 'pre' as EtapaId,
+      turma: 'Pré II',
+      periodo: 'parcial' as Periodo,
+      responsavel: 'Raimunda da Silva Santos',
+      telefone: '(83) 9••••-3321',
+      telefoneContato: '83988773321',
+      nascimento: '2021-08-15',
+      turnoVisita: 'manha' as TurnoVisita,
+      dataVisita: amanha,
+      documentosMarcados: ['certidao', 'cpf-crianca', 'doc-resp', 'cpf-resp', 'residencia', 'vacina'],
+      totalObrigatorios: 6,
+      status: 'aguardando' as StatusProtocolo,
+      reservaVaga: 1,
+      criterios: ['cadunico_bolsafamilia'] as CriterioVulnerabilidadeId[],
+      pontos: 100,
+      origem: 'regular' as const,
+      criadoEm: agora - 65 * 60_000,
+    },
+    {
+      codigo: 'PATOS-2027-8344',
+      escolaId: 'emef-aristides-hamad-timene',
+      escolaNome: 'EMEF Aristides Hamad Timene',
+      escolaEndereco: 'Rua Augusto dos Anjos, 275 – Belo Horizonte, Patos - PB',
+      escolaBairro: 'Belo Horizonte',
+      etapa: 'fund2' as EtapaId,
+      turma: '6º ano',
+      periodo: 'parcial' as Periodo,
+      responsavel: 'Antônia Helena Timene',
+      telefone: '(83) 9••••-5582',
+      telefoneContato: '83991225582',
+      nascimento: '2014-04-12',
+      turnoVisita: 'tarde' as TurnoVisita,
+      dataVisita: depois,
+      documentosMarcados: ['certidao', 'cpf-crianca', 'doc-resp', 'cpf-resp', 'residencia', 'vacina', 'historico'],
+      totalObrigatorios: 7,
+      status: 'aguardando' as StatusProtocolo,
+      reservaVaga: 0,
+      criterios: ['irmao_na_escola'] as CriterioVulnerabilidadeId[],
+      pontos: 50,
+      origem: 'regular' as const,
+      criadoEm: agora - 150 * 60_000,
     },
   ];
 
@@ -207,8 +290,8 @@ export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<
         codigo, escola_id, escola_nome, escola_endereco, escola_bairro,
         etapa, turma, periodo, responsavel, telefone_mascarado, telefone_contato, nascimento,
         turno_visita, data_visita, documentos_json, total_obrigatorios,
-        status, reserva_vaga, criado_em, atendido_em
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+        status, reserva_vaga, criterios_prioridade_json, pontos_prioridade, origem, numero_processo_judicial, criado_em, atendido_em
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, NULL, $22, $23)
       ON CONFLICT (codigo) DO NOTHING`,
       [
         p.codigo,
@@ -229,6 +312,9 @@ export async function garantirSeedProtocolosPatos(forcarReset = false): Promise<
         p.totalObrigatorios,
         p.status,
         p.reservaVaga,
+        JSON.stringify(p.criterios),
+        p.pontos,
+        p.origem,
         p.criadoEm,
         p.atendidoEm ?? null,
       ],
@@ -273,6 +359,9 @@ export async function criarProtocoloVisita(dados: {
   documentosMarcados: string[];
   totalObrigatorios: number;
   documentoEstudante?: string;
+  criteriosPrioridade?: CriterioVulnerabilidadeId[];
+  origem?: 'regular' | 'judicial';
+  numeroProcessoJudicial?: string;
 }): Promise<{ protocolo: ProtocoloVisita | null; evento: EventoVaga | null }> {
   const esc = await db.queryOne<{ id: string; nome: string; endereco: string; bairro: string }>(
     'SELECT id, nome, endereco, bairro FROM escolas WHERE id = $1',
@@ -308,6 +397,10 @@ export async function criarProtocoloVisita(dados: {
   const { mascarado } = mascararTelefoneLGPD(dados.telefone);
   const telefoneContato = dados.telefone?.replace(/\D/g, '') || null;
   const responsavelLimpo = dados.responsavel.trim().slice(0, 80) || 'Responsável Familiar';
+
+  const criterios = Array.isArray(dados.criteriosPrioridade) ? dados.criteriosPrioridade : [];
+  const pontosPrioridade = calcularPontuacaoVulnerabilidade(criterios);
+  const origem = dados.origem ?? 'regular';
 
   // Opção 2 - Pré-reserva garantida:
   // Se houver vaga disponível na oferta, debita imediatamente 1 vaga do quadro escolar.
@@ -354,8 +447,15 @@ export async function criarProtocoloVisita(dados: {
       turno_visita, data_visita, documentos_json, total_obrigatorios,
       status, reserva_vaga, motivo_cancelamento, posicao_fila, documento_estudante,
       documento_estudante_hash, token_cancelamento, notificado_dia_em, notificado_1h_em,
+      criterios_prioridade_json, pontos_prioridade, origem, numero_processo_judicial,
       criado_em, atendido_em
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'aguardando', $17, NULL, $18, $19, $20, $21, NULL, NULL, $22, NULL)`,
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+      $13, $14, $15, $16, 'aguardando', $17, NULL, $18, $19,
+      $20, $21, NULL, NULL,
+      $22, $23, $24, $25,
+      $26, NULL
+    )`,
     [
       codigo,
       esc.id,
@@ -378,12 +478,34 @@ export async function criarProtocoloVisita(dados: {
       docLimpo,
       docHash,
       tokenCancelamento,
+      JSON.stringify(criterios),
+      pontosPrioridade,
+      origem,
+      dados.numeroProcessoJudicial ?? null,
       criadoEm,
     ],
   );
 
   invalidarCacheEscolas();
   const protocolo = await obterProtocoloPorCodigo(codigo);
+
+  // Registro na Trilha de Auditoria para fiscalização do Ministério Público e TCE
+  void registrarLogAuditoria({
+    operadorUsuario: responsavelLimpo,
+    operadorPerfil: 'cidadao',
+    acao: 'CRIACAO_PROTOCOLO',
+    protocoloCodigo: codigo,
+    escolaId: esc.id,
+    justificativa: `Agendamento/pré-reserva digital emitida pelo responsável familiar (${pontosPrioridade} pts regulatórios)`,
+    detalhes: {
+      etapa: dados.etapa,
+      periodo: dados.periodo,
+      reservaVaga,
+      pontosPrioridade,
+      criterios,
+      origem,
+    },
+  }).catch((err) => console.warn('[Auditoria] Falha ao gravar log:', err));
 
   // Disparo assíncrono de confirmação imediata no WhatsApp caso configurado
   if (protocolo && telefoneContato) {
@@ -506,6 +628,48 @@ export async function atualizarStatusProtocolo(
   }
 
   const protocolo = await obterProtocoloPorCodigo(atual.codigo);
+
+  // Registro na Trilha de Auditoria para transparência junto aos órgãos de controle
+  const acaoAuditoria =
+    novoStatus === 'atendido'
+      ? 'BAIXA_PRESENCIAL'
+      : motivoCancelamento === 'cancelado_cidadao'
+        ? 'CANCELAMENTO_CIDADAO'
+        : motivoCancelamento === 'expirado_sem_comparecimento'
+          ? 'EXPIRACAO_AUTOMATICA'
+          : 'CANCELAMENTO_GESTOR';
+
+  void registrarLogAuditoria({
+    operadorUsuario:
+      motivoCancelamento === 'cancelado_cidadao'
+        ? atual.responsavel
+        : motivoCancelamento === 'expirado_sem_comparecimento'
+          ? 'sistema-cron'
+          : 'gestor-matricula',
+    operadorPerfil:
+      motivoCancelamento === 'cancelado_cidadao'
+        ? 'cidadao'
+        : motivoCancelamento === 'expirado_sem_comparecimento'
+          ? 'sistema'
+          : 'unidade',
+    acao: acaoAuditoria,
+    protocoloCodigo: atual.codigo,
+    escolaId: atual.escolaId,
+    justificativa:
+      motivoCancelamento === 'cancelado_cidadao'
+        ? 'Desistência e liberação voluntária da vaga pelo cidadão titular'
+        : motivoCancelamento === 'expirado_sem_comparecimento'
+          ? 'Prazo limite do turno de comparecimento expirado sem presença física na escola'
+          : novoStatus === 'atendido'
+            ? 'Comparecimento presencial com conferência documental e efetivação de matrícula'
+            : (motivoCancelamento ?? 'Alteração de status realizada pelo gestor'),
+    detalhes: {
+      statusAnterior: atual.status,
+      novoStatus,
+      motivo: motivoCancelamento,
+    },
+  }).catch((err) => console.warn('[Auditoria] Falha ao gravar log:', err));
+
   return { protocolo, evento };
 }
 
