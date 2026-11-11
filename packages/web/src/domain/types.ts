@@ -62,4 +62,6 @@ export {
   TIPOS_UNIDADE_VALIDOS,
   TURNOS_VISITA_VALIDOS,
   formatarCpfOuCertidao,
+  validarCpf,
+  gerarCpfValido,
 } from '@matricula-aberta/shared';

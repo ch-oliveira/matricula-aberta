@@ -692,6 +692,42 @@ export function formatarCpfOuCertidao(valor: string): string {
   return d;
 }
 
+/** Validação oficial de dígitos verificadores de CPF (Receita Federal) */
+export function validarCpf(cpf: string): boolean {
+  const d = cpf.replace(/\D/g, '');
+  if (d.length !== 11) return false;
+  // Bloqueia CPFs com todos os dígitos iguais (ex.: 000.000.000-00, 111.111.111-11)
+  if (/^(\d)\1{10}$/.test(d)) return false;
+
+  let soma = 0;
+  for (let i = 0; i < 9; i++) {
+    soma += Number(d[i]) * (10 - i);
+  }
+  let resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== Number(d[9])) return false;
+
+  soma = 0;
+  for (let i = 0; i < 10; i++) {
+    soma += Number(d[i]) * (11 - i);
+  }
+  resto = (soma * 10) % 11;
+  if (resto === 10 || resto === 11) resto = 0;
+  if (resto !== Number(d[10])) return false;
+
+  return true;
+}
+
+/** Gera um CPF válido com dígitos verificadores matemáticos (para testes e homologação) */
+export function gerarCpfValido(): string {
+  const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+  let d1 = n.reduce((total, num, i) => total + num * (10 - i), 0) % 11;
+  d1 = d1 < 2 ? 0 : 11 - d1;
+  let d2 = [...n, d1].reduce((total, num, i) => total + num * (11 - i), 0) % 11;
+  d2 = d2 < 2 ? 0 : 11 - d2;
+  return `${n.slice(0, 3).join('')}.${n.slice(3, 6).join('')}.${n.slice(6, 9).join('')}-${d1}${d2}`;
+}
+
 /** Mascara CPF ou certidão para exibição segura (LGPD) */
 export function mascararDocumentoEstudante(valor?: string | null): string {
   if (!valor) return '';

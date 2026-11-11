@@ -45,6 +45,7 @@ export function SchoolCard({ r, agora, comparando, podeComparar, destaque, onCom
         <li><IconeEtapa etapa={oferta.etapa} tamanho={15} /> {ETAPAS[oferta.etapa].nome}</li>
         <li><Icone nome={oferta.periodo === 'integral' ? 'sun' : 'cloud-sun'} tamanho={15} /> {oferta.periodo === 'integral' ? 'Integral' : 'Meio período'}</li>
         {escola.acessivel && <li><Icone nome="accessibility" tamanho={15} /> Acessível</li>}
+        <li><Icone nome="bus" tamanho={15} /> Transporte Escolar</li>
         {escola.destaques.slice(0, 2).map((d) => <li key={d}>{d}</li>)}
       </ul>
 

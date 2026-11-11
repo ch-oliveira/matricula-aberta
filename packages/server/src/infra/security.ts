@@ -35,7 +35,7 @@ export function aplicarHeadersSeguranca(req: IncomingMessage, res: ServerRespons
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'Content-Type, Authorization, Idempotency-Key, X-Alert-Token',
+    'Content-Type, Authorization, Idempotency-Key, X-Alert-Token, X-Protocolo-Token, X-Cron-Secret',
   );
   res.setHeader('Access-Control-Max-Age', '86400');
 

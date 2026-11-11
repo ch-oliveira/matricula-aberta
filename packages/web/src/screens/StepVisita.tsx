@@ -12,6 +12,7 @@ import {
   formatarCpfOuCertidao,
   LISTA_CRITERIOS_VULNERABILIDADE,
   proximoDiaUtilISO,
+  validarCpf,
   type Busca,
   type CriterioVulnerabilidadeId,
   type ProtocoloVisita,
@@ -116,6 +117,28 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
       `Como chegar: ${mapa}`,
   );
 
+  const msgWhatsComprovante = useMemo(() => {
+    if (!protocoloAtivo) return msgWhats;
+    const baseOrigem = typeof window !== 'undefined' ? window.location.origin : 'https://matricula.patos.pb.gov.br';
+    return encodeURIComponent(
+      `🎫 *Comprovante Oficial de Agendamento · Patos - PB*\n\n` +
+        `*Código do Protocolo:* ${protocoloAtivo.codigo}\n` +
+        `🏫 *Unidade:* ${escola.nome}\n` +
+        `📍 *Endereço:* ${escola.endereco}\n` +
+        `🎒 *Turma:* ${protocoloAtivo.turma} (${protocoloAtivo.periodo === 'integral' ? 'Integral' : 'Parcial'})\n` +
+        `📅 *Data da Visita:* ${formatarDataBR(protocoloAtivo.dataVisita)} (${
+          protocoloAtivo.turnoVisita === 'manha' ? 'Manhã: 7h30 às 11h30' : 'Tarde: 13h30 às 17h'
+        })\n` +
+        `👤 *Responsável:* ${protocoloAtivo.responsavel}\n\n` +
+        (protocoloAtivo.reservaVaga
+          ? `🔒 *Status: VAGA PRÉ-RESERVADA E GARANTIDA* até o término do turno agendado.\n\n`
+          : `📋 *Status: Inscrição em Fila de Espera Oficial* (Posição: ${protocoloAtivo.posicaoFila ?? 1}º lugar).\n\n`) +
+        `Apresente o QR Code na secretaria da escola no dia da visita.\n` +
+        `🔗 *Recuperar meu comprovante / QR Code:* ${baseOrigem}\n` +
+        `📍 *Como chegar:* ${mapa}`,
+    );
+  }, [protocoloAtivo, escola, msgWhats, mapa]);
+
   const fala =
     `Você escolheu a unidade ${escola.nome}, localizada no bairro ${escola.bairro}, em ${escola.endereco}. ` +
     `O atendimento funciona ${escola.atendimento.replace('·', ',')}. ` +
@@ -133,6 +156,17 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
     if (!responsavel.trim()) {
       setErroProt('Informe o nome do pai, mãe ou responsável para constar no protocolo.');
       return;
+    }
+    const docLimpo = documentoEstudante.replace(/\D/g, '');
+    if (docLimpo.length > 0) {
+      if (docLimpo.length === 11 && !validarCpf(docLimpo)) {
+        setErroProt('O CPF informado da criança possui dígitos verificadores inválidos. Confira os números digitados.');
+        return;
+      }
+      if (docLimpo.length < 6) {
+        setErroProt('Informe um CPF válido (11 dígitos) ou o número completo da Certidão de Nascimento.');
+        return;
+      }
     }
     setEmitindo(true);
     setErroProt(null);
@@ -425,6 +459,10 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
             </dd>
           </div>
           <div>
+            <dt><Icone nome="bus" tamanho={15} /> Transporte</dt>
+            <dd>Atendida pelo transporte escolar municipal</dd>
+          </div>
+          <div>
             <dt><Icone nome="refresh" tamanho={15} /> Atualizado</dt>
             <dd>{tempoRelativo(escola.atualizadoEm, agora)}</dd>
           </div>
@@ -691,8 +729,14 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                 >
                   <Icone nome="printer" tamanho={15} /> Imprimir Comprovante
                 </button>
-                <a className="btn btn-whats btn-pequeno" href={`https://wa.me/?text=${msgWhats}`} target="_blank" rel="noopener noreferrer">
-                  <Icone nome="message" tamanho={15} /> Salvar no WhatsApp
+                <a
+                  className="btn btn-whats btn-pequeno"
+                  href={`https://wa.me/?text=${msgWhatsComprovante}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Enviar dados completos do protocolo e link para recuperar no WhatsApp"
+                >
+                  <Icone nome="message" tamanho={15} /> Enviar Comprovante no WhatsApp
                 </a>
                 {protocoloAtivo.status === 'aguardando' && !confirmandoCancelamento && (
                   <button
@@ -772,9 +816,32 @@ export function StepVisita({ busca, escolaId, ajudante, turma, onAlerta }: Props
                     setErroProt(null);
                   }}
                 />
-                <small style={{ fontSize: '0.78rem', color: '#676479', marginTop: '4px', display: 'block' }}>
-                  Garante a vaga única da criança na rede municipal (evita duplicidades).
-                </small>
+                {(() => {
+                  const d = documentoEstudante.replace(/\D/g, '');
+                  if (d.length === 11) {
+                    const valido = validarCpf(d);
+                    return (
+                      <small
+                        style={{
+                          fontSize: '0.78rem',
+                          color: valido ? '#166534' : '#B91C1C',
+                          fontWeight: 600,
+                          marginTop: '4px',
+                          display: 'block',
+                        }}
+                      >
+                        {valido
+                          ? '✓ CPF válido verificado pelos dígitos oficiais.'
+                          : '⚠️ CPF inválido: confira se os 11 dígitos foram digitados corretamente.'}
+                      </small>
+                    );
+                  }
+                  return (
+                    <small style={{ fontSize: '0.78rem', color: '#676479', marginTop: '4px', display: 'block' }}>
+                      Garante a vaga única da criança na rede municipal (evita duplicidades).
+                    </small>
+                  );
+                })()}
               </div>
 
               <div className="campo">

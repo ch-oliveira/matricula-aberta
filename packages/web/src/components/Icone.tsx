@@ -77,6 +77,7 @@ export type NomeIcone =
   | 'mountain'
   | 'tree'
   | 'cart'
+  | 'bus'
   | 'plane';
 
 /**
@@ -885,6 +886,21 @@ function renderizarGeometria(nome: NomeIcone): ReactNode {
           <path d="M3 4h2.2l2.2 10.5h9.8l2-7.5H6.2" fill="currentColor" fillOpacity="0.16" />
           <circle cx="9" cy="19" r="1.6" />
           <circle cx="17" cy="19" r="1.6" />
+        </>
+      );
+
+    case 'bus':
+      return (
+        <>
+          <path
+            d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2h-6v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2h-1a2 2 0 0 1-2-2V6Z"
+            fill="currentColor"
+            fillOpacity="0.16"
+          />
+          <path d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-1v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2h-6v2a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-2h-1a2 2 0 0 1-2-2V6Z" />
+          <path d="M4 11h16" />
+          <circle cx="7.5" cy="15" r="1.3" fill="currentColor" />
+          <circle cx="16.5" cy="15" r="1.3" fill="currentColor" />
         </>
       );
 
