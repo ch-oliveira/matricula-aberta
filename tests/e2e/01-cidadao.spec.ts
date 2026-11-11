@@ -78,8 +78,13 @@ test.describe('Fluxo Cidadão (Pais e Responsáveis)', () => {
       await btnOutroProt.click();
     }
 
-    // Preenche os dados cadastrais (CPF único por execução para evitar duplicidade de reserva)
-    const docUnico = `${Math.floor(100 + Math.random() * 899)}.${Math.floor(100 + Math.random() * 899)}.${Math.floor(100 + Math.random() * 899)}-${Math.floor(10 + Math.random() * 89)}`;
+    // Preenche os dados cadastrais (CPF válido único por execução para evitar duplicidade de reserva)
+    const n = Array.from({ length: 9 }, () => Math.floor(Math.random() * 10));
+    let d1 = n.reduce((total, num, i) => total + num * (10 - i), 0) % 11;
+    d1 = d1 < 2 ? 0 : 11 - d1;
+    let d2 = [...n, d1].reduce((total, num, i) => total + num * (11 - i), 0) % 11;
+    d2 = d2 < 2 ? 0 : 11 - d2;
+    const docUnico = `${n.slice(0, 3).join('')}.${n.slice(3, 6).join('')}.${n.slice(6, 9).join('')}-${d1}${d2}`;
     await page.locator('.protocolo-form input[placeholder*="Ex.: Maria"]').fill('Maria das Dores Wanderley');
     await page.locator('.protocolo-form input[placeholder*="000.000.000-00"]').fill(docUnico);
     await page.locator('.protocolo-form input[type="tel"]').fill('(83) 98888-7777');

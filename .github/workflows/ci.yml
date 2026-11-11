@@ -16,7 +16,7 @@ jobs:
   qualidade-e-testes:
     name: Typecheck, Build & Testes de Segurança
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout do Repositório
@@ -52,4 +52,10 @@ jobs:
 
       - name: Executar Testes de Integração & Segurança (Backend RBAC / LGPD / PostgreSQL-Ready)
         run: npm test
+
+      - name: Instalar Navegador Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar Testes E2E dos 3 Perfis (Cidadão, SEDUC e Escola)
+        run: npm run test:e2e
 
