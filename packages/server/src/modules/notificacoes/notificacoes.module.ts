@@ -1,9 +1,15 @@
 import {
-  horarioTurnoVisita,
   dataLocalISO,
+  horarioTurnoVisita,
   type TurnoVisita,
 } from '../../../../shared/src/index.ts';
 import { db } from '../../infra/db.ts';
+import {
+  obterProvedorAtivo,
+  type WhatsAppMessageResult,
+} from './adapters/index.ts';
+
+export * from './adapters/index.ts';
 
 export interface MensagemWhatsApp {
   id: string;
@@ -19,60 +25,6 @@ export interface MensagemWhatsApp {
 
 // Histórico de disparos em memória para auditoria, inspeção e testes automatizados
 const historicoNotificacoes: MensagemWhatsApp[] = [];
-
-export interface WhatsAppProvider {
-  nome: string;
-  enviarMensagem(destinatario: string, texto: string): Promise<{ ok: boolean; resposta?: string }>;
-}
-
-/** Provedor Mock / Console para ambiente local e testes automatizados */
-class MockWhatsAppProvider implements WhatsAppProvider {
-  nome = 'mock-local';
-  async enviarMensagem(_destinatario: string, _texto: string): Promise<{ ok: boolean; resposta?: string }> {
-    return { ok: true, resposta: 'MOCK_SENT_200' };
-  }
-}
-
-/** Provedor HTTP para gateway real (Meta Cloud API / Evolution API / Z-API) */
-class HttpWhatsAppProvider implements WhatsAppProvider {
-  nome = 'http-gateway';
-  private readonly apiUrl: string;
-  private readonly apiToken: string;
-
-  constructor(apiUrl: string, apiToken: string) {
-    this.apiUrl = apiUrl;
-    this.apiToken = apiToken;
-  }
-
-  async enviarMensagem(destinatario: string, texto: string): Promise<{ ok: boolean; resposta?: string }> {
-    try {
-      const resp = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.apiToken}`,
-        },
-        body: JSON.stringify({
-          number: destinatario.replace(/\D/g, ''),
-          text: texto,
-        }),
-      });
-      const data = await resp.text();
-      return { ok: resp.ok, resposta: data.slice(0, 200) };
-    } catch (err: any) {
-      return { ok: false, resposta: err?.message || 'Falha de conexão com gateway' };
-    }
-  }
-}
-
-function obterProvedorAtivo(): WhatsAppProvider {
-  const apiUrl = (process.env.WHATSAPP_API_URL ?? '').trim();
-  const apiToken = (process.env.WHATSAPP_API_TOKEN ?? '').trim();
-  if (apiUrl && apiToken) {
-    return new HttpWhatsAppProvider(apiUrl, apiToken);
-  }
-  return new MockWhatsAppProvider();
-}
 
 export function formatarMensagemLembreteDia(p: {
   responsavel: string;
@@ -149,7 +101,7 @@ export async function enviarMensagemConfirmacaoImediata(p: {
   if (!tel || tel.length < 10) return { ok: false };
   const provedor = obterProvedorAtivo();
   const texto = formatarMensagemConfirmacaoImediata(p);
-  const res = await provedor.enviarMensagem(tel, texto);
+  const res: WhatsAppMessageResult = await provedor.enviarMensagem(tel, texto);
   const agoraMs = Date.now();
   historicoNotificacoes.push({
     id: `${p.codigo}-confirmacao-${agoraMs}`,
@@ -164,7 +116,6 @@ export async function enviarMensagemConfirmacaoImediata(p: {
   });
   return { ok: res.ok };
 }
-
 
 export async function processarNotificacoesWhatsApp(agora = new Date()): Promise<{
   totalVerificados: number;

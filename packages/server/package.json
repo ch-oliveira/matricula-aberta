@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --no-warnings --watch --experimental-strip-types --experimental-sqlite src/index.ts",
     "start": "node --no-warnings --experimental-strip-types --experimental-sqlite src/index.ts",
-    "test": "node --no-warnings test/api.test.mjs && node --no-warnings test/full-flow.test.mjs",
+    "test": "node --no-warnings test/api.test.mjs && node --no-warnings test/full-flow.test.mjs && node --no-warnings test/whatsapp-adapters.test.mjs",
     "test:load": "node --no-warnings test/load-test.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
