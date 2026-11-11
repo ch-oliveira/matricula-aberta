@@ -2535,6 +2535,108 @@ td.vis-desktop {
   justify-content: center;
 }
 
+/* Card de Governança do Gateway WhatsApp */
+.card-kpi-governo {
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-kpi-topo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.card-kpi-icone-box {
+  inline-size: 44px;
+  block-size: 44px;
+  border-radius: var(--r-sm);
+  background: #25d36618;
+  color: #25d366;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-kpi-titulo {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.badge-sucesso-destaque {
+  display: inline-block;
+  background: #25d36622;
+  color: #128c7e;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--r-xs);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.kpi-mini-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.kpi-mini-item {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-mini-rotulo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.kpi-mini-valor {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.linha-teste-whatsapp {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.input-teste-whats {
+  padding: 8px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.88rem;
+  min-inline-size: 200px;
+}
+
+.input-teste-whats:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+
 
 
 

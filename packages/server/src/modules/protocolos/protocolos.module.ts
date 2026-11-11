@@ -509,7 +509,10 @@ export async function criarProtocoloVisita(dados: {
 
   // Disparo assíncrono de confirmação imediata no WhatsApp caso configurado
   if (protocolo && telefoneContato) {
-    void enviarMensagemConfirmacaoImediata(protocolo).catch((err) => {
+    void enviarMensagemConfirmacaoImediata({
+      ...protocolo,
+      telefone: telefoneContato,
+    }).catch((err) => {
       console.warn('[WhatsApp] Falha ao enviar confirmação imediata:', err);
     });
   }

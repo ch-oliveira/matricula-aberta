@@ -4,7 +4,10 @@ import {
   type TurnoVisita,
 } from '../../../../shared/src/index.ts';
 import { db } from '../../infra/db.ts';
+import { obterProtocoloPorCodigo } from '../protocolos/protocolos.module.ts';
 import {
+  extrairCodigoProtocoloTexto,
+  normalizarTelefoneWhatsApp,
   obterProvedorAtivo,
   type WhatsAppMessageResult,
 } from './adapters/index.ts';
@@ -97,8 +100,8 @@ export async function enviarMensagemConfirmacaoImediata(p: {
   telefone?: string;
 }): Promise<{ ok: boolean }> {
   if (!p.telefone) return { ok: false };
-  const tel = p.telefone.replace(/\D/g, '');
-  if (!tel || tel.length < 10) return { ok: false };
+  const tel = normalizarTelefoneWhatsApp(p.telefone);
+  if (!tel || tel.length < 12) return { ok: false };
   const provedor = obterProvedorAtivo();
   const texto = formatarMensagemConfirmacaoImediata(p);
   const res: WhatsAppMessageResult = await provedor.enviarMensagem(tel, texto);
@@ -243,3 +246,243 @@ export function obterHistoricoNotificacoes(): MensagemWhatsApp[] {
 export function limparHistoricoNotificacoes(): void {
   historicoNotificacoes.length = 0;
 }
+
+export function formatarMensagemRespostaConsultaProtocolo(p: {
+  codigo: string;
+  responsavel: string;
+  escolaNome: string;
+  turma: string;
+  turnoVisita: TurnoVisita;
+  dataVisita: string;
+  reservaVaga?: boolean;
+}): string {
+  const turnoRotulo = p.turnoVisita === 'manha' ? 'Manhã (07h30 às 11h30)' : 'Tarde (13h30 às 17h30)';
+  const situacao = p.reservaVaga ? '🔒 *Vaga Pré-Reservada e Garantida*' : '📋 *Inscrito na Fila de Espera Oficial*';
+  return (
+    `📋 *Consulta de Agendamento · Matrícula Aberta Patos - PB*\n\n` +
+    `Olá, *${p.responsavel}*! Localizamos o seu protocolo no sistema:\n\n` +
+    `🎫 *Código:* ${p.codigo}\n` +
+    `🏫 *Escola:* ${p.escolaNome}\n` +
+    `🎒 *Turma:* ${p.turma}\n` +
+    `📅 *Data da Visita:* ${p.dataVisita}\n` +
+    `🕒 *Turno:* ${turnoRotulo}\n` +
+    `${situacao}\n\n` +
+    `📌 *Lembre-se de levar:* Certidão de Nascimento/RG da criança, comprovante de residência e documento do responsável com foto.\n\n` +
+    `Para visualizar seu comprovante digital completo com QR Code, acesse:\n` +
+    `https://matricula.patos.pb.gov.br/#/protocolo/${p.codigo}`
+  );
+}
+
+export function formatarMensagemMenuAjuda(): string {
+  return (
+    `👋 *Atendimento Digital · Matrícula Aberta Patos - PB*\n\n` +
+    `Olá! Sou o assistente automático da Secretaria Municipal de Educação.\n\n` +
+    `• Para consultar seu agendamento, digite o *código do seu protocolo* (exemplo: *PATOS-2027-1234*).\n` +
+    `• Para verificar vagas disponíveis na rede escolar e fazer pré-reserva, acesse nosso portal oficial:\n` +
+    `👉 https://matricula.patos.pb.gov.br\n\n` +
+    `📞 Atendimento SEDUC: (83) 3421-2204 (Segunda a Sexta, das 07h às 13h).`
+  );
+}
+
+export function extrairMensagemWebhook(payload: Record<string, unknown>): {
+  remetente: string | null;
+  texto: string | null;
+  status?: string;
+} {
+  // 1. Padrão Meta WhatsApp Cloud API
+  const entry = Array.isArray(payload.entry) ? (payload.entry[0] as any) : undefined;
+  const changes = Array.isArray(entry?.changes) ? (entry.changes[0] as any) : undefined;
+  const value = changes?.value;
+
+  if (value) {
+    if (Array.isArray(value.messages) && value.messages.length > 0) {
+      const msg = value.messages[0];
+      const from = typeof msg.from === 'string' ? msg.from : null;
+      const text = typeof msg.text?.body === 'string' ? msg.text.body : null;
+      return { remetente: from, texto: text };
+    }
+    if (Array.isArray(value.statuses) && value.statuses.length > 0) {
+      const st = value.statuses[0];
+      return {
+        remetente: typeof st.recipient_id === 'string' ? st.recipient_id : null,
+        texto: null,
+        status: typeof st.status === 'string' ? st.status : undefined,
+      };
+    }
+  }
+
+  // 2. Padrão Evolution API
+  const evoData = payload.data as any;
+  if (evoData) {
+    const remoteJid = typeof evoData.key?.remoteJid === 'string' ? evoData.key.remoteJid : '';
+    const phone = remoteJid.replace(/@s\.whatsapp\.net$/, '').replace(/\D/g, '');
+    const conversation =
+      typeof evoData.message?.conversation === 'string'
+        ? evoData.message.conversation
+        : typeof evoData.message?.extendedTextMessage?.text === 'string'
+          ? evoData.message.extendedTextMessage.text
+          : null;
+    if (phone && conversation) {
+      return { remetente: phone, texto: conversation };
+    }
+  }
+
+  // 3. Padrão Z-API
+  if (typeof payload.phone === 'string' || typeof (payload as any).sender === 'string') {
+    const phone = (payload.phone as string) || ((payload as any).sender as string);
+    const textObj = payload.text as any;
+    const text =
+      typeof textObj?.message === 'string'
+        ? textObj.message
+        : typeof payload.message === 'string'
+          ? (payload.message as string)
+          : null;
+    return { remetente: phone, texto: text };
+  }
+
+  // 4. Padrão Genérico
+  const genericPhone =
+    (typeof payload.from === 'string' && payload.from) ||
+    (typeof payload.destinatario === 'string' && payload.destinatario) ||
+    (typeof payload.telefone === 'string' && payload.telefone) ||
+    null;
+  const genericText =
+    (typeof payload.text === 'string' && payload.text) ||
+    (typeof payload.body === 'string' && payload.body) ||
+    (typeof payload.mensagem === 'string' && payload.mensagem) ||
+    null;
+
+  return { remetente: genericPhone, texto: genericText };
+}
+
+export async function processarWebhookWhatsAppEntrada(payload: Record<string, unknown>): Promise<{
+  ok: boolean;
+  acao: string;
+  respostaEnviada?: boolean;
+  protocoloCodigo?: string;
+  destinatario?: string;
+}> {
+  const { remetente, texto, status } = extrairMensagemWebhook(payload);
+
+  if (status && remetente) {
+    const normalizado = normalizarTelefoneWhatsApp(remetente);
+    const registro = historicoNotificacoes.find((h) => normalizarTelefoneWhatsApp(h.telefone) === normalizado);
+    if (registro) {
+      registro.resposta = `STATUS_UPDATED_${status.toUpperCase()}`;
+    }
+    return { ok: true, acao: 'recibo_entrega_atualizado', destinatario: normalizado };
+  }
+
+  if (!remetente || !texto) {
+    return { ok: true, acao: 'ignorado_sem_conteudo' };
+  }
+
+  const telNormalizado = normalizarTelefoneWhatsApp(remetente);
+  const textoLimpo = texto.trim();
+  const provedor = obterProvedorAtivo();
+
+  // 1. Tenta identificar se o usuário enviou um código de protocolo PATOS-AAAA-XXXX
+  const codigoIdentificado = extrairCodigoProtocoloTexto(textoLimpo);
+  if (codigoIdentificado) {
+    const protocolo = await obterProtocoloPorCodigo(codigoIdentificado);
+    if (protocolo) {
+      const msgResposta = formatarMensagemRespostaConsultaProtocolo(protocolo);
+      const res = await provedor.enviarMensagem(telNormalizado, msgResposta);
+      return {
+        ok: true,
+        acao: 'protocolo_encontrado_respondido',
+        respostaEnviada: res.ok,
+        protocoloCodigo: codigoIdentificado,
+        destinatario: telNormalizado,
+      };
+    } else {
+      const msgErro =
+        `❌ *Protocolo não localizado · Patos - PB*\n\n` +
+        `Não encontramos nenhum agendamento com o código *${codigoIdentificado}*.\n` +
+        `Por favor, confira os números no seu voucher ou acesse: https://matricula.patos.pb.gov.br`;
+      const res = await provedor.enviarMensagem(telNormalizado, msgErro);
+      return {
+        ok: true,
+        acao: 'protocolo_nao_encontrado_respondido',
+        respostaEnviada: res.ok,
+        protocoloCodigo: codigoIdentificado,
+        destinatario: telNormalizado,
+      };
+    }
+  }
+
+  // 2. Palavras-chave de saudação ou menu de ajuda
+  const upper = textoLimpo.toUpperCase();
+  const ehSaudacao =
+    upper.includes('AJUDA') ||
+    upper.includes('OLA') ||
+    upper.includes('OLÁ') ||
+    upper.includes('OI') ||
+    upper.includes('BOM DIA') ||
+    upper.includes('BOA TARDE') ||
+    upper.includes('MATRICULA') ||
+    upper.includes('MATRÍCULA') ||
+    upper.includes('MENU') ||
+    upper.includes('STATUS');
+
+  if (ehSaudacao) {
+    const menu = formatarMensagemMenuAjuda();
+    const res = await provedor.enviarMensagem(telNormalizado, menu);
+    return {
+      ok: true,
+      acao: 'menu_ajuda_respondido',
+      respostaEnviada: res.ok,
+      destinatario: telNormalizado,
+    };
+  }
+
+  return { ok: true, acao: 'mensagem_recebida_sem_gatilho', destinatario: telNormalizado };
+}
+
+export function obterMetricasNotificacoes(): {
+  provedorAtivo: string;
+  totalEnviadas: number;
+  totalSucessos: number;
+  totalFalhas: number;
+  ultimas: MensagemWhatsApp[];
+} {
+  const total = historicoNotificacoes.length;
+  const sucessos = historicoNotificacoes.filter((h) => h.sucesso).length;
+  const falhas = total - sucessos;
+  const provedor = obterProvedorAtivo();
+  return {
+    provedorAtivo: provedor.nome,
+    totalEnviadas: total,
+    totalSucessos: sucessos,
+    totalFalhas: falhas,
+    ultimas: historicoNotificacoes.slice(-20).reverse(),
+  };
+}
+
+export async function dispararMensagemTesteWhatsApp(telefone: string): Promise<{ ok: boolean; resposta?: string }> {
+  const limpo = normalizarTelefoneWhatsApp(telefone);
+  if (!limpo || limpo.length < 12) {
+    throw new Error('Informe um número de telefone com DDD válido.');
+  }
+  const provedor = obterProvedorAtivo();
+  const texto =
+    `🧪 *Mensagem de Teste · Secretaria de Educação de Patos - PB*\n\n` +
+    `Seu gateway de WhatsApp (*${provedor.nome}*) está conectado e operando com sucesso!\n` +
+    `Data do teste: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}.`;
+
+  const res = await provedor.enviarMensagem(limpo, texto);
+  const agoraMs = Date.now();
+  historicoNotificacoes.push({
+    id: `teste-${agoraMs}`,
+    telefone: limpo,
+    codigoProtocolo: 'TESTE-SEDUC',
+    tipo: 'lembrete_dia',
+    texto,
+    enviadoEm: agoraMs,
+    sucesso: res.ok,
+    provedor: provedor.nome,
+    resposta: res.resposta,
+  });
+  return { ok: res.ok, resposta: res.resposta };
+}
+

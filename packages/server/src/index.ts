@@ -14,6 +14,7 @@ import {
   tentarServirEstatico,
 } from './routes/shared.ts';
 import { handleUnidadeRoutes } from './routes/unidade.routes.ts';
+import { handleWhatsAppRoutes } from './routes/whatsapp.routes.ts';
 
 export { invalidarSnapshotPublico } from './routes/shared.ts';
 
@@ -45,6 +46,7 @@ const server = createServer(async (req, res) => {
     if (await handleUnidadeRoutes(req, res, url, path)) return;
     if (await handleSecretariaRoutes(req, res, url, path)) return;
     if (await handleCronRoutes(req, res, url, path)) return;
+    if (await handleWhatsAppRoutes(req, res, url, path)) return;
 
     return json(req, res, 404, { erro: 'Rota não encontrada na API.' });
   } catch (err) {

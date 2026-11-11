@@ -303,6 +303,52 @@ try {
   assert.equal(logAlocacao.operadorPerfil, 'secretaria');
   console.log('✓ 8. Pilar B: Regulação, Fila Pública Auditável, Liminares & Auditoria OK');
 
+  // 9. MÓDULO WHATSAPP: WEBHOOK DE ENTRADA, STATUS E DISPARO DE TESTE
+  // 9.1. Handshake do Webhook Meta (hub.challenge)
+  const rMetaChallenge = await fetch(
+    `${BASE_URL}/api/v1/webhook/whatsapp?hub.mode=subscribe&hub.verify_token=patos-whatsapp-verify-2026&hub.challenge=CHALLENGE_PATOS_123`,
+  );
+  assert.equal(rMetaChallenge.status, 200);
+  const textChallenge = await rMetaChallenge.text();
+  assert.equal(textChallenge, 'CHALLENGE_PATOS_123');
+
+  // 9.2. Recebimento de Mensagem via Webhook (POST)
+  const rWebhookPost = await fetch(`${BASE_URL}/api/v1/webhook/whatsapp`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: '5583999991234',
+      text: 'Olá, gostaria de ajuda com as matrículas',
+    }),
+  });
+  assert.equal(rWebhookPost.status, 200);
+  const dataWebhookPost = await rWebhookPost.json();
+  assert.equal(dataWebhookPost.ok, true);
+  assert.equal(dataWebhookPost.resultado.acao, 'menu_ajuda_respondido');
+
+  // 9.3. Status e Métricas do Gateway (SEDUC RBAC)
+  const rWhatsStatus = await fetch(`${BASE_URL}/api/v1/gestao/whatsapp/status`, {
+    headers: { Authorization: `Bearer ${tokenSeduc}` },
+  });
+  assert.equal(rWhatsStatus.status, 200);
+  const dataWhatsStatus = await rWhatsStatus.json();
+  assert.ok(dataWhatsStatus.metricas.provedorAtivo);
+  assert.ok(typeof dataWhatsStatus.metricas.totalEnviadas === 'number');
+
+  // 9.4. Disparo de Teste (SEDUC)
+  const rWhatsTeste = await fetch(`${BASE_URL}/api/v1/gestao/whatsapp/teste`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${tokenSeduc}`,
+    },
+    body: JSON.stringify({ telefone: '(83) 98888-9999' }),
+  });
+  assert.equal(rWhatsTeste.status, 200);
+  const dataWhatsTeste = await rWhatsTeste.json();
+  assert.equal(dataWhatsTeste.ok, true);
+  console.log('✓ 9. Webhook WhatsApp, Handshake Meta, Métricas & Teste SEDUC OK');
+
   console.log('\n======================================================');
   console.log(' TODOS OS TESTES PASSARAM COM 100% DE SUCESSO! ');
   console.log('======================================================\n');

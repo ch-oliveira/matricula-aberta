@@ -1,3 +1,4 @@
+import { normalizarTelefoneWhatsApp } from './utils.ts';
 import type { WhatsAppMessageResult, WhatsAppProvider } from './whatsapp.interface.ts';
 
 /**
@@ -16,7 +17,7 @@ export class EvolutionWhatsAppAdapter implements WhatsAppProvider {
   }
 
   async enviarMensagem(destinatario: string, texto: string): Promise<WhatsAppMessageResult> {
-    const limpo = destinatario.replace(/\D/g, '');
+    const limpo = normalizarTelefoneWhatsApp(destinatario);
     const endpoint = this.apiUrl.includes('/message/sendText')
       ? this.apiUrl
       : `${this.apiUrl}/message/sendText/${this.instance}`;

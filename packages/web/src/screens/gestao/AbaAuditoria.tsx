@@ -1,5 +1,8 @@
+import { useEffect, useState } from 'react';
 import { Icone } from '../../components/Icone';
+import { toast } from '../../components/Toasts';
 import type { LogAuditoria } from '../../domain/types';
+import { vagasStore } from '../../services/vagasStore';
 import { formatarAcaoAuditoria } from './auditoriaUtils';
 
 interface Props {
@@ -21,8 +24,93 @@ export function AbaAuditoria({
   filtroAcaoAuditoria,
   setFiltroAcaoAuditoria,
 }: Props) {
+  const [statusWhats, setStatusWhats] = useState<{
+    provedorAtivo: string;
+    totalEnviadas: number;
+    totalSucessos: number;
+    totalFalhas: number;
+  } | null>(null);
+  const [telTeste, setTelTeste] = useState('(83) 99999-0000');
+  const [testandoWhats, setTestandoWhats] = useState(false);
+
+  useEffect(() => {
+    vagasStore.obterStatusWhatsApp().then(setStatusWhats).catch(() => {});
+  }, []);
+
+  async function handleDispararTeste() {
+    if (!telTeste || telTeste.replace(/\D/g, '').length < 10) {
+      toast('Informe um número válido com DDD para o teste.', { emoji: 'warning', tom: 'aviso' });
+      return;
+    }
+    setTestandoWhats(true);
+    try {
+      await vagasStore.dispararTesteWhatsApp(telTeste);
+      toast('Mensagem de teste disparada com sucesso no gateway!', { emoji: 'whatsapp', tom: 'ok' });
+      const novoStatus = await vagasStore.obterStatusWhatsApp();
+      setStatusWhats(novoStatus);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Falha ao disparar teste.';
+      toast(msg, { emoji: 'cross', tom: 'aviso' });
+    } finally {
+      setTestandoWhats(false);
+    }
+  }
+
   return (
     <section className="sec-bloco sec-bloco-coluna">
+      {/* Card de Monitoramento e Governança do Gateway WhatsApp */}
+      <div className="card-kpi-governo">
+        <div className="card-kpi-topo">
+          <div className="card-kpi-icone-box">
+            <Icone nome="whatsapp" tamanho={22} />
+          </div>
+          <div>
+            <h3 className="card-kpi-titulo">Gateway de Notificações WhatsApp</h3>
+            <p className="legenda sem-margem-topo">
+              Provedor ativo:{' '}
+              <span className="badge-sucesso-destaque">
+                {statusWhats?.provedorAtivo ?? 'mock-local'}
+              </span>
+              {' · '}Disparos automáticos: Lembrete matinal (07h) e 1h antes da visita
+            </p>
+          </div>
+        </div>
+
+        <div className="kpi-mini-grid">
+          <div className="kpi-mini-item">
+            <span className="kpi-mini-rotulo">Total Disparadas</span>
+            <strong className="kpi-mini-valor">{statusWhats?.totalEnviadas ?? 0}</strong>
+          </div>
+          <div className="kpi-mini-item">
+            <span className="kpi-mini-rotulo">Entregas Bem-Sucedidas</span>
+            <strong className="kpi-mini-valor texto-cor-verde">{statusWhats?.totalSucessos ?? 0}</strong>
+          </div>
+          <div className="kpi-mini-item">
+            <span className="kpi-mini-rotulo">Falhas de Conexão</span>
+            <strong className="kpi-mini-valor texto-cor-muted">{statusWhats?.totalFalhas ?? 0}</strong>
+          </div>
+        </div>
+
+        <div className="linha-teste-whatsapp">
+          <label htmlFor="input-tel-teste-whats" className="sr-only">Telefone para teste</label>
+          <input
+            id="input-tel-teste-whats"
+            type="tel"
+            className="input-teste-whats"
+            placeholder="(83) 99999-0000"
+            value={telTeste}
+            onChange={(e) => setTelTeste(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn-primario btn-pequeno"
+            onClick={handleDispararTeste}
+            disabled={testandoWhats}
+          >
+            {testandoWhats ? 'Disparando...' : 'Enviar Mensagem de Teste'}
+          </button>
+        </div>
+      </div>
       <div>
         <h2 className="titulo-com-icone">
           <Icone nome="history" tamanho={22} /> Trilha de Auditoria Governamental (TCE-PB / MP-PB)

@@ -997,6 +997,39 @@ export const vagasStore = {
     const json = (await res.json()) as { ok: boolean; logs: LogAuditoria[] };
     return json.logs ?? [];
   },
+
+  async obterStatusWhatsApp(): Promise<{
+    provedorAtivo: string;
+    totalEnviadas: number;
+    totalSucessos: number;
+    totalFalhas: number;
+    ultimas: Array<{ id: string; telefone: string; codigoProtocolo: string; tipo: string; enviadoEm: number; sucesso: boolean; provedor: string; resposta?: string }>;
+  }> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/whatsapp/status`, {
+      headers: headersAutenticados('secretaria', true),
+    });
+    if (!res.ok) {
+      throw new Error('Falha ao carregar status do gateway de WhatsApp.');
+    }
+    const json = (await res.json()) as { ok: boolean; metricas: any };
+    return json.metricas;
+  },
+
+  async dispararTesteWhatsApp(telefone: string): Promise<{ ok: boolean; resposta?: string }> {
+    const res = await fetch(`${API_BASE}/api/v1/gestao/whatsapp/teste`, {
+      method: 'POST',
+      headers: {
+        ...headersAutenticados('secretaria', true),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ telefone }),
+    });
+    if (!res.ok) {
+      const msg = await extrairMensagemErro(res, 'Falha ao disparar teste de WhatsApp.');
+      throw new Error(msg);
+    }
+    return (await res.json()) as { ok: boolean; resposta?: string };
+  },
 };
 
 export function useCatalogo(): CatalogoMunicipioDTO {

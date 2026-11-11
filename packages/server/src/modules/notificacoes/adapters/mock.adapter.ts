@@ -1,3 +1,4 @@
+import { normalizarTelefoneWhatsApp } from './utils.ts';
 import type { WhatsAppMessageResult, WhatsAppProvider } from './whatsapp.interface.ts';
 
 /**
@@ -13,8 +14,9 @@ export class MockWhatsAppAdapter implements WhatsAppProvider {
   }
 
   async enviarMensagem(destinatario: string, texto: string): Promise<WhatsAppMessageResult> {
+    const limpo = normalizarTelefoneWhatsApp(destinatario);
     if (this.registrarLog) {
-      console.log(`[WhatsApp Mock] Para: ${destinatario} | Texto: ${texto.slice(0, 80).replace(/\n/g, ' ')}...`);
+      console.log(`[WhatsApp Mock] Para: ${limpo} | Texto: ${texto.slice(0, 80).replace(/\n/g, ' ')}...`);
     }
     return {
       ok: true,
