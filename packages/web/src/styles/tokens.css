@@ -1,0 +1,159 @@
+/* ==========================================================================
+   Matrícula Aberta — Design System Enxuto + Fun Isometric
+   Bordas nítidas, sombras deslocadas estilo "slab", tipografia limpa,
+   alvos de toque ≥ 48px, suporte a light-dark() e alto contraste.
+   ========================================================================== */
+
+:root {
+  color-scheme: light dark;
+
+  &:has(> head > meta[name='color-scheme'][content='dark']) {
+    color-scheme: dark;
+  }
+  &:has(> head > meta[name='color-scheme'][content='light']) {
+    color-scheme: light;
+  }
+
+  --bg: light-dark(#fcf8f2, #141220);
+  --bg-deco: light-dark(#fae8cb, #211c36);
+  --surface: light-dark(#ffffff, #1e1a30);
+  --surface-2: light-dark(#f6f3fc, #282240);
+  --ink: light-dark(#181528, #f5f3ff);
+  --muted: light-dark(#56506e, #bab3d9);
+  --line: light-dark(#181528, #4b4270);
+  --shadow-ink: light-dark(#181528, #0b0816);
+  --soft-line: light-dark(#ded8ee, #362f52);
+
+  --primary: light-dark(#5538d4, #8c75ff);
+  --primary-ink: light-dark(#ffffff, #130e26);
+  --primary-soft: light-dark(#ece8ff, #2d2452);
+  --accent: light-dark(#5538d4, #8c75ff);
+  --coral: #ff7a59;
+  --sun: #ffd24c;
+  --mint: #9be3c3;
+  --whats: light-dark(#128c4a, #25d366);
+
+  --ok: light-dark(#0f7347, #56e3a6);
+  --ok-bg: light-dark(#dcf6e8, #14382b);
+  --warn: light-dark(#8a4b00, #ffc86b);
+  --warn-bg: light-dark(#fff1cf, #3b2b0d);
+  --wait: light-dark(#b42318, #ff8f80);
+  --wait-bg: light-dark(#fde4e1, #3e1916);
+
+  --r-sm: 12px;
+  --r: 20px;
+  --r-lg: 26px;
+  --shadow: 4px 4px 0 var(--shadow-ink);
+  --shadow-sm: 2px 2px 0 var(--shadow-ink);
+  --shadow-lg: 6px 6px 0 var(--shadow-ink);
+  --font: 'Nunito', ui-rounded, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+html[data-fonte='grande'] {
+  font-size: 118.75%;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scroll-padding-block: 88px 40px;
+}
+
+@media (max-width: 760px) {
+  html {
+    scroll-padding-block: 92px 20px;
+  }
+  .lp-secao,
+  .palco-etapa,
+  .lp-hero-wrapper,
+  section[id],
+  h1[id],
+  h2[id] {
+    scroll-margin-top: 94px;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 1.03rem;
+  line-height: 1.5;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 6% 0%, var(--bg-deco) 0 240px, transparent 241px),
+    radial-gradient(circle at 96% 16%, var(--primary-soft) 0 220px, transparent 221px),
+    var(--bg);
+  background-attachment: fixed;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.16;
+  letter-spacing: -0.018em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--primary);
+}
+
+:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+h1:focus {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  clip-path: inset(50%);
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  white-space: nowrap;
+}
+
+.pular {
+  position: absolute;
+  inset-inline-start: 12px;
+  inset-block-start: -100px;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 12px 18px;
+  border-radius: var(--r-sm);
+  z-index: 100;
+  font-weight: 800;
+}
+.pular:focus {
+  inset-block-start: 12px;
+}
+

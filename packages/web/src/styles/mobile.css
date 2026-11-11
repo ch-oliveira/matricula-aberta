@@ -1,0 +1,897 @@
+/* ==========================================================================
+   OTIMIZAÇÃO MOBILE (max-width: 640px)
+   Espaçamentos equilibrados, tipografia proporcional e ergonomia touch
+   ========================================================================== */
+
+@media (max-width: 640px) {
+  /* --- Landing Page --- */
+  .landing {
+    gap: 22px;
+  }
+  .lp-secao {
+    gap: 14px;
+    scroll-margin-top: 94px;
+  }
+  .lp-hero-wrapper {
+    border-width: 2px;
+    border-radius: var(--r);
+    box-shadow: var(--shadow);
+  }
+  .lp-hero {
+    padding: 16px 14px 14px;
+    gap: 14px;
+  }
+  .lp-hero-texto {
+    gap: 12px;
+  }
+  .lp-selo-vivo {
+    font-size: 0.76rem;
+    padding: 3px 10px;
+    gap: 6px;
+  }
+  .lp-hero-texto h1 {
+    font-size: clamp(1.36rem, 5.8vw, 1.72rem);
+    line-height: 1.15;
+  }
+  .lp-grifo {
+    padding-inline: 6px;
+    border-radius: 8px;
+    border-width: 1.5px;
+  }
+  .lp-subtitulo {
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+  .lp-cta-linha {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    gap: 8px;
+  }
+  .btn-hero {
+    min-block-size: 48px;
+    width: 100%;
+    font-size: 0.96rem;
+    padding-inline: 16px;
+    justify-content: center;
+  }
+  .lp-cta-linha .btn-secundario {
+    min-block-size: 42px;
+    width: 100%;
+    font-size: 0.88rem;
+    justify-content: center;
+  }
+  .lp-garantias {
+    gap: 6px 12px;
+    font-size: 0.78rem;
+    margin: 2px 0 0;
+  }
+  .lp-check {
+    inline-size: 18px;
+    block-size: 18px;
+    font-size: 0.68rem;
+  }
+  .lp-hero-ilustracao {
+    padding-block: 0 4px;
+  }
+  .dupla3d-palco {
+    max-inline-size: 240px;
+    margin-inline: auto;
+  }
+  .dupla3d-svg {
+    max-block-size: 200px;
+  }
+  .dupla3d-dica {
+    font-size: 0.72rem;
+    margin-block-start: -4px;
+  }
+
+  /* Faixa de etapas no rodapé do hero */
+  .lp-faixa-etapas {
+    padding: 14px 12px 16px;
+    gap: 10px;
+    border-block-start-width: 1.5px;
+  }
+  .lp-faixa-topo {
+    gap: 4px;
+  }
+  .lp-faixa-topo h2 {
+    font-size: 1rem;
+    line-height: 1.2;
+  }
+  .lp-faixa-dica {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+  }
+  .lp-etapas-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .lp-etapa-card {
+    padding: 10px 10px 8px;
+    gap: 4px;
+    border-radius: var(--r-sm);
+    border-block-start-width: 5px;
+  }
+  .lp-etapa-card:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+  .lp-etapa-card-topo strong {
+    font-size: 0.86rem;
+  }
+  .lp-etapa-card-topo small {
+    font-size: 0.72rem;
+  }
+  .lp-etapa-icone {
+    font-size: 1.15rem;
+  }
+  .lp-etapa-card-rodape {
+    font-size: 0.72rem;
+    padding-block-start: 2px;
+  }
+  .lp-etapa-vagas-pill {
+    font-size: 0.7rem;
+    padding: 1px 6px;
+  }
+
+  /* Seção "Como funciona em 3 passos" */
+  .lp-secao-cabecalho {
+    gap: 4px;
+  }
+  .lp-secao-cabecalho h2 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+  .lp-tag {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+  }
+  .lp-passos-grade {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .lp-passo-card {
+    padding: 14px 12px;
+    gap: 6px;
+    border-radius: var(--r-sm);
+  }
+  .lp-passo-num {
+    inline-size: 30px;
+    block-size: 30px;
+    font-size: 0.82rem;
+    border-radius: 8px;
+  }
+  .lp-passo-sticker {
+    margin-block: -4px -2px;
+  }
+  .lp-passo-sticker canvas,
+  .lp-passo-sticker svg {
+    max-inline-size: 46px;
+    block-size: auto;
+  }
+  .lp-passo-card h3 {
+    font-size: 1rem;
+  }
+  .lp-passo-card p {
+    font-size: 0.86rem;
+    line-height: 1.4;
+  }
+
+  /* CTA Lateral + FAQ */
+  .lp-rodape-duplo {
+    gap: 16px;
+  }
+  .lp-cta-lateral {
+    padding: 16px 14px;
+    gap: 10px;
+    border-radius: var(--r-sm);
+    border-width: 2px;
+  }
+  .lp-cta-lateral-topo {
+    gap: 8px;
+  }
+  .lp-cta-lateral-topo canvas,
+  .lp-cta-lateral-topo svg {
+    max-inline-size: 44px;
+    block-size: auto;
+  }
+  .lp-cta-lateral h2 {
+    font-size: 1.22rem;
+  }
+  .lp-cta-lateral p {
+    font-size: 0.88rem;
+    line-height: 1.4;
+  }
+  .lp-cta-final-botoes {
+    gap: 8px;
+  }
+  .lp-cta-final-botoes .btn {
+    min-block-size: 44px;
+    font-size: 0.92rem;
+  }
+  .lp-faq-coluna {
+    gap: 10px;
+  }
+  .lp-faq-coluna h2 {
+    font-size: 1.22rem;
+  }
+  .lp-faq {
+    gap: 8px;
+  }
+  .lp-faq-item {
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+  }
+  .lp-faq-item summary {
+    font-size: 0.92rem;
+    gap: 8px;
+  }
+  .lp-faq-item summary::after {
+    inline-size: 24px;
+    block-size: 24px;
+    font-size: 0.85rem;
+    border-width: 1.5px;
+  }
+  .lp-faq-item p {
+    font-size: 0.86rem;
+    line-height: 1.42;
+    margin-block-start: 8px;
+    padding-block-start: 8px;
+  }
+
+  /* Rodapé */
+  .rodape {
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+  }
+  .rodape-interno {
+    font-size: 0.82rem;
+    gap: 14px;
+  }
+  .rodape-grade {
+    gap: 14px;
+  }
+  .rodape-col {
+    gap: 6px;
+  }
+  .rodape-endereco-compacto {
+    font-size: 0.78rem;
+  }
+  .rodape-titulo {
+    font-size: 0.76rem;
+  }
+  .rodape-item-link {
+    font-size: 0.82rem;
+    min-block-size: 32px;
+    padding: 4px 6px;
+    margin-inline-start: -6px;
+  }
+  .rodape-base {
+    padding-block-start: 10px;
+    gap: 8px;
+  }
+  .rodape-copyright {
+    font-size: 0.75rem;
+  }
+  .rodape-pill-btn {
+    font-size: 0.74rem;
+    min-block-size: 28px;
+    padding-inline: 9px;
+  }
+  .link-sutil {
+    font-size: 0.82rem;
+    padding: 4px 6px;
+    min-block-size: 32px;
+  }
+
+  /* --- Wizard de Consulta: Stepper & Palco --- */
+  .stepper {
+    padding: 6px 4px;
+    border-radius: var(--r-sm);
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .stepper ol {
+    gap: 3px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    min-inline-size: 0;
+    width: 100%;
+  }
+  .passo {
+    min-inline-size: 0;
+  }
+  .passo button {
+    flex-direction: column;
+    text-align: center;
+    gap: 2px;
+    padding: 4px 1px;
+    border-radius: 8px;
+    min-block-size: 38px;
+    justify-content: center;
+    min-inline-size: 0;
+    width: 100%;
+  }
+  .passo-bolha {
+    inline-size: 24px;
+    block-size: 24px;
+    font-size: 0.72rem;
+    border-radius: 7px;
+    border-width: 1.5px;
+  }
+  .passo-textos {
+    min-inline-size: 0;
+    width: 100%;
+    text-align: center;
+  }
+  .passo-rotulo {
+    font-size: 0.68rem;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    width: 100%;
+  }
+  .passo-desc {
+    display: none;
+  }
+
+  .palco-etapa {
+    padding: 14px 12px;
+    gap: 14px;
+    border-radius: var(--r-sm);
+    border-width: 2px;
+    box-shadow: 2.5px 2.5px 0 var(--shadow-ink);
+    min-inline-size: 0;
+    min-width: 0;
+    max-inline-size: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .etapa {
+    gap: 14px;
+    min-inline-size: 0;
+    min-width: 0;
+    max-inline-size: 100%;
+    width: 100%;
+  }
+  .titulo-etapa {
+    gap: 8px;
+    padding-block-end: 10px;
+  }
+  .titulo-sticker canvas,
+  .titulo-sticker svg {
+    max-inline-size: 40px;
+    block-size: auto;
+  }
+  .titulo-emoji {
+    font-size: 1.5rem;
+  }
+  .titulo-textos h1 {
+    font-size: 1.22rem;
+    line-height: 1.15;
+  }
+  .titulo-textos p {
+    font-size: 0.84rem;
+    line-height: 1.38;
+  }
+  .btn-ouvir {
+    min-block-size: 30px;
+    padding-inline: 9px;
+    font-size: 0.76rem;
+    box-shadow: 1px 1px 0 var(--line);
+  }
+
+  /* Etapa 1: Quem vai estudar? */
+  .campo {
+    gap: 4px;
+  }
+  .campo label {
+    font-size: 0.88rem;
+  }
+  .campo input,
+  .campo select {
+    min-block-size: 44px;
+    padding: 8px 10px;
+    font-size: 0.92rem;
+    border-radius: var(--r-sm);
+    box-sizing: border-box;
+    width: 100%;
+    max-inline-size: 100%;
+  }
+  .atalhos-idade-container {
+    gap: 6px;
+    min-inline-size: 0;
+    width: 100%;
+  }
+  .atalhos-idade-rotulo {
+    font-size: 0.8rem;
+  }
+  .atalhos-idade-grade {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    min-inline-size: 0;
+    width: 100%;
+  }
+  .btn-atalho-idade {
+    min-inline-size: 0;
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 0.78rem;
+    gap: 4px;
+    justify-content: flex-start;
+    box-shadow: 1.5px 1.5px 0 var(--line);
+    border-radius: 9px;
+    min-block-size: 38px;
+    box-sizing: border-box;
+  }
+  .btn-atalho-idade:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    max-inline-size: 260px;
+    margin-inline: auto;
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-atalho-idade strong {
+    font-size: 0.76rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .btn-atalho-idade small {
+    font-size: 0.68rem;
+    padding: 1px 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-inline-start: auto;
+  }
+  .btn-atalho-idade:last-child:nth-child(odd) small {
+    margin-inline-start: 0;
+  }
+
+  .grade-etapas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    min-inline-size: 0;
+  }
+  .grade-etapas legend {
+    font-size: 0.82rem;
+    margin-block-end: 6px;
+  }
+  .chip-etapa {
+    padding: 8px 10px;
+    gap: 3px;
+    border-radius: var(--r-sm);
+    border-width: 1.5px;
+    min-inline-size: 0;
+  }
+  .chip-etapa:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    max-inline-size: 260px;
+    margin-inline: auto;
+    width: 100%;
+  }
+  .chip-etapa-emoji {
+    font-size: 1.22rem;
+  }
+  .chip-etapa-nome {
+    font-size: 0.88rem;
+  }
+  .chip-etapa-faixa {
+    font-size: 0.72rem;
+  }
+  .chip-etapa-vagas {
+    margin-block-start: 2px;
+    gap: 2px;
+  }
+  .chip-etapa-vagas small {
+    font-size: 0.7rem;
+  }
+
+  /* Barra de Navegação Inferior Elegante (Lado a Lado no Mobile) */
+  .barra-acao {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding-block-start: 12px;
+    margin-block-start: 2px;
+    width: 100%;
+    min-inline-size: 0;
+  }
+  .barra-acao .btn {
+    min-block-size: 42px;
+    font-size: 0.88rem;
+    padding-inline: 12px;
+    justify-content: center;
+    white-space: nowrap;
+    box-sizing: border-box;
+  }
+  .barra-acao .btn-fantasma {
+    flex: 0 0 auto;
+    min-block-size: 42px;
+    font-size: 0.82rem;
+    padding-inline: 10px;
+    box-shadow: 1.5px 1.5px 0 var(--shadow-ink);
+  }
+  .barra-acao .btn-crescer {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  /* Painéis Laterais Compactados no Mobile */
+  .consulta-lateral {
+    position: static;
+    gap: 8px;
+    margin-block-start: 4px;
+  }
+  .painel-resumo,
+  .painel-familia {
+    padding: 10px 12px;
+    gap: 6px;
+    border-radius: var(--r-sm);
+    border-width: 1.5px;
+    box-shadow: var(--shadow-sm);
+  }
+  .painel-resumo-topo,
+  .painel-familia-topo {
+    gap: 8px;
+  }
+  .painel-resumo-topo canvas,
+  .painel-resumo-topo svg,
+  .painel-familia-topo canvas,
+  .painel-familia-topo svg {
+    max-inline-size: 30px;
+    block-size: auto;
+  }
+  .painel-resumo-topo h2,
+  .painel-familia-topo h3 {
+    font-size: 0.9rem;
+  }
+  .painel-resumo-topo p,
+  .painel-familia-topo p {
+    font-size: 0.72rem;
+  }
+  .resumo-lista {
+    gap: 4px;
+  }
+  .resumo-lista > div {
+    padding: 5px 8px;
+    border-radius: 6px;
+  }
+  .resumo-lista dt {
+    font-size: 0.66rem;
+  }
+  .resumo-lista dd {
+    font-size: 0.82rem;
+  }
+  .resumo-lista dd small {
+    font-size: 0.72rem;
+  }
+  .painel-familia-texto {
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+  .painel-familia .btn {
+    min-block-size: 36px;
+    font-size: 0.82rem;
+    padding-inline: 10px;
+  }
+
+  /* Etapa 2: Bairro & Filtros */
+  .chips {
+    gap: 6px;
+  }
+  .chips-raio {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  .chips-raio .chip span {
+    min-block-size: 38px;
+    padding-inline: 2px;
+    font-size: 0.82rem;
+    justify-content: center;
+  }
+  .chips-periodo {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    width: 100%;
+  }
+  .chips-periodo .chip span {
+    min-block-size: 38px;
+    padding-inline: 2px;
+    font-size: 0.78rem;
+    gap: 3px;
+    justify-content: center;
+  }
+  .chip span {
+    min-block-size: 38px;
+    padding: 6px 10px;
+    font-size: 0.84rem;
+  }
+
+  /* Etapa 3: Vagas */
+  .placar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 12px;
+    border-radius: var(--r-sm);
+  }
+  .placar-principal {
+    justify-content: space-between;
+    align-items: center;
+  }
+  .placar-numero {
+    font-size: 2rem;
+  }
+  .placar-rotulo {
+    font-size: 0.82rem;
+  }
+  .placar-semaforo {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    text-align: center;
+    font-size: 0.76rem;
+    padding: 0;
+  }
+  .placar-semaforo li {
+    padding: 6px 4px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--soft-line);
+    justify-content: center;
+  }
+  .barra-ferramentas {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .segmentado {
+    width: 100%;
+  }
+  .segmentado label {
+    flex: 1;
+    min-block-size: 38px;
+    justify-content: center;
+    font-size: 0.84rem;
+  }
+
+  /* Card da Escola */
+  .card-escola {
+    padding: 12px 14px;
+    gap: 8px;
+    border-radius: var(--r-sm);
+    border-inline-start-width: 7px;
+  }
+  .card-topo {
+    gap: 10px;
+  }
+  .card-avatar {
+    inline-size: 38px;
+    block-size: 38px;
+    font-size: 1.22rem;
+    border-radius: 10px;
+  }
+  .card-nome h2,
+  .card-nome h3 {
+    font-size: 1.02rem;
+  }
+  .card-nome p {
+    font-size: 0.82rem;
+  }
+  .card-numero {
+    font-size: 0.94rem;
+  }
+  .card-acoes {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .card-acoes .btn {
+    width: 100%;
+    min-block-size: 44px;
+  }
+  .btn-comparar > span {
+    min-block-size: 38px;
+    justify-content: center;
+    width: 100%;
+    font-size: 0.82rem;
+  }
+
+  /* Etapa 4: Visita & Protocolo */
+  .card-escolhida {
+    border-radius: var(--r-sm);
+    padding: 12px;
+  }
+  .protocolo-bilhete {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+    padding: 12px;
+    gap: 12px;
+  }
+  .protocolo-qr-svg {
+    inline-size: 110px;
+    block-size: 110px;
+  }
+  .protocolo-codigo-destaque {
+    font-size: 1.35rem;
+  }
+  .checklist-item {
+    min-block-size: 44px;
+    padding: 8px 10px;
+    gap: 8px;
+    font-size: 0.86rem;
+  }
+
+  /* Painel de Gestão & Topo & Login */
+  .gestao {
+    padding: 0 10px 40px;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    overflow-x: hidden;
+  }
+  .gestao-topo-interno {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px 10px;
+    inline-size: 100%;
+    padding-block: 4px;
+  }
+  .gestao-topo-interno .marca {
+    grid-column: 1 / 2;
+  }
+  .gestao-topo-interno .gestao-topo-acoes {
+    grid-column: 2 / 3;
+    justify-content: flex-end;
+  }
+  .gestao-topo-interno .gestao-topo-acoes .btn {
+    padding-inline: 8px;
+    font-size: 0.78rem;
+    min-block-size: 34px;
+  }
+  .gestao-topo-interno .topo-nav {
+    grid-column: 1 / -1;
+    inline-size: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 3px;
+    box-sizing: border-box;
+    gap: 2px;
+  }
+  .gestao-topo-interno .topo-nav .nav-link {
+    inline-size: 100%;
+    padding-inline: 4px;
+    font-size: 0.76rem;
+    min-block-size: 36px;
+    justify-content: center;
+    gap: 4px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+  .btn-voltar-texto-longo {
+    display: none;
+  }
+  .btn-voltar-texto-curto {
+    display: inline;
+  }
+  .secretaria-hero {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+  .sec-bloco {
+    padding: 12px 8px;
+    gap: 10px;
+    border-radius: var(--r);
+  }
+  .sec-bloco h2 {
+    font-size: 1.05rem;
+  }
+  .sec-bloco .legenda {
+    font-size: 0.8rem;
+    line-height: 1.36;
+  }
+  .login-card {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    padding: 18px 14px;
+    margin: 10px 0;
+    border-radius: var(--r);
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+    box-sizing: border-box;
+  }
+  .login-card-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    inline-size: 100%;
+  }
+  .login-card-topo canvas,
+  .login-card-topo svg {
+    max-inline-size: 40px;
+    flex-shrink: 0;
+  }
+  .login-card-topo .lp-tag {
+    font-size: 0.7rem;
+    padding: 3px 6px;
+    white-space: normal;
+    text-align: right;
+    max-inline-size: 72%;
+    line-height: 1.2;
+  }
+  .login-card h1 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+  .login-card .legenda {
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+  .login-card .campo select,
+  .login-card .campo input {
+    font-size: 0.92rem;
+    min-block-size: 44px;
+  }
+  .login-dica-homologacao {
+    padding: 10px 12px;
+    font-size: 0.78rem;
+  }
+
+  /* Toasts & Bandeja */
+  .toasts {
+    inset-block-start: 8px;
+    padding-inline: 8px;
+  }
+  .toast {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    border-radius: var(--r-sm);
+    max-inline-size: 94vw;
+  }
+  .bandeja-comparar {
+    padding: 8px 12px;
+    gap: 8px;
+    border-radius: var(--r-sm);
+    font-size: 0.84rem;
+    inset-block-end: calc(10px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 480px) {
+  .marca-nome small {
+    display: none;
+  }
+  .conteudo-container {
+    padding: 8px 10px 32px;
+  }
+  .palco-etapa {
+    padding: 12px 10px;
+  }
+  .lp-hero {
+    padding: 14px 10px 12px;
+  }
+  .lp-hero-texto h1 {
+    font-size: 1.32rem;
+  }
+  .lp-faixa-etapas {
+    padding: 12px 10px 14px;
+  }
+  .lp-passo-card {
+    padding: 12px 10px;
+  }
+  .card-escola {
+    padding: 10px 12px;
+  }
+}
+
