@@ -310,3 +310,4 @@ export const handleCidadaoRoutes: RouteHandler = async (
 
   return false;
 };
+

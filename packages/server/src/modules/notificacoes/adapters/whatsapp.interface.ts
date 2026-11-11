@@ -12,3 +12,4 @@ export interface WhatsAppProvider {
   readonly nome: string;
   enviarMensagem(destinatario: string, texto: string): Promise<WhatsAppMessageResult>;
 }
+

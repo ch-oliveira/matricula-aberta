@@ -24,3 +24,4 @@ export class MockWhatsAppAdapter implements WhatsAppProvider {
     };
   }
 }
+

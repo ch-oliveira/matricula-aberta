@@ -30,6 +30,7 @@ export class ZApiWhatsAppAdapter implements WhatsAppProvider {
           phone: limpo,
           message: texto,
         }),
+        signal: AbortSignal.timeout(10_000),
       });
 
       const bodyTexto = await resp.text();
@@ -49,3 +50,4 @@ export class ZApiWhatsAppAdapter implements WhatsAppProvider {
     }
   }
 }
+

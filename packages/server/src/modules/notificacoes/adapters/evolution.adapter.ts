@@ -32,6 +32,7 @@ export class EvolutionWhatsAppAdapter implements WhatsAppProvider {
           number: limpo,
           text: texto,
         }),
+        signal: AbortSignal.timeout(10_000),
       });
 
       const bodyTexto = await resp.text();
@@ -51,3 +52,4 @@ export class EvolutionWhatsAppAdapter implements WhatsAppProvider {
     }
   }
 }
+

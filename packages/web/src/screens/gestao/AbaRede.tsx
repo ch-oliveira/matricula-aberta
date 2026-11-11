@@ -249,3 +249,4 @@ export function AbaRede({ painel, agora, onAbrirUnidade }: Props) {
     </>
   );
 }
+

@@ -53,3 +53,4 @@ export const handleCronRoutes: RouteHandler = async (
 
   return false;
 };
+

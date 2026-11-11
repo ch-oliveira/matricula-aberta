@@ -5,3 +5,4 @@ export * from './mock.adapter.ts';
 export * from './webhook.adapter.ts';
 export * from './whatsapp.interface.ts';
 export * from './zapi.adapter.ts';
+

@@ -81,3 +81,4 @@ export function obterProvedorAtivo(): WhatsAppProvider {
 export function definirProvedorWhatsApp(provedor: WhatsAppProvider | null): void {
   provedorSobrescrito = provedor;
 }
+

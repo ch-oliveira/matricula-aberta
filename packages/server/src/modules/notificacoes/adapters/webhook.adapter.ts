@@ -41,6 +41,7 @@ export class WebhookWhatsAppAdapter implements WhatsAppProvider {
           mensagem: texto,
           enviadoEm: Date.now(),
         }),
+        signal: AbortSignal.timeout(10_000),
       });
 
       const bodyTexto = await resp.text();
@@ -60,3 +61,4 @@ export class WebhookWhatsAppAdapter implements WhatsAppProvider {
     }
   }
 }
+

@@ -281,3 +281,4 @@ export function ComprovanteVoucher({
     </div>
   );
 }
+
